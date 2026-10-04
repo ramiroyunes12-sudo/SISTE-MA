@@ -1,0 +1,11 @@
+// Esquema de la base de datos: acá se definen las tablas (paso 3).
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
