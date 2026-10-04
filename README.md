@@ -8,12 +8,12 @@ Venta de entradas por lotes con QR enviado por mail y validación en la puerta.
 
 ## Correrlo en tu compu
 
-Necesitás **Node.js 20.9 o más nuevo** (versión LTS de nodejs.org) y **Git**.
+Necesitás **Node.js 22.12 o más nuevo** (lo más fácil: bajá la versión LTS de nodejs.org) y **Git**.
 
 ```bash
 git clone https://github.com/ramiroyunes12-sudo/SISTE-MA.git
 cd SISTE-MA
-npm install       # baja las librerías (solo la primera vez)
+npm install       # baja las librerías (la primera vez y cada vez que bajes cambios con git pull)
 npm run dev       # levanta el sistema
 ```
 
