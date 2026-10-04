@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+/* Colores del diseño (https://claude.ai/artifact/TEQZ3qY3s5V2eufJfgSWtJ) */
+@theme {
+  --color-fondo: #f5f5f2;
+  --color-superficie: #ffffff;
+  --color-tinta: #15171c;
+  --color-tenue: #5b5f69;
+  --color-borde: #e2e2dc;
+  --color-acento: #3b3be8;
+  --color-acento-hover: #2626b8;
+  --color-ok: #157a3a;
+  --color-alerta: #a4510a;
+  --color-error: #b42323;
+}
+
+@theme inline {
+  --font-sans: var(--font-dm-sans);
+  --font-display: var(--font-archivo);
+}
+
+body {
+  background: var(--color-fondo);
+  color: var(--color-tinta);
+}
