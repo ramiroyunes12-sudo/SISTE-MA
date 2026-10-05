@@ -6,9 +6,11 @@ Cada paso termina con algo para probar. Se marca `[x]` cuando está revisado.
 - [x] **1. Crear el proyecto vacío** — Next.js + TypeScript + Tailwind, página de bienvenida.
 - [x] **2. Conectar la base de datos** — PostgreSQL en Supabase + Prisma. https://siste-ma.vercel.app/api/salud → conectada.
   - Ojo: instalar Prisma 7 con versión explícita (`prisma@7`, `@prisma/client@7`). Hoy el `latest` de `prisma` es una 8.0 RC sin `generate` ni `migrate`.
-  - El sistema usa el usuario `entradas_app` (sin permisos de administrador). Todavía no puede crear tablas: en el paso 3 hay que darle permiso sobre su esquema.
-- [ ] **3. Definir las tablas** — Evento, TipoEntrada, Lote, Orden, Entrada, Usuario, Escaneo.
-  - Ojo: las tablas en `public` quedan expuestas por la API de Supabase; activar RLS o usar otro esquema.
+  - El sistema usa el usuario `entradas_app` (sin permisos de administrador).
+- [x] **3. Definir las tablas** — usuarios, eventos, tipos_entrada, lotes, ordenes, pagos, entradas, escaneos.
+  - Esquema `entradas` (no `public`): la API de Supabase no lo publica. Migraciones automáticas en el deploy de producción.
+  - Pendiente (menor): Supabase sugiere índices para 6 claves foráneas (entradas.lote/orden/tipo, validada_por, escaneos.usuario, ordenes.emitida_por). Sumarlos en una migración cuando haya datos.
+  - Para el paso 9: ¿una misma persona (DNI) puede tener dos entradas del mismo evento? Hoy la base lo permite.
 - [ ] **4. Datos de prueba** — seed con un evento de ejemplo.
 
 ## Bloque 1 — Admin: login y evento
