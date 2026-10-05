@@ -4,9 +4,11 @@ Cada paso termina con algo para probar. Se marca `[x]` cuando está revisado.
 
 ## Bloque 0 — Preparar el terreno
 - [x] **1. Crear el proyecto vacío** — Next.js + TypeScript + Tailwind, página de bienvenida.
-- [ ] **2. Conectar la base de datos** — PostgreSQL en Supabase + Prisma.
+- [x] **2. Conectar la base de datos** — PostgreSQL en Supabase + Prisma. https://siste-ma.vercel.app/api/salud → conectada.
   - Ojo: instalar Prisma 7 con versión explícita (`prisma@7`, `@prisma/client@7`). Hoy el `latest` de `prisma` es una 8.0 RC sin `generate` ni `migrate`.
+  - El sistema usa el usuario `entradas_app` (sin permisos de administrador). Todavía no puede crear tablas: en el paso 3 hay que darle permiso sobre su esquema.
 - [ ] **3. Definir las tablas** — Evento, TipoEntrada, Lote, Orden, Entrada, Usuario, Escaneo.
+  - Ojo: las tablas en `public` quedan expuestas por la API de Supabase; activar RLS o usar otro esquema.
 - [ ] **4. Datos de prueba** — seed con un evento de ejemplo.
 
 ## Bloque 1 — Admin: login y evento
