@@ -20,7 +20,9 @@ Cada paso termina con algo para probar. Se marca `[x]` cuando está revisado.
   - Usuarios nuevos o contraseña olvidada: `npm run usuario` (da una contraseña temporal que vence en 72 h y se cambia al entrar; con `--sql` imprime el SQL para Supabase).
   - Revisado por 5 revisores + verificadores: se arreglaron 30 hallazgos (contraseñas comunes, carreras al cambiar la contraseña, mensajes que delataban emails, errores en español, vencimiento de la temporal).
   - Para más adelante (opcional): además del bloqueo por cuenta, limitar intentos por IP con el firewall de Vercel.
-- [ ] **6. Pantalla "Evento y lotes"** — crear/editar evento, tipos y lotes.
+- [x] **6. Pantalla "Evento y lotes"** — crear/editar evento, tipos y lotes. Panel → "Evento y lotes" (`/admin/eventos`).
+  - Precios en pesos ("8.000"), fecha en hora argentina. No deja bajar un cupo por debajo de lo vendido ni quitar lotes o tipos con entradas.
+  - El flyer se sube en el paso 7 (junto con la página pública).
 
 ## Bloque 2 — Página pública
 - [ ] **7. Página del evento** — flyer, datos y lotes con su estado.

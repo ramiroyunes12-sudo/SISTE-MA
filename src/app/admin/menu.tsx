@@ -7,13 +7,18 @@ import { usePathname } from "next/navigation";
 // (El número es el paso del plan en el que se arma cada una.)
 const SECCIONES: { texto: string; href?: string; paso?: number }[] = [
   { texto: "Resumen", href: "/admin" },
-  { texto: "Evento y lotes", paso: 6 },
+  { texto: "Evento y lotes", href: "/admin/eventos" },
   { texto: "Ventas", paso: 20 },
   { texto: "Cortesías", paso: 19 },
   { texto: "Validadores", paso: 17 },
 ];
 
 const base = "flex min-h-11 items-center justify-between gap-2 rounded-lg px-3 text-[15px]";
+
+// Marcada si es esa página o una de adentro (/admin/eventos/…); "Resumen" solo exacta.
+function esActual(ruta: string, href: string) {
+  return ruta === href || (href !== "/admin" && ruta.startsWith(`${href}/`));
+}
 
 export function MenuAdmin() {
   const ruta = usePathname();
@@ -24,7 +29,7 @@ export function MenuAdmin() {
           {href ? (
             <Link
               href={href}
-              aria-current={ruta === href ? "page" : undefined}
+              aria-current={esActual(ruta, href) ? "page" : undefined}
               className={`${base} text-[#D6D7DB] no-underline hover:bg-white/10 aria-[current=page]:bg-[#2E313A] aria-[current=page]:font-bold aria-[current=page]:text-white`}
             >
               {texto}

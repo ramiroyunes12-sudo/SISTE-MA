@@ -99,6 +99,15 @@ npm run usuario -- --sql --email ana@gmail.com --nombre "Ana Gómez" --rol ADMIN
 
 > Si alguien prueba contraseñas sin parar contra un email, esa cuenta queda bloqueada mientras dure el ataque (las sesiones ya abiertas siguen andando), y resetearla no alcanza. La salida es cambiarle el email a ese usuario.
 
+## Eventos y lotes
+
+En el panel, **Evento y lotes** (`/admin/eventos`): crear un evento, editar sus datos, sus tipos de entrada (General, VIP…) y los lotes de cada tipo. Todo se guarda junto con "Guardar cambios" (`src/lib/eventos/guardar.ts`, en una sola transacción).
+
+- Estado: **Borrador** (no se ve), **Publicado** (a la venta) o **Finalizado**. Para publicar hace falta al menos un lote.
+- Se vende de a un lote por vez, en orden: el primero con lugar está "En venta"; cuando se agota, se abre el siguiente (`src/lib/eventos/lotes.ts`).
+- No se puede bajar el cupo de un lote por debajo de lo vendido + reservado, ni quitar lotes o tipos que ya tienen entradas (lo frena también la base).
+- Precios en pesos como se escriben acá ("8.000", "8000,50"); en la base van en centavos (`src/lib/dinero.ts`). Fechas en hora argentina (`src/lib/fechas.ts`).
+
 ## Publicación (Vercel)
 
 El proyecto `siste-ma` de Vercel está conectado a este repo: cada cambio que se sube a GitHub se publica solo en https://siste-ma.vercel.app. Las funciones corren en São Paulo (`gru1`, en `vercel.json`), al lado de la base.
