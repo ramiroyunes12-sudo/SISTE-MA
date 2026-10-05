@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { generarContrasenaTemporal, hashearContrasena, hashFalso, verificarContrasena } from "./contrasenas";
+import { generarContrasenaTemporal, HASH_DE_RELLENO, hashearContrasena, verificarContrasena } from "./contrasenas";
 import { problemaConContrasenaNueva } from "./reglas";
 
 // scrypt tarda ~0,4 s a propósito: estos tests son más lentos que los demás.
@@ -34,6 +34,8 @@ describe("contraseñas", { timeout: 20_000 }, () => {
       "texto cualquiera",
       ["bcrypt", ...partes.slice(1)].join("$"),
       ["scrypt", "30", ...partes.slice(2)].join("$"), // costo absurdo
+      ["scrypt", "18", ...partes.slice(2)].join("$"), // necesitaría más memoria que la permitida
+      ["scrypt", "17", "16", "1", ...partes.slice(4)].join("$"), // ídem
       ["scrypt", "17", "8", "1", partes[4], "corto"].join("$"),
       ["scrypt", "17", "8", "1", "", partes[5]].join("$"), // sin sal
     ]) {
@@ -41,9 +43,11 @@ describe("contraseñas", { timeout: 20_000 }, () => {
     }
   });
 
-  it("el hash de relleno no coincide con nada razonable", async () => {
-    expect(await verificarContrasena("", await hashFalso())).toBe(false);
-    expect(await hashFalso()).toBe(await hashFalso()); // se calcula una sola vez
+  it("el hash de relleno tiene el formato real (tarda lo mismo) y no coincide con nada", async () => {
+    expect(HASH_DE_RELLENO).toMatch(/^scrypt\$17\$8\$1\$[\w-]{22}\$[\w-]{43}$/);
+    for (const intento of ["", "admin", "mate amargo en la costanera"]) {
+      expect(await verificarContrasena(intento, HASH_DE_RELLENO)).toBe(false);
+    }
   });
 
   it("las contraseñas temporales son fáciles de dictar y no se repiten", () => {
@@ -54,12 +58,48 @@ describe("contraseñas", { timeout: 20_000 }, () => {
 });
 
 describe("reglas para una contraseña nueva", () => {
-  it("pide largo mínimo, sin espacios en las puntas y distinta del email", () => {
-    expect(problemaConContrasenaNueva("corta", "a@b.com")).toMatch(/al menos 10/);
-    expect(problemaConContrasenaNueva("x".repeat(129), "a@b.com")).toMatch(/hasta 128/);
-    expect(problemaConContrasenaNueva(" con espacio al principio", "a@b.com")).toMatch(/espacios/);
-    expect(problemaConContrasenaNueva("Ana@Gmail.com", "ana@gmail.com")).toMatch(/email/);
-    expect(problemaConContrasenaNueva("aaaaaaaaaaaa", "a@b.com")).toMatch(/adivinar/);
-    expect(problemaConContrasenaNueva("mate amargo en la costanera", "a@b.com")).toBeNull();
+  const email = "ana.gomez@gmail.com";
+
+  it("pide largo mínimo y máximo, sin espacios en las puntas", () => {
+    expect(problemaConContrasenaNueva("corta", email)).toMatch(/al menos 10/);
+    expect(problemaConContrasenaNueva("x".repeat(129), email)).toMatch(/hasta 128/);
+    expect(problemaConContrasenaNueva(" con espacio al principio", email)).toMatch(/espacios/);
+  });
+
+  it("rechaza las más usadas, secuencias, repeticiones y el propio email", () => {
+    const rechazadas: [string, RegExp][] = [
+      ["1234567890", /letras/],
+      ["0123456789", /letras/],
+      ["contraseña", /más usadas/],
+      ["Contraseña123!", /más usadas/],
+      ["argentina1", /más usadas/],
+      ["password12", /más usadas/],
+      ["Boca Juniors 2024", /más usadas/],
+      ["qwertyuiop", /secuencia/],
+      ["poiuytrewq", /secuencia/],
+      ["1q2w3e4r5t", /secuencia/],
+      ["a1234567890", /secuencia/],
+      ["zxcvbnm123", /secuencia/],
+      ["aaaaaaaaab", /adivinar/],
+      ["abababab12", /adivinar/],
+      ["ab12ab12ab12", /adivinar/],
+      ["Ana.Gomez@Gmail.com", /email/],
+      ["ana.gomez2024", /email/],
+    ];
+    for (const [contrasena, motivo] of rechazadas) {
+      expect(problemaConContrasenaNueva(contrasena, email), contrasena).toMatch(motivo);
+    }
+  });
+
+  it("acepta frases y contraseñas al azar", () => {
+    for (const contrasena of [
+      "mate amargo en la costanera",
+      "tres perros y un gato",
+      "Río Paraná 1816 grande",
+      "x7#k9!q2@zR",
+      "canción-de-cuna",
+    ]) {
+      expect(problemaConContrasenaNueva(contrasena, email), contrasena).toBeNull();
+    }
   });
 });

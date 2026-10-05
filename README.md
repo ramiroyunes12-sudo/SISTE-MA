@@ -77,9 +77,9 @@ TEST_DATABASE_URL="postgresql://usuario:clave@localhost:5432/prueba" npm test
 ## Panel y usuarios
 
 - Se entra por **`/ingresar`**. Los **admin** van al panel (`/admin`); los **validadores**, a la puerta (`/validar`). Un validador no puede entrar al panel.
-- Las contraseñas se guardan cifradas con scrypt (`src/lib/auth/contrasenas.ts`), nunca tal cual.
-- La sesión se cierra a los 7 días sin usarla, y siempre a los 30. "Cerrar sesión" la corta en ese navegador; cambiar la contraseña cierra la de los otros.
-- 5 contraseñas mal seguidas bloquean la cuenta 15 minutos.
+- Las contraseñas se guardan cifradas con scrypt (`src/lib/auth/contrasenas.ts`), nunca tal cual. No se aceptan las muy usadas ("1234567890", "argentina1", "qwertyuiop"…) ni las que contienen el email (`src/lib/auth/reglas.ts`).
+- La sesión se cierra a los 7 días sin usarla, y siempre a los 30. "Cerrar sesión" la corta en ese navegador; cambiar la contraseña cierra todas las demás.
+- 5 contraseñas mal seguidas bloquean la cuenta 15 minutos (después, 1 intento cada 15 minutos hasta acertar). El mensaje de error es siempre el mismo, para no delatar qué emails tienen cuenta.
 - Cada página y acción del panel controla el permiso con `requerirUsuario()` (`src/lib/auth/actual.ts`).
 
 ### Crear un usuario o resetear su contraseña
@@ -89,7 +89,15 @@ npm run usuario -- --email ana@gmail.com --nombre "Ana Gómez" --rol ADMIN
 npm run usuario -- --email ana@gmail.com   # si ya existe: le da una contraseña nueva
 ```
 
-Muestra una **contraseña temporal**: al entrar, el sistema le pide elegir una propia. Usa la `DATABASE_URL` del `.env`. Sin `--rol`, crea un validador.
+Muestra una **contraseña temporal** que **vence en 72 horas**: al entrar, el sistema le pide elegir una propia. Resetear también desbloquea la cuenta y cierra sus sesiones. Usa la `DATABASE_URL` del `.env`. Sin `--rol`, crea un validador.
+
+Sin acceso a la base desde la compu, `--sql` no se conecta: imprime el SQL para pegar en Supabase (**SQL Editor**). Hacen falta `--nombre` y `--rol`; si el usuario ya existe, solo le resetea la contraseña.
+
+```bash
+npm run usuario -- --sql --email ana@gmail.com --nombre "Ana Gómez" --rol ADMIN
+```
+
+> Si alguien prueba contraseñas sin parar contra un email, esa cuenta queda bloqueada mientras dure el ataque (las sesiones ya abiertas siguen andando), y resetearla no alcanza. La salida es cambiarle el email a ese usuario.
 
 ## Publicación (Vercel)
 

@@ -10,7 +10,7 @@ export function Campo({ etiqueta, ayuda, id, ...input }: ComponentProps<"input">
       <input
         id={id}
         aria-describedby={ayuda ? `${id}-ayuda` : undefined}
-        className="h-12 rounded-xl border border-borde bg-superficie px-4 text-base outline-acento focus:outline-2 focus:outline-offset-1"
+        className="h-12 rounded-xl border border-borde-campo bg-superficie px-4 text-base outline-acento focus:outline-2 focus:outline-offset-1"
         {...input}
       />
       {ayuda && (

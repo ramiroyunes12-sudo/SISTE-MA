@@ -5,7 +5,10 @@
 // Duración: se cierra después de 7 días sin usarla, y siempre a los 30 días.
 import { createHash, randomBytes } from "node:crypto";
 
-import type { PrismaClient, Rol } from "@/generated/prisma/client";
+import type { Prisma, PrismaClient, Rol } from "@/generated/prisma/client";
+
+// La base, o una transacción abierta en ella.
+type Db = PrismaClient | Prisma.TransactionClient;
 
 const DIA = 24 * 60 * 60 * 1000;
 export const INACTIVIDAD_MAXIMA = 7 * DIA;
@@ -38,7 +41,7 @@ export function nuevoVencimiento(creadaEn: Date, expiraEn: Date, ahora: Date): D
   return candidato - expiraEn.getTime() >= DIA ? new Date(candidato) : null;
 }
 
-export async function crearSesion(db: PrismaClient, usuarioId: string, ahora = new Date()) {
+export async function crearSesion(db: Db, usuarioId: string, ahora = new Date()) {
   const token = generarToken();
   // De paso, se borran las sesiones vencidas de este usuario.
   await db.sesion.deleteMany({ where: { usuarioId, expiraEn: { lte: ahora } } });
@@ -93,12 +96,6 @@ export async function validarSesion(
   };
 }
 
-export async function cerrarSesion(db: PrismaClient, token: string) {
+export async function cerrarSesion(db: Db, token: string) {
   await db.sesion.deleteMany({ where: { id: huellaDeToken(token) } });
-}
-
-// Cierra todas las sesiones del usuario (menos `excepto`, si se pasa): por
-// ejemplo, al cambiar la contraseña se cierran los otros navegadores.
-export async function cerrarSesionesDe(db: PrismaClient, usuarioId: string, excepto?: string) {
-  await db.sesion.deleteMany({ where: { usuarioId, ...(excepto ? { id: { not: excepto } } : {}) } });
 }

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 
 import { obtenerSesionActual } from "@/lib/auth/actual";
 import { inicioSegunRol } from "@/lib/auth/cuentas";
@@ -12,8 +12,15 @@ export const metadata: Metadata = {
 };
 
 export default async function PaginaIngresar() {
-  // Si ya tiene la sesión abierta, directo a su inicio.
-  const sesion = await obtenerSesionActual();
+  // Si ya tiene la sesión abierta, directo a su inicio. Si la base no
+  // contesta, igual se muestra el formulario (al mandarlo avisa del problema).
+  let sesion = null;
+  try {
+    sesion = await obtenerSesionActual();
+  } catch (error) {
+    unstable_rethrow(error); // las señales internas de Next.js no son errores
+    console.error("[ingresar] No se pudo leer la sesión:", error);
+  }
   if (sesion) {
     redirect(sesion.usuario.debeCambiarContrasena ? "/cuenta/contrasena" : inicioSegunRol(sesion.usuario.rol));
   }

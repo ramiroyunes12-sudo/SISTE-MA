@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 // Secciones del panel. Las que todavía no existen se muestran apagadas.
+// (El número es el paso del plan en el que se arma cada una.)
 const SECCIONES: { texto: string; href?: string; paso?: number }[] = [
   { texto: "Resumen", href: "/admin" },
   { texto: "Evento y lotes", paso: 6 },
@@ -18,7 +19,7 @@ export function MenuAdmin() {
   const ruta = usePathname();
   return (
     <ul className="flex flex-col gap-1">
-      {SECCIONES.map(({ texto, href, paso }) => (
+      {SECCIONES.map(({ texto, href }) => (
         <li key={texto}>
           {href ? (
             <Link
@@ -29,7 +30,7 @@ export function MenuAdmin() {
               {texto}
             </Link>
           ) : (
-            <span className={`${base} cursor-default text-white/40`} title={`Llega en el paso ${paso}`}>
+            <span className={`${base} cursor-default text-white/40`} title="Próximamente">
               {texto}
               <span className="text-xs">pronto</span>
             </span>

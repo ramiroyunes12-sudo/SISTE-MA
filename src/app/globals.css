@@ -7,9 +7,11 @@
   --color-tinta: #15171c;
   --color-tenue: #5b5f69;
   --color-borde: #e2e2dc;
+  --color-borde-campo: #8a8d93; /* borde de los campos: que se vean (contraste 3:1) */
   --color-acento: #3b3be8;
   --color-acento-hover: #2626b8;
   --color-ok: #157a3a;
+  --color-ok-oscuro: #0f5a2b; /* texto sobre fondo verde claro */
   --color-alerta: #a4510a;
   --color-error: #b42323;
 }

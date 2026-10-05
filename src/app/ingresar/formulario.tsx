@@ -27,7 +27,8 @@ export function FormularioIngreso() {
         autoComplete="current-password"
         required
       />
-      <MensajeError>{estado.error}</MensajeError>
+      {/* Se saca mientras envía: si el error se repite, vuelve a aparecer (y se vuelve a leer). */}
+      {!enviando && <MensajeError>{estado.error}</MensajeError>}
       <BotonPrincipal type="submit" disabled={enviando}>
         {enviando ? "Ingresando…" : "Ingresar"}
       </BotonPrincipal>

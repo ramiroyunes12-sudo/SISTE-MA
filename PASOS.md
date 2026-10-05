@@ -17,7 +17,8 @@ Cada paso termina con algo para probar. Se marca `[x]` cuando está revisado.
 
 ## Bloque 1 — Admin: login y evento
 - [x] **5. Login del administrador** — roles admin y validador. Entrar por `/ingresar`: el admin va a `/admin`, el validador a `/validar`.
-  - Usuarios nuevos o contraseña olvidada: `npm run usuario` (da una contraseña temporal que se cambia al entrar).
+  - Usuarios nuevos o contraseña olvidada: `npm run usuario` (da una contraseña temporal que vence en 72 h y se cambia al entrar; con `--sql` imprime el SQL para Supabase).
+  - Revisado por 5 revisores + verificadores: se arreglaron 30 hallazgos (contraseñas comunes, carreras al cambiar la contraseña, mensajes que delataban emails, errores en español, vencimiento de la temporal).
   - Para más adelante (opcional): además del bloqueo por cuenta, limitar intentos por IP con el firewall de Vercel.
 - [ ] **6. Pantalla "Evento y lotes"** — crear/editar evento, tipos y lotes.
 

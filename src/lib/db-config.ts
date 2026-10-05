@@ -20,7 +20,13 @@ export class ErrorConfigDb extends Error {
 export type OpcionesConexion = {
   connectionString: string;
   ssl: false | { ca: string; rejectUnauthorized: true };
+  connectionTimeoutMillis: number;
+  query_timeout: number;
 };
+
+// Si la base no contesta, mejor cortar y mostrar "no pudimos conectar" que
+// dejar la pantalla esperando minutos.
+const LIMITES = { connectionTimeoutMillis: 5_000, query_timeout: 20_000 };
 
 // Variables de entorno (se lee DATABASE_URL y DATABASE_CA_CERT).
 type VariablesDb = Record<string, string | undefined>;
@@ -43,11 +49,12 @@ export function opcionesConexion(env: VariablesDb): OpcionesConexion {
   const url = leerUrl(env, "DATABASE_URL");
   const host = hostDe(url);
   if (HOSTS_LOCALES.has(host)) {
-    return { connectionString: url.toString(), ssl: false };
+    return { connectionString: url.toString(), ssl: false, ...LIMITES };
   }
   return {
     connectionString: url.toString(),
     ssl: { ca: certificadoPara(host, env), rejectUnauthorized: true },
+    ...LIMITES,
   };
 }
 

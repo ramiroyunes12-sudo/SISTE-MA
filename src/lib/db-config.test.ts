@@ -40,6 +40,14 @@ describe("opcionesConexion", () => {
     expect(opciones.ssl).toBe(false);
   });
 
+  it("si la base no contesta, corta en segundos (local y remota)", () => {
+    for (const url of ["postgresql://postgres:local@localhost:5432/entradas", SUPABASE]) {
+      const opciones = opcionesConexion({ DATABASE_URL: url });
+      expect(opciones.connectionTimeoutMillis).toBe(5_000);
+      expect(opciones.query_timeout).toBe(20_000);
+    }
+  });
+
   it("en Supabase usa su certificado sin necesidad de cargarlo", () => {
     for (const url of [SUPABASE, "postgresql://postgres:x@db.abc.supabase.co:5432/postgres"]) {
       const opciones = opcionesConexion({ DATABASE_URL: url });

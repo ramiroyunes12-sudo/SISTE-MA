@@ -26,13 +26,13 @@ export default async function PaginaContrasena() {
           <h1 className="font-display text-3xl font-extrabold leading-tight">
             {obligatoria ? "Elegí tu contraseña" : "Cambiar contraseña"}
           </h1>
-          <p className="text-base text-tenue">
+          <p className="text-base text-tenue [overflow-wrap:anywhere]">
             {obligatoria
               ? `Hola, ${usuario.nombre}. Entraste con una contraseña temporal: antes de seguir, elegí una propia.`
               : usuario.email}
           </p>
         </div>
-        <FormularioContrasena obligatoria={obligatoria} />
+        <FormularioContrasena obligatoria={obligatoria} email={usuario.email} />
         <div className="flex items-center justify-between text-sm">
           {obligatoria ? (
             <span />

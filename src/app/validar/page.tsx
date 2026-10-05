@@ -29,7 +29,7 @@ export default async function PaginaValidar({ searchParams }: PageProps<"/valida
       </header>
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-4 px-4 py-8">
         {contrasena === "cambiada" && (
-          <p role="status" className="rounded-xl bg-ok/10 px-4 py-3 font-semibold text-ok">
+          <p role="status" className="rounded-xl bg-ok/10 px-4 py-3 font-semibold text-ok-oscuro">
             Listo, tu contraseña quedó cambiada.
           </p>
         )}

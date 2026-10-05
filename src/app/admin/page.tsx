@@ -7,7 +7,7 @@ export default async function PaginaResumen({ searchParams }: PageProps<"/admin"
   return (
     <>
       {contrasena === "cambiada" && (
-        <p role="status" className="rounded-xl bg-ok/10 px-4 py-3 font-semibold text-ok">
+        <p role="status" className="rounded-xl bg-ok/10 px-4 py-3 font-semibold text-ok-oscuro">
           Listo, tu contraseña quedó cambiada.
         </p>
       )}
