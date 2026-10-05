@@ -25,8 +25,10 @@ Cada paso termina con algo para probar. Se marca `[x]` cuando está revisado.
   - El flyer se sube en el paso 7 (junto con la página pública).
 
 ## Bloque 2 — Página pública
-- [ ] **7. Página del evento** — flyer, datos y lotes con su estado.
+- [ ] **7. Página del evento** — flyer, datos y el lote en venta de cada tipo.
+  - El público ve SOLO el lote en venta (nombre y precio). Nada de cantidades vendidas ni disponibles, y los lotes siguientes no se muestran (ni se mandan al navegador) hasta que se agote el anterior. Si no queda nada: "Agotado".
 - [ ] **8. Lógica de lotes** — paso automático de lote sin vender de más (con tests).
+  - A decidir: si alguien pide 4 y en el lote quedan 2, ¿2 de este lote y 2 del siguiente, o las 4 del siguiente?
 - [ ] **9. Formulario de datos (checkout)** — nombre y DNI por entrada.
 - [ ] **10. Reserva temporal** — 10 minutos para pagar.
 
