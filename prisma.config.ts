@@ -21,6 +21,7 @@ export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
+    seed: "tsx prisma/seed.ts", // datos de prueba: `npx prisma db seed`
   },
   datasource: {
     // Para crear y modificar tablas se usa la conexión directa

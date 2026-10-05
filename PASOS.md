@@ -11,7 +11,9 @@ Cada paso termina con algo para probar. Se marca `[x]` cuando está revisado.
   - Esquema `entradas` (no `public`): la API de Supabase no lo publica. Migraciones automáticas en el deploy de producción.
   - Pendiente (menor): Supabase sugiere índices para 6 claves foráneas (entradas.lote/orden/tipo, validada_por, escaneos.usuario, ordenes.emitida_por). Sumarlos en una migración cuando haya datos.
   - Para el paso 9: ¿una misma persona (DNI) puede tener dos entradas del mismo evento? Hoy la base lo permite.
-- [ ] **4. Datos de prueba** — seed con un evento de ejemplo.
+- [x] **4. Datos de prueba** — `npx prisma db seed`: "Evento de prueba" (sáb 21/11/2026 23:00) con General (Lotes 1–3) y VIP. Cargado en Supabase.
+  - Borrar el evento de prueba antes del paso 21 (salir a vender).
+  - El usuario admin se crea en el paso 5, junto con el login.
 
 ## Bloque 1 — Admin: login y evento
 - [ ] **5. Login del administrador** — roles admin y validador.

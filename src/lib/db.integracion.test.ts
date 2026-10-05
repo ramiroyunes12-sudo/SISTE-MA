@@ -6,6 +6,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { PrismaClient } from "@/generated/prisma/client";
 
+import { cargarDatosDePrueba, SLUG_EVENTO_PRUEBA } from "../../prisma/datos-prueba";
+
 const url = process.env.TEST_DATABASE_URL;
 
 describe.skipIf(!url)("reglas de la base de datos", () => {
@@ -163,5 +165,48 @@ describe.skipIf(!url)("reglas de la base de datos", () => {
     };
     await db.entrada.create({ data: datos });
     await expect(db.entrada.create({ data: { ...datos, dni: "30111223" } })).rejects.toThrow();
+  });
+});
+
+describe.skipIf(!url)("datos de prueba", () => {
+  let db: PrismaClient;
+
+  beforeAll(() => {
+    db = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
+  });
+
+  afterAll(async () => {
+    await db?.$disconnect();
+  });
+
+  async function contar() {
+    const evento = await db.evento.findUniqueOrThrow({
+      where: { slug: SLUG_EVENTO_PRUEBA },
+      include: { tipos: { include: { lotes: true } } },
+    });
+    return {
+      tipos: evento.tipos.length,
+      lotes: evento.tipos.reduce((total, tipo) => total + tipo.lotes.length, 0),
+      lote1General: evento.tipos.find((t) => t.nombre === "General")!.lotes.find((l) => l.numero === 1)!,
+    };
+  }
+
+  it("se pueden cargar varias veces sin duplicar ni pisar las ventas", async () => {
+    await cargarDatosDePrueba(db);
+    const primera = await contar();
+    expect(primera.tipos).toBe(2);
+    expect(primera.lotes).toBe(4);
+    expect(primera.lote1General.precioCentavos).toBe(600000);
+
+    // simulamos ventas y volvemos a cargar: no tiene que borrarlas
+    await db.lote.update({ where: { id: primera.lote1General.id }, data: { vendidas: 7, reservadas: 2 } });
+    await cargarDatosDePrueba(db);
+    const segunda = await contar();
+    expect(segunda.tipos).toBe(2);
+    expect(segunda.lotes).toBe(4);
+    expect(segunda.lote1General.vendidas).toBe(7);
+    expect(segunda.lote1General.reservadas).toBe(2);
+
+    await db.lote.update({ where: { id: primera.lote1General.id }, data: { vendidas: 0, reservadas: 0 } });
   });
 });

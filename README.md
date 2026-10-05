@@ -60,6 +60,12 @@ Abrí https://siste-ma.vercel.app/api/salud (o `http://localhost:3000/api/salud`
   grant usage, create on schema entradas to entradas_app;
   ```
 
+### Datos de prueba
+
+`npx prisma db seed` carga un **evento de ejemplo** (`evento-de-prueba`): General con Lotes 1, 2 y 3 ($6.000 / $8.000 / $10.000) y VIP ($15.000). Se puede correr varias veces: actualiza lo que existe, no duplica y nunca toca las ventas. Los datos están en `prisma/datos-prueba.ts`.
+
+> Antes de empezar a vender de verdad, hay que borrar el evento de prueba.
+
 ### Tests con base de datos
 
 `src/lib/db.integracion.test.ts` prueba las reglas que cuida la base (por ejemplo, que nunca se venda más que el cupo). Necesita un PostgreSQL de prueba con las migraciones aplicadas; si no está `TEST_DATABASE_URL`, se saltea:
