@@ -24,20 +24,43 @@ enum Rol {
 }
 
 model Usuario {
-  id             String   @id @default(uuid(7)) @db.Uuid
-  nombre         String
-  email          String   @unique // siempre en minúsculas
-  hashContrasena String   @map("hash_contrasena")
-  rol            Rol      @default(VALIDADOR)
-  activo         Boolean  @default(true)
-  creadoEn       DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
-  actualizadoEn  DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+  id                    String    @id @default(uuid(7)) @db.Uuid
+  nombre                String
+  email                 String    @unique // siempre en minúsculas
+  hashContrasena        String    @map("hash_contrasena") // scrypt; nunca la contraseña en sí
+  rol                   Rol       @default(VALIDADOR)
+  activo                Boolean   @default(true)
+  // Contraseña temporal: al entrar, primero tiene que elegir una propia.
+  debeCambiarContrasena Boolean   @default(false) @map("debe_cambiar_contrasena")
+  // Contra los que prueban contraseñas: 5 fallas seguidas bloquean 15 minutos.
+  intentosFallidos      Int       @default(0) @map("intentos_fallidos")
+  bloqueadoHasta        DateTime? @map("bloqueado_hasta") @db.Timestamptz(3)
+  ultimoIngresoEn       DateTime? @map("ultimo_ingreso_en") @db.Timestamptz(3)
+  creadoEn              DateTime  @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn         DateTime  @updatedAt @map("actualizado_en") @db.Timestamptz(3)
 
+  sesiones          Sesion[]
   entradasValidadas Entrada[] @relation("ValidadaPor")
   cortesiasEmitidas Orden[]   @relation("EmitidaPor")
   escaneos          Escaneo[]
 
   @@map("usuarios")
+  @@schema("entradas")
+}
+
+// Una sesión abierta (un navegador con el panel abierto). El navegador guarda
+// un código secreto en una cookie; acá solo se guarda su huella (SHA-256),
+// así una copia de la base no sirve para entrar.
+model Sesion {
+  id        String   @id // huella SHA-256 (hex) del código de la cookie
+  usuarioId String   @map("usuario_id") @db.Uuid
+  creadaEn  DateTime @default(now()) @map("creada_en") @db.Timestamptz(3)
+  expiraEn  DateTime @map("expira_en") @db.Timestamptz(3) // se estira con el uso, hasta 30 días
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@map("sesiones")
   @@schema("entradas")
 }
 

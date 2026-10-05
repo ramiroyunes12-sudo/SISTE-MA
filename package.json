@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
+    "usuario": "tsx scripts/usuario.ts",
     "postinstall": "prisma generate"
   },
   "engines": {

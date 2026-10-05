@@ -68,11 +68,28 @@ Abrí https://siste-ma.vercel.app/api/salud (o `http://localhost:3000/api/salud`
 
 ### Tests con base de datos
 
-`src/lib/db.integracion.test.ts` prueba las reglas que cuida la base (por ejemplo, que nunca se venda más que el cupo). Necesita un PostgreSQL de prueba con las migraciones aplicadas; si no está `TEST_DATABASE_URL`, se saltea:
+Los archivos `*.integracion.test.ts` prueban contra una base de verdad: las reglas que cuida la base (por ejemplo, que nunca se venda más que el cupo) y el login (bloqueo por intentos, sesiones). Necesitan un PostgreSQL de prueba con las migraciones aplicadas; si no está `TEST_DATABASE_URL`, se saltean:
 
 ```bash
 TEST_DATABASE_URL="postgresql://usuario:clave@localhost:5432/prueba" npm test
 ```
+
+## Panel y usuarios
+
+- Se entra por **`/ingresar`**. Los **admin** van al panel (`/admin`); los **validadores**, a la puerta (`/validar`). Un validador no puede entrar al panel.
+- Las contraseñas se guardan cifradas con scrypt (`src/lib/auth/contrasenas.ts`), nunca tal cual.
+- La sesión se cierra a los 7 días sin usarla, y siempre a los 30. "Cerrar sesión" la corta en ese navegador; cambiar la contraseña cierra la de los otros.
+- 5 contraseñas mal seguidas bloquean la cuenta 15 minutos.
+- Cada página y acción del panel controla el permiso con `requerirUsuario()` (`src/lib/auth/actual.ts`).
+
+### Crear un usuario o resetear su contraseña
+
+```bash
+npm run usuario -- --email ana@gmail.com --nombre "Ana Gómez" --rol ADMIN
+npm run usuario -- --email ana@gmail.com   # si ya existe: le da una contraseña nueva
+```
+
+Muestra una **contraseña temporal**: al entrar, el sistema le pide elegir una propia. Usa la `DATABASE_URL` del `.env`. Sin `--rol`, crea un validador.
 
 ## Publicación (Vercel)
 
@@ -88,6 +105,7 @@ El proyecto `siste-ma` de Vercel está conectado a este repo: cada cambio que se
 | `npm test` | Corre los tests automáticos. |
 | `npm run lint` | Revisa errores comunes en el código. |
 | `npm run typecheck` | Revisa los tipos de TypeScript. |
+| `npm run usuario -- ...` | Crea un usuario del panel o le resetea la contraseña (ver "Panel y usuarios"). |
 
 ## Tecnologías
 

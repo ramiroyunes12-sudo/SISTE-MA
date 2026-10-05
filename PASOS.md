@@ -16,7 +16,9 @@ Cada paso termina con algo para probar. Se marca `[x]` cuando está revisado.
   - El usuario admin se crea en el paso 5, junto con el login.
 
 ## Bloque 1 — Admin: login y evento
-- [ ] **5. Login del administrador** — roles admin y validador.
+- [x] **5. Login del administrador** — roles admin y validador. Entrar por `/ingresar`: el admin va a `/admin`, el validador a `/validar`.
+  - Usuarios nuevos o contraseña olvidada: `npm run usuario` (da una contraseña temporal que se cambia al entrar).
+  - Para más adelante (opcional): además del bloqueo por cuenta, limitar intentos por IP con el firewall de Vercel.
 - [ ] **6. Pantalla "Evento y lotes"** — crear/editar evento, tipos y lotes.
 
 ## Bloque 2 — Página pública
@@ -37,6 +39,7 @@ Cada paso termina con algo para probar. Se marca `[x]` cuando está revisado.
 
 ## Bloque 5 — Puerta
 - [ ] **17. Escáner** — cámara del celu, marcar usada de forma atómica.
+  - Incluye la pantalla "Validadores" del panel: crearlos, desactivarlos y darles contraseña temporal.
 - [ ] **18. Búsqueda por DNI y contador**
 
 ## Bloque 6 — Admin completo
