@@ -1,5 +1,8 @@
-// Esquema de la base de datos: acá se definen las tablas (paso 3).
-// Docs: https://pris.ly/d/prisma-schema
+// Esquema de la base de datos. Docs: https://pris.ly/d/prisma-schema
+//
+// Las tablas viven en el esquema "entradas" (no en "public"), así la API
+// automática de Supabase no las publica. Los montos van en centavos (Int)
+// para no tener errores de redondeo.
 
 generator client {
   provider = "prisma-client"
@@ -8,4 +11,265 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  schemas  = ["entradas"]
+}
+
+// ─── Usuarios del panel y de la puerta ────────────────────────────────────────
+
+enum Rol {
+  ADMIN
+  VALIDADOR
+
+  @@schema("entradas")
+}
+
+model Usuario {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  nombre         String
+  email          String   @unique // siempre en minúsculas
+  hashContrasena String   @map("hash_contrasena")
+  rol            Rol      @default(VALIDADOR)
+  activo         Boolean  @default(true)
+  creadoEn       DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn  DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  entradasValidadas Entrada[] @relation("ValidadaPor")
+  cortesiasEmitidas Orden[]   @relation("EmitidaPor")
+  escaneos          Escaneo[]
+
+  @@map("usuarios")
+  @@schema("entradas")
+}
+
+// ─── Evento, tipos de entrada y lotes ─────────────────────────────────────────
+
+enum EstadoEvento {
+  BORRADOR // no se ve en la página pública
+  PUBLICADO // a la venta
+  FINALIZADO // ya pasó; no se vende más
+
+  @@schema("entradas")
+}
+
+model Evento {
+  id                String       @id @default(uuid(7)) @db.Uuid
+  slug              String       @unique // parte de la dirección: /e/fiesta-primavera
+  nombre            String
+  descripcion       String?
+  fecha             DateTime     @db.Timestamptz(3) // día y hora de inicio
+  lugar             String
+  direccion         String?
+  flyerUrl          String?      @map("flyer_url")
+  maxPorCompra      Int          @default(6) @map("max_por_compra")
+  cupoCortesias     Int          @default(0) @map("cupo_cortesias")
+  cortesiasEmitidas Int          @default(0) @map("cortesias_emitidas")
+  estado            EstadoEvento @default(BORRADOR)
+  creadoEn          DateTime     @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn     DateTime     @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  tipos    TipoEntrada[]
+  ordenes  Orden[]
+  entradas Entrada[]
+  escaneos Escaneo[]
+
+  @@map("eventos")
+  @@schema("entradas")
+}
+
+// General, VIP, etc. Cada tipo tiene sus propios lotes.
+model TipoEntrada {
+  id       String @id @default(uuid(7)) @db.Uuid
+  eventoId String @map("evento_id") @db.Uuid
+  nombre   String
+  orden    Int    @default(0) // orden en que se muestra en la página
+
+  evento   Evento    @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  lotes    Lote[]
+  entradas Entrada[]
+
+  @@unique([eventoId, nombre])
+  @@unique([id, eventoId]) // para las claves compuestas de Entrada
+  @@map("tipos_entrada")
+  @@schema("entradas")
+}
+
+// Lote 1, 2, 3... Se vende el de menor número que tenga lugar.
+// disponibles = cupo - vendidas - reservadas (la base no deja que dé negativo).
+model Lote {
+  id             String @id @default(uuid(7)) @db.Uuid
+  tipoEntradaId  String @map("tipo_entrada_id") @db.Uuid
+  numero         Int // 1, 2, 3...
+  nombre         String // "Lote 1"
+  precioCentavos Int    @map("precio_centavos")
+  cupo           Int
+  vendidas       Int    @default(0) // pagadas
+  reservadas     Int    @default(0) // en órdenes pendientes de pago
+
+  tipoEntrada TipoEntrada @relation(fields: [tipoEntradaId], references: [id], onDelete: Cascade)
+  entradas    Entrada[]
+
+  @@unique([tipoEntradaId, numero])
+  @@unique([id, tipoEntradaId]) // para las claves compuestas de Entrada
+  @@map("lotes")
+  @@schema("entradas")
+}
+
+// ─── Órdenes (compras y cortesías) ────────────────────────────────────────────
+
+enum TipoOrden {
+  VENTA
+  CORTESIA
+
+  @@schema("entradas")
+}
+
+enum EstadoOrden {
+  PENDIENTE // reservada, esperando el pago
+  PAGADA // o cortesía emitida: las entradas son válidas
+  VENCIDA // no pagó a tiempo: se liberó el lugar
+  CANCELADA
+  REEMBOLSADA
+
+  @@schema("entradas")
+}
+
+// La reserva se crea al tocar "Continuar" (todavía sin email ni datos de las
+// personas); la base exige esos datos recién cuando la orden pasa a PAGADA.
+model Orden {
+  id              String      @id @default(uuid(7)) @db.Uuid
+  numero          Int         @unique @default(autoincrement()) // el "N° de orden" que ve la gente
+  eventoId        String      @map("evento_id") @db.Uuid
+  tipo            TipoOrden   @default(VENTA)
+  estado          EstadoOrden @default(PENDIENTE)
+  email           String? // a dónde se mandan las entradas (en minúsculas)
+  telefono        String?
+  totalCentavos   Int         @map("total_centavos")
+  venceEn         DateTime?   @map("vence_en") @db.Timestamptz(3) // fin de la reserva (solo ventas)
+  pagadaEn        DateTime?   @map("pagada_en") @db.Timestamptz(3)
+  reembolsadaEn   DateTime?   @map("reembolsada_en") @db.Timestamptz(3)
+  mpPreferenciaId String?     @unique @map("mp_preferencia_id") // Mercado Pago: checkout creado
+  emitidaPorId    String?     @map("emitida_por_id") @db.Uuid // admin que dio la cortesía
+
+  // Mail con las entradas: si falló, se reintenta (paso 15).
+  mailEnviadoEn DateTime? @map("mail_enviado_en") @db.Timestamptz(3)
+  mailIntentos  Int       @default(0) @map("mail_intentos")
+  mailError     String?   @map("mail_error")
+  // "Reenviar mis entradas": máximo 3 por día por orden (paso 16).
+  reenviosCount Int       @default(0) @map("reenvios_count")
+  reenviosDesde DateTime? @map("reenvios_desde") @db.Timestamptz(3)
+
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  evento     Evento    @relation(fields: [eventoId], references: [id], onDelete: Restrict)
+  emitidaPor Usuario?  @relation("EmitidaPor", fields: [emitidaPorId], references: [id], onDelete: SetNull)
+  entradas   Entrada[]
+  pagos      Pago[]
+
+  @@unique([id, eventoId]) // para que cada entrada quede atada al evento de su orden
+  @@index([eventoId, estado])
+  @@index([email])
+  @@index([estado, venceEn]) // para liberar reservas vencidas
+  @@index([estado, mailEnviadoEn]) // para reintentar mails que fallaron
+  @@map("ordenes")
+  @@schema("entradas")
+}
+
+// Cada pago que avisa Mercado Pago. Una orden puede tener más de uno
+// (por ejemplo, si alguien paga dos veces): así se ve qué hay que devolver.
+model Pago {
+  id                  String   @id @default(uuid(7)) @db.Uuid
+  ordenId             String   @map("orden_id") @db.Uuid
+  mpPagoId            String   @unique @map("mp_pago_id") // evita procesar dos veces el mismo aviso
+  estadoMp            String   @map("estado_mp") // approved, refunded, etc. (como lo manda Mercado Pago)
+  montoCentavos       Int      @map("monto_centavos")
+  reembolsadoCentavos Int      @default(0) @map("reembolsado_centavos")
+  creadoEn            DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn       DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  orden Orden @relation(fields: [ordenId], references: [id], onDelete: Restrict)
+
+  @@index([ordenId])
+  @@map("pagos")
+  @@schema("entradas")
+}
+
+// ─── Entradas (una por persona, con su QR) ───────────────────────────────────
+
+enum EstadoEntrada {
+  PENDIENTE // la orden todavía no se pagó: el QR no sirve
+  VALIDA
+  USADA // ya entró
+  ANULADA
+
+  @@schema("entradas")
+}
+
+model Entrada {
+  id             String        @id @default(uuid(7)) @db.Uuid
+  ordenId        String        @map("orden_id") @db.Uuid
+  eventoId       String        @map("evento_id") @db.Uuid
+  tipoEntradaId  String        @map("tipo_entrada_id") @db.Uuid
+  loteId         String?       @map("lote_id") @db.Uuid // vacío en las cortesías
+  titular        String? // nombre y apellido (obligatorio desde que la orden se paga)
+  dni            String? // solo números (obligatorio desde que la orden se paga)
+  codigo         String        @unique // va dentro del QR (se firma en el paso 13)
+  precioCentavos Int           @map("precio_centavos") // lo que se pagó por esta entrada
+  estado         EstadoEntrada @default(PENDIENTE)
+  usadaEn        DateTime?     @map("usada_en") @db.Timestamptz(3)
+  validadaPorId  String?       @map("validada_por_id") @db.Uuid
+  creadoEn       DateTime      @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn  DateTime      @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  // Claves compuestas: la orden y el tipo tienen que ser del mismo evento que
+  // la entrada, y el lote del mismo tipo. Así una entrada no puede mezclar eventos.
+  orden       Orden       @relation(fields: [ordenId, eventoId], references: [id, eventoId], onDelete: Cascade)
+  evento      Evento      @relation(fields: [eventoId], references: [id], onDelete: Restrict)
+  tipoEntrada TipoEntrada @relation(fields: [tipoEntradaId, eventoId], references: [id, eventoId], onDelete: Restrict)
+  lote        Lote?       @relation(fields: [loteId, tipoEntradaId], references: [id, tipoEntradaId], onDelete: Restrict)
+  validadaPor Usuario?    @relation("ValidadaPor", fields: [validadaPorId], references: [id], onDelete: SetNull)
+  escaneos    Escaneo[]
+
+  @@index([eventoId, dni]) // búsqueda por DNI en la puerta
+  @@index([eventoId, estado]) // contador de ingresados
+  @@index([ordenId])
+  @@map("entradas")
+  @@schema("entradas")
+}
+
+// ─── Registro de cada escaneo en la puerta ───────────────────────────────────
+
+enum MetodoIngreso {
+  QR
+  DNI // búsqueda manual
+
+  @@schema("entradas")
+}
+
+enum ResultadoEscaneo {
+  PASA
+  YA_INGRESO
+  NO_VALIDA
+
+  @@schema("entradas")
+}
+
+model Escaneo {
+  id          String           @id @default(uuid(7)) @db.Uuid
+  eventoId    String           @map("evento_id") @db.Uuid
+  entradaId   String?          @map("entrada_id") @db.Uuid // vacío si el QR no corresponde a ninguna entrada
+  usuarioId   String           @map("usuario_id") @db.Uuid // quién escaneó
+  metodo      MetodoIngreso
+  resultado   ResultadoEscaneo
+  codigoLeido String?          @map("codigo_leido") // lo que leyó la cámara (para investigar QR truchos)
+  creadoEn    DateTime         @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  evento  Evento   @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  entrada Entrada? @relation(fields: [entradaId], references: [id], onDelete: SetNull)
+  usuario Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+
+  @@index([eventoId, creadoEn])
+  @@index([entradaId])
+  @@map("escaneos")
+  @@schema("entradas")
 }

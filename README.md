@@ -46,6 +46,28 @@ Abrí https://siste-ma.vercel.app/api/salud (o `http://localhost:3000/api/salud`
 | `falta_certificado` | La base no es de Supabase y falta `DATABASE_CA_CERT`. |
 | `sin_conexion` | Contraseña incorrecta o Supabase pausado. El detalle está en los logs de Vercel. |
 
+### Tablas y migraciones
+
+- Las tablas están en `prisma/schema.prisma`, dentro del esquema **`entradas`** (no en `public`), así la API automática de Supabase no las publica. En el panel de Supabase se ven en **Table Editor → schema `entradas`**.
+- Cada cambio a las tablas es una **migración** en `prisma/migrations/`. En el deploy de **producción**, Vercel aplica las pendientes antes de armar el sistema (`scripts/migrar.mjs`). Los deploys de prueba no tocan la base.
+- Las migraciones usan siempre `DIRECT_URL` (nunca `DATABASE_URL`). `prisma.config.ts` le agrega solo el esquema `entradas` y, en una base remota, el cifrado verificando el certificado.
+- Las reglas importantes las cuida la propia base (al final de la migración inicial): nunca más vendidas + reservadas que el cupo, cortesías dentro de su cupo, email/titular/DNI obligatorios desde que se paga, una entrada no puede mezclar eventos, no se devuelve más de lo cobrado.
+- Preparación de una base nueva (una sola vez, como administrador):
+
+  ```sql
+  create role entradas_app with login password '...';
+  create schema entradas;
+  grant usage, create on schema entradas to entradas_app;
+  ```
+
+### Tests con base de datos
+
+`src/lib/db.integracion.test.ts` prueba las reglas que cuida la base (por ejemplo, que nunca se venda más que el cupo). Necesita un PostgreSQL de prueba con las migraciones aplicadas; si no está `TEST_DATABASE_URL`, se saltea:
+
+```bash
+TEST_DATABASE_URL="postgresql://usuario:clave@localhost:5432/prueba" npm test
+```
+
 ## Publicación (Vercel)
 
 El proyecto `siste-ma` de Vercel está conectado a este repo: cada cambio que se sube a GitHub se publica solo en https://siste-ma.vercel.app. Las funciones corren en São Paulo (`gru1`, en `vercel.json`), al lado de la base.

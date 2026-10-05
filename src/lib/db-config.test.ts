@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ErrorConfigDb, opcionesConexion } from "./db-config";
+import { ErrorConfigDb, opcionesConexion, urlMigraciones } from "./db-config";
 import { SUPABASE_ROOT_CA_2021 } from "./supabase-ca";
 
 const CERT = "-----BEGIN CERTIFICATE-----\nABC\n-----END CERTIFICATE-----";
@@ -85,5 +85,42 @@ describe("opcionesConexion", () => {
     expect(url.username).toBe("postgres.abc");
     expect(url.password).toBe("clave123");
     expect(url.port).toBe("6543");
+  });
+});
+
+describe("urlMigraciones", () => {
+  const SESION = "postgresql://entradas_app.abc:clave123@aws-0-sa-east-1.pooler.supabase.com:5432/postgres";
+  const guardados: string[] = [];
+  const guardar = (pem: string) => {
+    guardados.push(pem);
+    return "/tmp/ca.crt";
+  };
+
+  it("sin DIRECT_URL no devuelve nada (prisma generate no la necesita)", () => {
+    expect(urlMigraciones({}, guardar)).toBeUndefined();
+    // nunca usa DATABASE_URL (el pooler de transacciones no sirve para migrar)
+    expect(urlMigraciones({ DATABASE_URL: SUPABASE }, guardar)).toBeUndefined();
+  });
+
+  it("siempre usa el esquema entradas", () => {
+    const url = new URL(urlMigraciones({ DIRECT_URL: `${SESION}?schema=public` }, guardar)!);
+    expect(url.searchParams.get("schema")).toBe("entradas");
+  });
+
+  it("en Supabase exige cifrado verificando su certificado", () => {
+    guardados.length = 0;
+    const url = new URL(urlMigraciones({ DIRECT_URL: `${SESION}?sslmode=disable` }, guardar)!);
+    expect(url.searchParams.get("sslmode")).toBe("require");
+    expect(url.searchParams.get("sslaccept")).toBe("strict");
+    expect(url.searchParams.get("sslcert")).toBe("/tmp/ca.crt");
+    expect(guardados).toEqual([SUPABASE_ROOT_CA_2021]);
+  });
+
+  it("en una base local no usa SSL", () => {
+    const url = new URL(
+      urlMigraciones({ DIRECT_URL: "postgresql://u:p@localhost:5432/db?sslaccept=strict" }, guardar)!,
+    );
+    expect(url.searchParams.has("sslmode")).toBe(false);
+    expect(url.searchParams.has("sslaccept")).toBe(false);
   });
 });
