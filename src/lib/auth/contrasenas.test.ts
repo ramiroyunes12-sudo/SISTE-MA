@@ -69,12 +69,20 @@ describe("reglas para una contraseña nueva", () => {
   it("rechaza las más usadas, secuencias, repeticiones y el propio email", () => {
     const rechazadas: [string, RegExp][] = [
       ["1234567890", /letras/],
+      ["!@#$%^&*()_+", /letras/],
       ["0123456789", /letras/],
       ["contraseña", /más usadas/],
       ["Contraseña123!", /más usadas/],
       ["argentina1", /más usadas/],
       ["password12", /más usadas/],
       ["Boca Juniors 2024", /más usadas/],
+      ["P@ssw0rd123", /más usadas/],
+      ["Pa$$word2026", /más usadas/],
+      ["C0ntr4s3n4!", /más usadas/],
+      ["Contr@seña123", /más usadas/],
+      ["4rgentina2026", /más usadas/],
+      ["Adm1n12345!", /más usadas/],
+      ["W3lcome2024", /más usadas/],
       ["qwertyuiop", /secuencia/],
       ["poiuytrewq", /secuencia/],
       ["1q2w3e4r5t", /secuencia/],
@@ -98,6 +106,10 @@ describe("reglas para una contraseña nueva", () => {
       "Río Paraná 1816 grande",
       "x7#k9!q2@zR",
       "canción-de-cuna",
+      "amor de verano en corrientes", // empieza con una palabra común, pero sigue
+      "#9$!Q%&*@k-x", // al azar, con pocas letras y un número
+      "Sapo-8273-5519!",
+      "Привет мир 2026",
     ]) {
       expect(problemaConContrasenaNueva(contrasena, email), contrasena).toBeNull();
     }

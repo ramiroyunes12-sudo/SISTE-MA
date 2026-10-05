@@ -8,7 +8,9 @@ import { LARGO_MINIMO, problemaConContrasenaNueva } from "@/lib/auth/reglas";
 
 export function FormularioContrasena({ obligatoria, email }: { obligatoria: boolean; email: string }) {
   const [estado, accion, enviando] = useActionState(cambiarMiContrasena, {});
-  const [errorLocal, setErrorLocal] = useState<string>();
+  // `vez` cambia en cada intento: así el aviso se vuelve a anunciar aunque sea el mismo.
+  const [errorLocal, setErrorLocal] = useState<{ texto: string; vez: number }>();
+  const avisar = (texto: string) => setErrorLocal((anterior) => ({ texto, vez: (anterior?.vez ?? 0) + 1 }));
 
   // Revisa las reglas acá mismo antes de mandar, y manda "a mano" para que un
   // error no borre lo que ya escribió (el servidor igual vuelve a revisar todo).
@@ -17,13 +19,11 @@ export function FormularioContrasena({ obligatoria, email }: { obligatoria: bool
     const datos = new FormData(evento.currentTarget);
     const nueva = String(datos.get("nueva") ?? "");
     const problema = problemaConContrasenaNueva(nueva, email);
-    if (problema) return setErrorLocal(`La contraseña nueva no sirve: ${problema}`);
-    if (nueva !== datos.get("repetida")) return setErrorLocal("Las dos contraseñas nuevas no coinciden.");
+    if (problema) return avisar(`La contraseña nueva no sirve: ${problema}`);
+    if (nueva !== datos.get("repetida")) return avisar("Las dos contraseñas nuevas no coinciden.");
     setErrorLocal(undefined);
     startTransition(() => accion(datos));
   }
-
-  const error = errorLocal ?? estado.error;
 
   return (
     <form action={accion} onSubmit={alEnviar} className="flex flex-col gap-4">
@@ -54,7 +54,11 @@ export function FormularioContrasena({ obligatoria, email }: { obligatoria: bool
         minLength={LARGO_MINIMO}
         required
       />
-      {!enviando && <MensajeError>{error}</MensajeError>}
+      {!enviando && (
+        <MensajeError key={errorLocal ? `local-${errorLocal.vez}` : "servidor"}>
+          {errorLocal?.texto ?? estado.error}
+        </MensajeError>
+      )}
       <BotonPrincipal type="submit" disabled={enviando}>
         {enviando ? "Guardando…" : "Guardar contraseña"}
       </BotonPrincipal>

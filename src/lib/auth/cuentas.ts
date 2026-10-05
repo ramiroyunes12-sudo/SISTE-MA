@@ -35,6 +35,13 @@ async function demorar(contrasena: string) {
   await verificarContrasena(contrasena.slice(0, LARGO_MAXIMO), HASH_DE_RELLENO);
 }
 
+// Una consulta que no cambia nada: así, con un email que existe o que no,
+// se hace la misma cantidad de idas y vueltas a la base (1 lectura + 2 escrituras).
+const ID_INEXISTENTE = "00000000-0000-0000-0000-000000000000";
+async function consultaDeRelleno(db: PrismaClient) {
+  await db.usuario.updateMany({ where: { id: ID_INEXISTENTE }, data: { intentosFallidos: { increment: 1 } } });
+}
+
 // Comprueba la contraseña de un usuario y cuenta el intento. El intento se
 // anota ANTES de comprobar, así ni mandando muchos a la vez se pasan del límite.
 // Si da "ok", el que llama pone el contador en cero junto con lo que haga.
@@ -50,7 +57,9 @@ async function probarContrasena(
     data: { intentosFallidos: { increment: 1 } },
   });
   let ultimo = false;
-  if (comun.count === 0) {
+  if (comun.count === 1) {
+    await consultaDeRelleno(db);
+  } else {
     // Es el último intento permitido: se bloquea de antemano y, si acierta, se desbloquea.
     const bloqueo = await db.usuario.updateMany({
       where: { id: usuario.id, intentosFallidos: { gte: MAX_INTENTOS - 1 }, ...libre },
@@ -111,7 +120,9 @@ export async function ingresarConContrasena(
   });
 
   if (!usuario || !usuario.activo) {
-    // Misma demora que con un email que existe, para no delatar cuáles existen.
+    // Mismo trabajo que con un email que existe, para no delatar cuáles existen.
+    await consultaDeRelleno(db);
+    await consultaDeRelleno(db);
     await demorar(contrasena);
     return { ok: false, motivo: "incorrecta" };
   }

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 
 import { BotonSalir } from "@/components/boton-salir";
 import { obtenerSesionActual } from "@/lib/auth/actual";
@@ -8,10 +8,18 @@ import { inicioSegunRol } from "@/lib/auth/cuentas";
 
 import { FormularioContrasena } from "./formulario";
 
-export const metadata: Metadata = {
-  title: "Cambiar contraseña",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  let obligatoria = false;
+  try {
+    obligatoria = (await obtenerSesionActual())?.usuario.debeCambiarContrasena ?? false;
+  } catch (error) {
+    unstable_rethrow(error); // si la base falla, la página misma muestra el error
+  }
+  return {
+    title: obligatoria ? "Elegí tu contraseña" : "Cambiar contraseña",
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function PaginaContrasena() {
   const sesion = await obtenerSesionActual();
