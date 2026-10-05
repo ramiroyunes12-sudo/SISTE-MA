@@ -1,5 +1,7 @@
 // Arma las opciones de conexión a PostgreSQL a partir de las variables de entorno.
 
+import { SUPABASE_ROOT_CA_2021 } from "./supabase-ca";
+
 export type MotivoErrorConfigDb =
   | "falta_database_url"
   | "database_url_invalida"
@@ -74,13 +76,20 @@ export function opcionesConexion(env: VariablesDb): OpcionesConexion {
 
   // Supabase firma sus certificados con su propia autoridad (Supabase Root 2021 CA),
   // que Node no conoce. Para cifrar y además verificar el servidor, hay que pasarle ese certificado.
-  const ca = env.DATABASE_CA_CERT?.replace(/\\n/g, "\n").trim();
+  // DATABASE_CA_CERT permite usar otro (por ejemplo, si Supabase lo renueva o se cambia de proveedor).
+  const ca =
+    env.DATABASE_CA_CERT?.replace(/\\n/g, "\n").trim() ||
+    (esHostDeSupabase(host) ? SUPABASE_ROOT_CA_2021 : undefined);
   if (!ca) {
     throw new ErrorConfigDb(
       "falta_certificado",
-      "Falta la variable DATABASE_CA_CERT con el certificado de Supabase (ver README).",
+      "La base no es de Supabase: falta la variable DATABASE_CA_CERT con el certificado del servidor.",
     );
   }
 
   return { connectionString, ssl: { ca, rejectUnauthorized: true } };
+}
+
+function esHostDeSupabase(host: string) {
+  return host.endsWith(".supabase.com") || host.endsWith(".supabase.co");
 }

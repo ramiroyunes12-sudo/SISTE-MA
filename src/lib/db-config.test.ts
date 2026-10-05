@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ErrorConfigDb, opcionesConexion } from "./db-config";
+import { SUPABASE_ROOT_CA_2021 } from "./supabase-ca";
 
 const CERT = "-----BEGIN CERTIFICATE-----\nABC\n-----END CERTIFICATE-----";
 const SUPABASE =
@@ -39,13 +40,26 @@ describe("opcionesConexion", () => {
     expect(opciones.ssl).toBe(false);
   });
 
-  it("en una base remota exige el certificado", () => {
-    expect(motivoDe(() => opcionesConexion({ DATABASE_URL: SUPABASE }))).toBe(
-      "falta_certificado",
-    );
+  it("en Supabase usa su certificado sin necesidad de cargarlo", () => {
+    for (const url of [SUPABASE, "postgresql://postgres:x@db.abc.supabase.co:5432/postgres"]) {
+      const opciones = opcionesConexion({ DATABASE_URL: url });
+      expect(opciones.ssl).toEqual({ ca: SUPABASE_ROOT_CA_2021, rejectUnauthorized: true });
+    }
   });
 
-  it("en una base remota verifica el servidor con el certificado", () => {
+  it("en otra base remota exige el certificado", () => {
+    for (const url of [
+      "postgresql://u:p@db.ejemplo.com:5432/postgres",
+      // que "supabase.com" aparezca en el nombre no alcanza
+      "postgresql://u:p@supabase.com.ejemplo.net:5432/postgres",
+    ]) {
+      expect(motivoDe(() => opcionesConexion({ DATABASE_URL: url }))).toBe(
+        "falta_certificado",
+      );
+    }
+  });
+
+  it("DATABASE_CA_CERT reemplaza al certificado de Supabase", () => {
     const opciones = opcionesConexion({ DATABASE_URL: SUPABASE, DATABASE_CA_CERT: CERT });
     expect(opciones.ssl).toEqual({ ca: CERT, rejectUnauthorized: true });
   });

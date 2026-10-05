@@ -22,43 +22,19 @@ Después abrí http://localhost:3000 en el navegador.
 
 ## Base de datos (Supabase)
 
-El sistema guarda todo en una base PostgreSQL en [Supabase](https://supabase.com). Se configura con tres variables:
+El sistema guarda todo en una base PostgreSQL en [Supabase](https://supabase.com) (proyecto en São Paulo). Se conecta con un usuario propio, `entradas_app`, que no es administrador: la contraseña principal de Supabase queda solo para el dueño.
 
 | Variable | Qué es |
 |---|---|
 | `DATABASE_URL` | Dirección que usa el sistema (Transaction pooler, puerto **6543**). |
 | `DIRECT_URL` | Dirección para crear y modificar tablas (Session pooler, puerto **5432**). |
-| `DATABASE_CA_CERT` | Certificado de Supabase, para que la conexión vaya cifrada y verificada. |
+| `DATABASE_CA_CERT` | Opcional. El certificado de Supabase ya viene en el código (`src/lib/supabase-ca.ts`). |
 
-### 1. Crear el proyecto
+Las direcciones tienen contraseña: van solo en Vercel (Settings → Environment Variables) o en tu `.env`. **Nunca en GitHub.**
 
-1. En supabase.com → **New project**.
-2. **Database Password**: usá solo letras y números (los símbolos rompen la dirección de conexión). Guardala bien.
-3. **Region**: South America (São Paulo), la más cercana a Argentina.
+### Probar la conexión
 
-### 2. Copiar las direcciones
-
-En el proyecto, botón **Connect** (arriba):
-
-- **Transaction pooler** → copiá la dirección en `DATABASE_URL`.
-- **Session pooler** → copiá la dirección en `DIRECT_URL`.
-
-En las dos, reemplazá `[YOUR-PASSWORD]` por tu contraseña (sin los corchetes).
-
-### 3. Bajar el certificado
-
-En **Database → Settings → SSL Configuration** tocá **Download certificate** (se baja `prod-ca-2021.crt`). Abrilo con el Bloc de notas y copiá todo el texto, desde `-----BEGIN CERTIFICATE-----` hasta `-----END CERTIFICATE-----`, en `DATABASE_CA_CERT`.
-
-> El certificado es público (es igual para todos los proyectos de Supabase). Las direcciones de conexión, en cambio, **tienen tu contraseña**: no las compartas ni las subas a GitHub.
-
-### 4. Cargar las variables
-
-- **En Vercel** (para probarlo en internet): Project → **Settings → Environment Variables**, una por una.
-- **En tu compu**: en el archivo `.env` (copia de `.env.example`).
-
-### 5. Probar la conexión
-
-Abrí `/api/salud` (por ejemplo `https://tu-proyecto.vercel.app/api/salud` o `http://localhost:3000/api/salud`):
+Abrí https://siste-ma.vercel.app/api/salud (o `http://localhost:3000/api/salud` en tu compu):
 
 - `{"estado":"ok","baseDeDatos":"conectada"}` → anda.
 - Si dice `"estado":"error"`, mirá el `motivo`:
@@ -67,16 +43,12 @@ Abrí `/api/salud` (por ejemplo `https://tu-proyecto.vercel.app/api/salud` o `ht
 |---|---|
 | `falta_database_url` | No está cargada `DATABASE_URL`. |
 | `database_url_invalida` | La dirección está mal copiada o la contraseña tiene símbolos. |
-| `falta_certificado` | No está cargado `DATABASE_CA_CERT`. |
-| `sin_conexion` | Contraseña incorrecta, certificado mal pegado o Supabase pausado. El detalle está en los logs de Vercel. |
+| `falta_certificado` | La base no es de Supabase y falta `DATABASE_CA_CERT`. |
+| `sin_conexion` | Contraseña incorrecta o Supabase pausado. El detalle está en los logs de Vercel. |
 
-## Probarlo en internet (Vercel)
+## Publicación (Vercel)
 
-1. En vercel.com → **Add New… → Project** → importá el repo **SISTE-MA**.
-2. Antes de tocar **Deploy**, abrí **Environment Variables** y cargá las tres variables de arriba.
-3. **Deploy**. Al terminar te da una dirección tipo `https://siste-ma.vercel.app`.
-
-Cada vez que se sube un cambio a GitHub, Vercel lo vuelve a publicar solo.
+El proyecto `siste-ma` de Vercel está conectado a este repo: cada cambio que se sube a GitHub se publica solo en https://siste-ma.vercel.app. Las funciones corren en São Paulo (`gru1`, en `vercel.json`), al lado de la base.
 
 ## Comandos
 
