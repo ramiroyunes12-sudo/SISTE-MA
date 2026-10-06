@@ -69,7 +69,10 @@ where usuario_id = (select id from entradas.usuarios where email = ${textoSql(em
 async function conectarYHacer() {
   const db = new PrismaClient({ adapter: new PrismaPg(opcionesConexion(process.env)) });
   try {
-    const existe = await db.usuario.findUnique({ where: { email }, select: { id: true } });
+    const existe = await db.usuario.findUnique({
+      where: { email },
+      select: { id: true, productora: { select: { nombre: true, activa: true } } },
+    });
     if (existe && (nombre || rolPedido)) {
       cortar("Ese usuario ya existe: este comando solo le resetea la contraseña (sacá --nombre y --rol).");
     }
@@ -80,10 +83,12 @@ async function conectarYHacer() {
     console.log(`  ${usuario.nombre} <${usuario.email}> · ${usuario.rol}`);
     console.log(`  Contraseña temporal: ${temporal}`);
     console.log(`  Vence: ${venceEn.toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" })}`);
-    if (usuario.activo) {
-      console.log("  Al entrar en /ingresar le va a pedir que elija una propia.");
-    } else {
+    if (!usuario.activo) {
       console.log("  OJO: la cuenta está DESACTIVADA. La temporal no va a servir hasta reactivarla.");
+    } else if (existe?.productora && !existe.productora.activa) {
+      console.log(`  OJO: su productora (${existe.productora.nombre}) está DESACTIVADA. La temporal no va a servir hasta reactivarla.`);
+    } else {
+      console.log("  Al entrar en /ingresar le va a pedir que elija una propia.");
     }
   } finally {
     await db.$disconnect();

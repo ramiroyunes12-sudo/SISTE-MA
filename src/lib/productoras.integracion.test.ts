@@ -125,6 +125,33 @@ describe.skipIf(!url)("productoras y su gente", { timeout: 60_000 }, () => {
     expect(await ingresarConContrasena(db, una.email, una.cuenta.temporal)).toMatchObject({ ok: true });
   });
 
+  it("al desactivar la productora se cierran sus sesiones: reactivarla no las revive", async () => {
+    const una = await nueva();
+    const persona = await db.usuario.findUniqueOrThrow({ where: { email: una.email } });
+    const token = await crearSesion(db, persona.id);
+    const nombre = (await db.productora.findUniqueOrThrow({ where: { id: una.productoraId } })).nombre;
+    await editarProductora(db, una.productoraId, { nombre, activa: false });
+    await editarProductora(db, una.productoraId, { nombre, activa: true }); // sin usar la sesión en el medio
+    expect(await validarSesion(db, token)).toBeNull();
+  });
+
+  it("avisa si la contraseña temporal no va a servir (persona o productora desactivada)", async () => {
+    const una = await nueva();
+    const persona = await db.usuario.findUniqueOrThrow({ where: { email: una.email } });
+    expect(una.cuenta.sirve).toBe(true);
+
+    await cambiarActivo(db, una.productoraId, persona.id, false);
+    expect(await nuevaTemporal(db, una.productoraId, persona.id)).toMatchObject({ ok: true, cuenta: { sirve: false } });
+    await cambiarActivo(db, una.productoraId, persona.id, true);
+    expect(await nuevaTemporal(db, una.productoraId, persona.id)).toMatchObject({ ok: true, cuenta: { sirve: true } });
+
+    const nombre = (await db.productora.findUniqueOrThrow({ where: { id: una.productoraId } })).nombre;
+    await editarProductora(db, una.productoraId, { nombre, activa: false });
+    expect(
+      await agregarPersona(db, una.productoraId, { nombrePersona: "Pedro Puerta", email: `p-${unico()}@ejemplo.com` }),
+    ).toMatchObject({ ok: true, cuenta: { sirve: false } });
+  });
+
   it("la base exige productora para organizadores y validadores, y ninguna para el dueño", async () => {
     const hash = await hashearContrasena("una frase cualquiera");
     const { productoraId } = await nueva();

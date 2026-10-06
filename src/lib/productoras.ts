@@ -7,7 +7,9 @@ import { normalizarEmail, prepararTemporal } from "./auth/cuentas";
 import { unicoRepetido } from "./errores-db";
 
 export type Errores = Record<string, string>;
-export type CuentaNueva = { email: string; temporal: string; venceEn: Date };
+// `sirve`: false si la persona o su productora están desactivadas (la
+// contraseña no va a andar hasta reactivarlas).
+export type CuentaNueva = { email: string; temporal: string; venceEn: Date; sirve: boolean };
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const ROLES_DE_PRODUCTORA = ["ORGANIZADOR", "VALIDADOR"] as const;
@@ -55,7 +57,7 @@ export async function crearProductora(
       });
       return productora.id;
     });
-    return { ok: true, productoraId, cuenta: { email: persona.email, temporal, venceEn } };
+    return { ok: true, productoraId, cuenta: { email: persona.email, temporal, venceEn, sirve: true } };
   } catch (error) {
     const repetido = unicoRepetido(error);
     if (repetido === NOMBRE_REPETIDO) return { ok: false, errores: { nombre: "Ya hay una productora con ese nombre." } };
@@ -73,12 +75,15 @@ export async function editarProductora(
   const nombre = validarNombreProductora(entrada.nombre, errores);
   if (Object.keys(errores).length) return { ok: false, errores };
   try {
-    // Al desactivarla, su gente queda afuera enseguida (validarSesion mira si está activa).
-    const { count } = await db.productora.updateMany({
-      where: { id: productoraId },
-      data: { nombre, activa: entrada.activa === true },
+    const activa = entrada.activa === true;
+    const existe = await db.$transaction(async (tx) => {
+      const { count } = await tx.productora.updateMany({ where: { id: productoraId }, data: { nombre, activa } });
+      // Al desactivarla, se cierran las sesiones de toda su gente: quedan afuera
+      // enseguida, y si después se reactiva, tienen que volver a ingresar.
+      if (count === 1 && !activa) await tx.sesion.deleteMany({ where: { usuario: { productoraId } } });
+      return count === 1;
     });
-    return count === 1 ? { ok: true } : { ok: false, errores: { general: "Esa productora ya no existe." } };
+    return existe ? { ok: true } : { ok: false, errores: { general: "Esa productora ya no existe." } };
   } catch (error) {
     if (unicoRepetido(error) === NOMBRE_REPETIDO) {
       return { ok: false, errores: { nombre: "Ya hay una productora con ese nombre." } };
@@ -98,7 +103,7 @@ export async function agregarPersona(
   const persona = validarPersona({ nombre: entrada.nombrePersona, email: entrada.email, rol: entrada.rol }, errores);
   if (Object.keys(errores).length) return { ok: false, errores };
 
-  const productora = await db.productora.findUnique({ where: { id: productoraId }, select: { id: true } });
+  const productora = await db.productora.findUnique({ where: { id: productoraId }, select: { activa: true } });
   if (!productora) return { ok: false, errores: { general: "Esa productora ya no existe." } };
 
   const { temporal, venceEn, datos } = await prepararTemporal(ahora);
@@ -106,7 +111,7 @@ export async function agregarPersona(
     await db.usuario.create({
       data: { ...datos, nombre: persona.nombre, email: persona.email, rol: persona.rol, productoraId },
     });
-    return { ok: true, cuenta: { email: persona.email, temporal, venceEn } };
+    return { ok: true, cuenta: { email: persona.email, temporal, venceEn, sirve: productora.activa } };
   } catch (error) {
     if (unicoRepetido(error) === EMAIL_REPETIDO) return { ok: false, errores: { email: "Ese email ya tiene una cuenta." } };
     throw error;
@@ -123,14 +128,18 @@ export async function nuevaTemporal(
 ): Promise<{ ok: true; cuenta: CuentaNueva } | { ok: false; error: string }> {
   const { temporal, venceEn, datos } = await prepararTemporal(ahora);
   const usuario = await db.$transaction(async (tx) => {
-    const encontrado = await tx.usuario.findFirst({ where: { id: usuarioId, productoraId }, select: { id: true, email: true } });
+    const encontrado = await tx.usuario.findFirst({
+      where: { id: usuarioId, productoraId },
+      select: { id: true, email: true, activo: true, productora: { select: { activa: true } } },
+    });
     if (!encontrado) return null;
     await tx.usuario.update({ where: { id: encontrado.id }, data: datos });
     await tx.sesion.deleteMany({ where: { usuarioId: encontrado.id } });
     return encontrado;
   });
   if (!usuario) return { ok: false, error: "Esa persona ya no está en esta productora." };
-  return { ok: true, cuenta: { email: usuario.email, temporal, venceEn } };
+  const sirve = usuario.activo && usuario.productora?.activa === true;
+  return { ok: true, cuenta: { email: usuario.email, temporal, venceEn, sirve } };
 }
 
 // Activar o desactivar a alguien de la productora (al desactivar, queda afuera enseguida).

@@ -31,6 +31,18 @@ export function CuentaCreada({ cuenta }: { cuenta: CuentaNueva }) {
     }
   }
 
+  if (!cuenta.sirve) {
+    return (
+      <div role="status" className="flex flex-col gap-2 rounded-xl bg-error/10 p-4 text-error">
+        <p className="font-semibold">Contraseña temporal para {cuenta.email}: {cuenta.temporal}</p>
+        <p className="text-sm">
+          OJO: la persona o su productora están desactivadas. Esta contraseña no va a servir hasta reactivarlas (vence el{" "}
+          {vence}).
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div role="status" className="flex flex-col gap-2 rounded-xl border border-ok/30 bg-ok/10 p-4 text-ok-oscuro">
       <p className="font-semibold">Cuenta lista para {cuenta.email}</p>

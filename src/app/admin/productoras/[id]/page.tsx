@@ -10,6 +10,8 @@ import { AccionesPersona, FormularioAgregarPersona, FormularioEditarProductora }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const ROL = { ORGANIZADOR: "Organizador", VALIDADOR: "Validador", ADMIN: "Admin" } as const;
+// Primero los organizadores, después los validadores.
+const ORDEN_ROL = { ADMIN: 0, ORGANIZADOR: 1, VALIDADOR: 2 } as const;
 
 export default async function PaginaProductora({ params }: PageProps<"/admin/productoras/[id]">) {
   await requerirUsuario(["ADMIN"]);
@@ -20,7 +22,7 @@ export default async function PaginaProductora({ params }: PageProps<"/admin/pro
     where: { id },
     include: {
       usuarios: {
-        orderBy: [{ rol: "asc" }, { nombre: "asc" }],
+        orderBy: { nombre: "asc" },
         select: {
           id: true,
           nombre: true,
@@ -35,6 +37,7 @@ export default async function PaginaProductora({ params }: PageProps<"/admin/pro
     },
   });
   if (!productora) notFound();
+  const personas = [...productora.usuarios].sort((a, b) => ORDEN_ROL[a.rol] - ORDEN_ROL[b.rol]);
 
   return (
     <>
@@ -59,7 +62,7 @@ export default async function PaginaProductora({ params }: PageProps<"/admin/pro
           </p>
         </div>
         <ul>
-          {productora.usuarios.map((persona) => (
+          {personas.map((persona) => (
             <li
               key={persona.id}
               className="flex flex-wrap items-start justify-between gap-3 border-t border-[#EDEDE8] px-5 py-4"
