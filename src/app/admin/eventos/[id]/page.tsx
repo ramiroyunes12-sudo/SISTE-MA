@@ -8,7 +8,9 @@ import type { EventoEditado } from "@/lib/eventos/editor";
 import { estadosDeLotes } from "@/lib/eventos/lotes";
 import { aFechaLocal } from "@/lib/fechas";
 
+import { simularCompraAccion } from "../acciones";
 import { EditorEvento, type InfoLote } from "../editor";
+import { SimuladorCompra } from "../simulador";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -59,15 +61,24 @@ export default async function PaginaEditarEvento({ params, searchParams }: PageP
   }
 
   return (
-    <EditorEvento
-      // Al guardar cambia la fecha de actualización: el editor arranca de nuevo con lo guardado.
-      key={evento.actualizadoEn.toISOString()}
-      eventoId={evento.id}
-      inicial={inicial}
-      infoLotes={infoLotes}
-      cortesiasEmitidas={evento.cortesiasEmitidas}
-      guardado={guardado === "1"}
-      productoraNombre={usuario.rol === "ADMIN" ? evento.productora.nombre : undefined}
-    />
+    <>
+      <EditorEvento
+        // Al guardar cambia la fecha de actualización: el editor arranca de nuevo con lo guardado.
+        key={evento.actualizadoEn.toISOString()}
+        eventoId={evento.id}
+        inicial={inicial}
+        infoLotes={infoLotes}
+        cortesiasEmitidas={evento.cortesiasEmitidas}
+        guardado={guardado === "1"}
+        productoraNombre={usuario.rol === "ADMIN" ? evento.productora.nombre : undefined}
+      />
+      <SimuladorCompra
+        // Se vuelve a armar al guardar: los tipos pueden haber cambiado.
+        key={evento.actualizadoEn.toISOString()}
+        accion={simularCompraAccion.bind(null, evento.id)}
+        tipos={evento.tipos.map((tipo) => ({ id: tipo.id, nombre: tipo.nombre }))}
+        maxPorCompra={evento.maxPorCompra}
+      />
+    </>
   );
 }

@@ -37,6 +37,13 @@ async function guardarEnTransaccion(
   datos: EventoValidado,
   alcance: Alcance,
 ): Promise<string> {
+  // Primero se bloquea el evento: si alguien está comprando, se espera a que
+  // termine, y nadie compra hasta que esto se guarde. Así los números de
+  // vendidas y reservadas que se leen abajo no cambian en el medio (ver
+  // src/lib/ventas/reservas.ts).
+  if (eventoId) {
+    await tx.$queryRaw`SELECT id FROM entradas.eventos WHERE id = ${eventoId}::uuid FOR UPDATE`;
+  }
   // Solo se encuentra si es de la productora de quien edita (el ADMIN, cualquiera).
   const actual = eventoId
     ? await tx.evento.findFirst({
@@ -142,7 +149,9 @@ async function guardarEnTransaccion(
           [`tipos.${t}.nombre`]: `No se puede quitar "${lote.nombre}": ya tiene entradas vendidas o reservadas.`,
         });
       }
-      await tx.lote.delete({ where: { id: lote.id } });
+      // Solo si sigue sin ventas ni reservas (además del bloqueo de arriba).
+      const { count } = await tx.lote.deleteMany({ where: { id: lote.id, vendidas: 0, reservadas: 0 } });
+      if (count !== 1) throw new ErrorDeGuardado({ general: DESACTUALIZADO });
     }
 
     // Los lotes nuevos van al final, con el número que sigue.
