@@ -14,12 +14,29 @@ datasource db {
   schemas  = ["entradas"]
 }
 
-// ─── Usuarios del panel y de la puerta ────────────────────────────────────────
+// ─── Productoras, usuarios del panel y de la puerta ───────────────────────────
 
 enum Rol {
-  ADMIN
-  VALIDADOR
+  ADMIN // dueño de la plataforma: ve y maneja todo
+  ORGANIZADOR // de una productora: sus eventos y sus números
+  VALIDADOR // de una productora: solo la puerta
 
+  @@schema("entradas")
+}
+
+// Quien organiza eventos usando la plataforma. Cada evento es de una productora
+// y su gente solo ve lo suyo. Desactivarla corta el acceso de toda su gente.
+model Productora {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  nombre        String   @unique
+  activa        Boolean  @default(true)
+  creadaEn      DateTime @default(now()) @map("creada_en") @db.Timestamptz(3)
+  actualizadaEn DateTime @updatedAt @map("actualizada_en") @db.Timestamptz(3)
+
+  usuarios Usuario[]
+  eventos  Evento[]
+
+  @@map("productoras")
   @@schema("entradas")
 }
 
@@ -29,6 +46,8 @@ model Usuario {
   email                 String    @unique // siempre en minúsculas
   hashContrasena        String    @map("hash_contrasena") // scrypt; nunca la contraseña en sí
   rol                   Rol       @default(VALIDADOR)
+  // ADMIN no tiene productora; ORGANIZADOR y VALIDADOR, sí (lo controla la base).
+  productoraId          String?   @map("productora_id") @db.Uuid
   activo                Boolean   @default(true)
   // Contraseña temporal: al entrar, primero tiene que elegir una propia.
   // Vence a las 72 horas (null = no vence).
@@ -41,11 +60,13 @@ model Usuario {
   creadoEn              DateTime  @default(now()) @map("creado_en") @db.Timestamptz(3)
   actualizadoEn         DateTime  @updatedAt @map("actualizado_en") @db.Timestamptz(3)
 
+  productora        Productora? @relation(fields: [productoraId], references: [id], onDelete: Restrict)
   sesiones          Sesion[]
-  entradasValidadas Entrada[] @relation("ValidadaPor")
-  cortesiasEmitidas Orden[]   @relation("EmitidaPor")
+  entradasValidadas Entrada[]   @relation("ValidadaPor")
+  cortesiasEmitidas Orden[]     @relation("EmitidaPor")
   escaneos          Escaneo[]
 
+  @@index([productoraId])
   @@map("usuarios")
   @@schema("entradas")
 }
@@ -78,6 +99,7 @@ enum EstadoEvento {
 
 model Evento {
   id                String       @id @default(uuid(7)) @db.Uuid
+  productoraId      String       @map("productora_id") @db.Uuid
   slug              String       @unique // parte de la dirección: /e/fiesta-primavera
   nombre            String
   descripcion       String?
@@ -92,11 +114,13 @@ model Evento {
   creadoEn          DateTime     @default(now()) @map("creado_en") @db.Timestamptz(3)
   actualizadoEn     DateTime     @updatedAt @map("actualizado_en") @db.Timestamptz(3)
 
-  tipos    TipoEntrada[]
-  ordenes  Orden[]
-  entradas Entrada[]
-  escaneos Escaneo[]
+  productora Productora    @relation(fields: [productoraId], references: [id], onDelete: Restrict)
+  tipos      TipoEntrada[]
+  ordenes    Orden[]
+  entradas   Entrada[]
+  escaneos   Escaneo[]
 
+  @@index([productoraId])
   @@map("eventos")
   @@schema("entradas")
 }

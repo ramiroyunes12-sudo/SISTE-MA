@@ -1,7 +1,7 @@
 import { requerirUsuario } from "@/lib/auth/actual";
 
 export default async function PaginaResumen({ searchParams }: PageProps<"/admin">) {
-  const usuario = await requerirUsuario(["ADMIN"]);
+  const usuario = await requerirUsuario(["ADMIN", "ORGANIZADOR"]);
   const { contrasena } = await searchParams;
 
   return (

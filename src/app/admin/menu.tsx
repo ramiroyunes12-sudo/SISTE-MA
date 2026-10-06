@@ -5,8 +5,9 @@ import { usePathname } from "next/navigation";
 
 // Secciones del panel. Las que todavía no existen se muestran apagadas.
 // (El número es el paso del plan en el que se arma cada una.)
-const SECCIONES: { texto: string; href?: string; paso?: number }[] = [
+const SECCIONES: { texto: string; href?: string; paso?: number; soloAdmin?: boolean }[] = [
   { texto: "Resumen", href: "/admin" },
+  { texto: "Productoras", href: "/admin/productoras", soloAdmin: true },
   { texto: "Evento y lotes", href: "/admin/eventos" },
   { texto: "Ventas", paso: 20 },
   { texto: "Cortesías", paso: 19 },
@@ -20,11 +21,11 @@ function esActual(ruta: string, href: string) {
   return ruta === href || (href !== "/admin" && ruta.startsWith(`${href}/`));
 }
 
-export function MenuAdmin() {
+export function MenuAdmin({ esAdmin }: { esAdmin: boolean }) {
   const ruta = usePathname();
   return (
     <ul className="flex flex-col gap-1">
-      {SECCIONES.map(({ texto, href }) => (
+      {SECCIONES.filter((seccion) => esAdmin || !seccion.soloAdmin).map(({ texto, href }) => (
         <li key={texto}>
           {href ? (
             <Link

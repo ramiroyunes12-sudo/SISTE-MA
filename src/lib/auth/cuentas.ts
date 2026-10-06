@@ -3,7 +3,13 @@ import type { PrismaClient, Rol } from "@/generated/prisma/client";
 
 import { generarContrasenaTemporal, HASH_DE_RELLENO, hashearContrasena, verificarContrasena } from "./contrasenas";
 import { LARGO_MAXIMO, problemaConContrasenaNueva } from "./reglas";
-import { crearSesion, type UsuarioDeSesion } from "./sesiones";
+import {
+  aUsuarioDeSesion,
+  CAMPOS_USUARIO_DE_SESION,
+  crearSesion,
+  puedeEntrar,
+  type UsuarioDeSesion,
+} from "./sesiones";
 
 // 5 contraseñas mal seguidas → 15 minutos bloqueado. Después del bloqueo
 // queda 1 intento cada 15 minutos hasta que acierte.
@@ -16,9 +22,9 @@ export function normalizarEmail(valor: unknown) {
   return typeof valor === "string" ? valor.trim().toLowerCase() : "";
 }
 
-// Adónde va cada uno después de ingresar.
+// Adónde va cada uno después de ingresar: el panel, o la puerta si es validador.
 export function inicioSegunRol(rol: Rol) {
-  return rol === "ADMIN" ? "/admin" : "/validar";
+  return rol === "VALIDADOR" ? "/validar" : "/admin";
 }
 
 type ParaProbar = {
@@ -107,19 +113,11 @@ export async function ingresarConContrasena(
 ): Promise<ResultadoIngreso> {
   const usuario = await db.usuario.findUnique({
     where: { email: normalizarEmail(email) },
-    select: {
-      id: true,
-      nombre: true,
-      email: true,
-      rol: true,
-      activo: true,
-      debeCambiarContrasena: true,
-      temporalVenceEn: true,
-      hashContrasena: true,
-    },
+    select: { ...CAMPOS_USUARIO_DE_SESION, temporalVenceEn: true, hashContrasena: true },
   });
 
-  if (!usuario || !usuario.activo) {
+  // Cuenta desactivada o de una productora desactivada: igual que si no existiera.
+  if (!usuario || !puedeEntrar(usuario)) {
     // Mismo trabajo que con un email que existe, para no delatar cuáles existen.
     await consultaDeRelleno(db);
     await consultaDeRelleno(db);
@@ -141,17 +139,7 @@ export async function ingresarConContrasena(
   });
   if (!token) return { ok: false, motivo: "incorrecta" };
 
-  return {
-    ok: true,
-    token,
-    usuario: {
-      id: usuario.id,
-      nombre: usuario.nombre,
-      email: usuario.email,
-      rol: usuario.rol,
-      debeCambiarContrasena: usuario.debeCambiarContrasena,
-    },
-  };
+  return { ok: true, token, usuario: aUsuarioDeSesion(usuario) };
 }
 
 export type ResultadoCambio = { ok: true; token: string } | { ok: false; error: string };
@@ -220,24 +208,32 @@ export async function cambiarContrasena(
   return { ok: true, token };
 }
 
-// Crea el usuario (o, si ya existe, le resetea la contraseña) con una
-// contraseña temporal que tiene que cambiar al entrar y que vence en 72 horas.
-// También lo desbloquea y le cierra las sesiones. Devuelve la temporal.
-export async function darContrasenaTemporal(
-  db: PrismaClient,
-  datos: { email: string; nombre: string; rol: Rol },
-  ahora = new Date(),
-) {
-  const email = normalizarEmail(datos.email);
+// Una contraseña temporal nueva (vence en 72 horas), ya cifrada y lista para
+// guardar. También destraba la cuenta.
+export async function prepararTemporal(ahora = new Date()) {
   const temporal = generarContrasenaTemporal();
   const venceEn = new Date(ahora.getTime() + HORAS_TEMPORAL * 60 * 60 * 1000);
-  const comun = {
+  const datos = {
     hashContrasena: await hashearContrasena(temporal),
     debeCambiarContrasena: true,
     temporalVenceEn: venceEn,
     intentosFallidos: 0,
     bloqueadoHasta: null,
   };
+  return { temporal, venceEn, datos };
+}
+
+// Crea el usuario (o, si ya existe, le resetea la contraseña) con una
+// contraseña temporal que tiene que cambiar al entrar y que vence en 72 horas.
+// También lo desbloquea y le cierra las sesiones. Devuelve la temporal.
+// (Lo usa `npm run usuario`; el panel usa las funciones de lib/productoras.)
+export async function darContrasenaTemporal(
+  db: PrismaClient,
+  datos: { email: string; nombre: string; rol: Rol; productoraId?: string | null },
+  ahora = new Date(),
+) {
+  const email = normalizarEmail(datos.email);
+  const { temporal, venceEn, datos: comun } = await prepararTemporal(ahora);
   const campos = { id: true, nombre: true, email: true, rol: true, activo: true } as const;
 
   const usuario = await db.$transaction(async (tx) => {
@@ -245,7 +241,13 @@ export async function darContrasenaTemporal(
     const resultado = existe
       ? await tx.usuario.update({ where: { id: existe.id }, data: comun, select: campos })
       : await tx.usuario.create({
-          data: { email, nombre: datos.nombre.trim(), rol: datos.rol, ...comun },
+          data: {
+            email,
+            nombre: datos.nombre.trim(),
+            rol: datos.rol,
+            productoraId: datos.productoraId ?? null,
+            ...comun,
+          },
           select: campos,
         });
     await tx.sesion.deleteMany({ where: { usuarioId: resultado.id } });

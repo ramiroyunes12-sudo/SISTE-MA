@@ -71,26 +71,42 @@ function formulario(campos: Record<string, string>) {
 describe.skipIf(!url)("acciones de ingreso y permisos", { timeout: 60_000 }, () => {
   let db: PrismaClient;
   let hash: string;
+  let productoraId: string;
   const emails: string[] = [];
 
   beforeAll(async () => {
     db = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
     simulado.db = db;
     hash = await hashearContrasena(CONTRASENA);
+    productoraId = (await db.productora.create({ data: { nombre: `Productora ${crypto.randomUUID()}` } })).id;
   });
 
   afterAll(async () => {
     if (!db) return;
     await db.usuario.deleteMany({ where: { email: { in: emails } } });
+    await db.productora.deleteMany({ where: { id: productoraId } });
     await db.$disconnect();
   });
 
   beforeEach(() => simulado.cookies.clear());
 
-  async function crearUsuario(datos: { rol?: "ADMIN" | "VALIDADOR"; activo?: boolean; debeCambiarContrasena?: boolean } = {}) {
+  // El ADMIN no tiene productora; organizadores y validadores, la del test.
+  async function crearUsuario(
+    datos: { rol?: "ADMIN" | "ORGANIZADOR" | "VALIDADOR"; activo?: boolean; debeCambiarContrasena?: boolean } = {},
+  ) {
     const email = `prueba-${crypto.randomUUID()}@ejemplo.com`;
     emails.push(email);
-    return db.usuario.create({ data: { email, nombre: "Persona de Prueba", hashContrasena: hash, rol: "ADMIN", ...datos } });
+    const rol = datos.rol ?? "ADMIN";
+    return db.usuario.create({
+      data: {
+        email,
+        nombre: "Persona de Prueba",
+        hashContrasena: hash,
+        ...datos,
+        rol,
+        productoraId: rol === "ADMIN" ? null : productoraId,
+      },
+    });
   }
 
   async function conSesion(usuarioId: string) {
@@ -119,6 +135,41 @@ describe.skipIf(!url)("acciones de ingreso y permisos", { timeout: 60_000 }, () 
     await conSesion(admin.id);
     expect(await requerirUsuario(["ADMIN"])).toMatchObject({ id: admin.id, rol: "ADMIN" });
     expect(await requerirUsuario(["ADMIN", "VALIDADOR"])).toMatchObject({ id: admin.id });
+  });
+
+  it("un organizador entra al panel y a la puerta, con su productora", async () => {
+    const organizador = await crearUsuario({ rol: "ORGANIZADOR" });
+    await conSesion(organizador.id);
+    expect(await requerirUsuario(["ADMIN", "ORGANIZADOR"])).toMatchObject({
+      id: organizador.id,
+      rol: "ORGANIZADOR",
+      productora: { id: productoraId },
+    });
+    expect(await requerirUsuario(["ADMIN", "ORGANIZADOR", "VALIDADOR"])).toMatchObject({ id: organizador.id });
+    // lo que es solo del dueño (Productoras), no: va a su inicio
+    expect(await destinoDe(requerirUsuario(["ADMIN"]))).toBe("/admin");
+  });
+
+  it("si se desactiva la productora, su gente queda afuera (y no puede volver a entrar)", async () => {
+    const otra = await db.productora.create({ data: { nombre: `Otra ${crypto.randomUUID()}` } });
+    const email = `prueba-${crypto.randomUUID()}@ejemplo.com`;
+    emails.push(email);
+    const organizador = await db.usuario.create({
+      data: { email, nombre: "Persona de Prueba", hashContrasena: hash, rol: "ORGANIZADOR", productoraId: otra.id },
+    });
+    try {
+      await conSesion(organizador.id);
+      await db.productora.update({ where: { id: otra.id }, data: { activa: false } });
+      expect(await destinoDe(requerirUsuario(["ADMIN", "ORGANIZADOR"]))).toBe("/ingresar");
+
+      simulado.cookies.clear();
+      const intento = await ingresar({}, formulario({ email, contrasena: CONTRASENA }));
+      expect(intento.error).toMatch(/^Email o contraseña incorrectos/);
+      expect(simulado.cookies.has("sesion")).toBe(false);
+    } finally {
+      await db.usuario.delete({ where: { id: organizador.id } });
+      await db.productora.delete({ where: { id: otra.id } });
+    }
   });
 
   it("con contraseña temporal, primero tiene que cambiarla", async () => {

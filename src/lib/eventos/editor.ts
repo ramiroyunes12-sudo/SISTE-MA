@@ -15,6 +15,7 @@ const MAX_PRECIO = 100_000_000; // centavos: un millón de pesos
 export type LoteEditado = { id?: string; nombre: string; precio: string; cupo: string };
 export type TipoEditado = { id?: string; nombre: string; lotes: LoteEditado[] };
 export type EventoEditado = {
+  productoraId?: string; // solo al crear, y solo lo elige el ADMIN
   nombre: string;
   slug: string;
   fecha: string; // "2026-11-21T23:00", hora argentina
@@ -31,6 +32,7 @@ export type EventoEditado = {
 export type LoteValidado = { id?: string; nombre: string; precioCentavos: number; cupo: number };
 export type TipoValidado = { id?: string; nombre: string; orden: number; lotes: LoteValidado[] };
 export type EventoValidado = {
+  productoraId: string | null; // la que eligió el ADMIN al crear (los demás: la suya)
   nombre: string;
   slug: string;
   slugAutomatico: boolean; // la persona no eligió dirección: se arma con el nombre
@@ -118,6 +120,9 @@ export function validarEvento(
   const cupoCortesias = entero(e.cupoCortesias, 0, MAX_CUPO);
   if (cupoCortesias === null) errores.cupoCortesias = `Un número de 0 a ${MAX_CUPO}.`;
 
+  const productoraId = idOpcional(e.productoraId);
+  if (productoraId === false) errores.productoraId = "Elegí una productora.";
+
   const estado = ESTADOS_EVENTO.find((opcion) => opcion === e.estado);
   if (!estado) errores.estado = "Elegí un estado.";
 
@@ -174,6 +179,7 @@ export function validarEvento(
   return {
     ok: true,
     datos: {
+      productoraId: productoraId || null,
       nombre,
       slug,
       slugAutomatico: !slugEscrito,

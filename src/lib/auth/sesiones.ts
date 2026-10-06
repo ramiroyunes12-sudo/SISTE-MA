@@ -20,7 +20,45 @@ export type UsuarioDeSesion = {
   email: string;
   rol: Rol;
   debeCambiarContrasena: boolean;
+  productora: { id: string; nombre: string } | null; // null solo para ADMIN
 };
+
+// Lo que hay que leer de la base para armar un UsuarioDeSesion.
+export const CAMPOS_USUARIO_DE_SESION = {
+  id: true,
+  nombre: true,
+  email: true,
+  rol: true,
+  activo: true,
+  debeCambiarContrasena: true,
+  productora: { select: { id: true, nombre: true, activa: true } },
+} as const;
+
+type UsuarioLeido = {
+  id: string;
+  nombre: string;
+  email: string;
+  rol: Rol;
+  activo: boolean;
+  debeCambiarContrasena: boolean;
+  productora: { id: string; nombre: string; activa: boolean } | null;
+};
+
+// ¿Puede usar el sistema? Cuenta activa y, si es de una productora, que esté activa.
+export function puedeEntrar(usuario: Pick<UsuarioLeido, "activo" | "productora">) {
+  return usuario.activo && (usuario.productora === null || usuario.productora.activa);
+}
+
+export function aUsuarioDeSesion(usuario: UsuarioLeido): UsuarioDeSesion {
+  return {
+    id: usuario.id,
+    nombre: usuario.nombre,
+    email: usuario.email,
+    rol: usuario.rol,
+    debeCambiarContrasena: usuario.debeCambiarContrasena,
+    productora: usuario.productora && { id: usuario.productora.id, nombre: usuario.productora.nombre },
+  };
+}
 
 export type Sesion = { id: string; usuario: UsuarioDeSesion };
 
@@ -68,15 +106,13 @@ export async function validarSesion(
     select: {
       creadaEn: true,
       expiraEn: true,
-      usuario: {
-        select: { id: true, nombre: true, email: true, rol: true, activo: true, debeCambiarContrasena: true },
-      },
+      usuario: { select: CAMPOS_USUARIO_DE_SESION },
     },
   });
   if (!sesion) return null;
 
   const { usuario } = sesion;
-  if (sesion.expiraEn <= ahora || !usuario.activo) {
+  if (sesion.expiraEn <= ahora || !puedeEntrar(usuario)) {
     await db.sesion.deleteMany({ where: { id } });
     return null;
   }
@@ -84,16 +120,7 @@ export async function validarSesion(
   const vencimiento = nuevoVencimiento(sesion.creadaEn, sesion.expiraEn, ahora);
   if (vencimiento) await db.sesion.updateMany({ where: { id }, data: { expiraEn: vencimiento } });
 
-  return {
-    id,
-    usuario: {
-      id: usuario.id,
-      nombre: usuario.nombre,
-      email: usuario.email,
-      rol: usuario.rol,
-      debeCambiarContrasena: usuario.debeCambiarContrasena,
-    },
-  };
+  return { id, usuario: aUsuarioDeSesion(usuario) };
 }
 
 export async function cerrarSesion(db: Db, token: string) {

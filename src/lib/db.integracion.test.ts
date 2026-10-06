@@ -14,11 +14,14 @@ describe.skipIf(!url)("reglas de la base de datos", () => {
   let db: PrismaClient;
   let eventoId: string;
   let tipoId: string;
+  let productoraId: string;
 
   beforeAll(async () => {
     db = new PrismaClient({ adapter: new PrismaPg({ connectionString: url, max: 30 }) });
+    productoraId = (await db.productora.create({ data: { nombre: `Productora ${crypto.randomUUID()}` } })).id;
     const evento = await db.evento.create({
       data: {
+        productoraId,
         slug: `prueba-${crypto.randomUUID()}`,
         nombre: "Evento de prueba",
         fecha: new Date("2030-01-01T23:00:00-03:00"),
@@ -38,6 +41,7 @@ describe.skipIf(!url)("reglas de la base de datos", () => {
     await db.pago.deleteMany({ where: { orden: { eventoId } } });
     await db.orden.deleteMany({ where: { eventoId } });
     await db.evento.delete({ where: { id: eventoId } });
+    await db.productora.delete({ where: { id: productoraId } });
     await db.$disconnect();
   });
 
@@ -109,6 +113,7 @@ describe.skipIf(!url)("reglas de la base de datos", () => {
   it("una entrada no puede mezclar datos de dos eventos", async () => {
     const otro = await db.evento.create({
       data: {
+        productoraId,
         slug: `prueba-${crypto.randomUUID()}`,
         nombre: "Otro evento",
         fecha: new Date("2030-02-01T23:00:00-03:00"),

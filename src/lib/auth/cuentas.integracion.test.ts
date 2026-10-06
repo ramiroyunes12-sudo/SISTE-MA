@@ -42,16 +42,19 @@ function conCambioEnElMedio(db: PrismaClient, cambio: () => Promise<unknown>): P
 describe.skipIf(!url)("cuentas y sesiones", { timeout: 60_000 }, () => {
   let db: PrismaClient;
   let hash: string;
+  let productoraId: string;
   const emails: string[] = [];
 
   beforeAll(async () => {
     db = new PrismaClient({ adapter: new PrismaPg({ connectionString: url, max: 20 }) });
     hash = await hashearContrasena(CONTRASENA);
+    productoraId = (await db.productora.create({ data: { nombre: `Productora ${crypto.randomUUID()}` } })).id;
   });
 
   afterAll(async () => {
     if (!db) return;
     await db.usuario.deleteMany({ where: { email: { in: emails } } }); // borra sus sesiones también
+    await db.productora.deleteMany({ where: { id: productoraId } });
     await db.$disconnect();
   });
 
@@ -278,7 +281,7 @@ describe.skipIf(!url)("cuentas y sesiones", { timeout: 60_000 }, () => {
   it("la temporal crea el usuario, o lo resetea: lo desbloquea y le cierra las sesiones", async () => {
     const email = emailNuevo();
     const ahora = new Date();
-    const creado = await darContrasenaTemporal(db, { email: email.toUpperCase(), nombre: " Ana ", rol: "VALIDADOR" }, ahora);
+    const creado = await darContrasenaTemporal(db, { email: email.toUpperCase(), nombre: " Ana ", rol: "VALIDADOR", productoraId }, ahora);
     expect(creado.usuario).toEqual({ id: expect.any(String), email, nombre: "Ana", rol: "VALIDADOR", activo: true });
     expect(creado.venceEn.getTime()).toBe(ahora.getTime() + HORAS_TEMPORAL * HORA);
     expect(await ingresarConContrasena(db, email, creado.temporal, ahora)).toMatchObject({
@@ -301,7 +304,7 @@ describe.skipIf(!url)("cuentas y sesiones", { timeout: 60_000 }, () => {
   it("la temporal vence a las 72 horas (para entrar y para cambiarla)", async () => {
     const email = emailNuevo();
     const ahora = new Date();
-    const { usuario, temporal } = await darContrasenaTemporal(db, { email, nombre: "Beto", rol: "VALIDADOR" }, ahora);
+    const { usuario, temporal } = await darContrasenaTemporal(db, { email, nombre: "Beto", rol: "VALIDADOR", productoraId }, ahora);
     const antes = new Date(ahora.getTime() + (HORAS_TEMPORAL - 1) * HORA);
     const despues = new Date(ahora.getTime() + (HORAS_TEMPORAL + 1) * HORA);
 

@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 // Puerta: acá va a ir el escáner de QR (paso 17) y la búsqueda por DNI (paso 18).
 export default async function PaginaValidar({ searchParams }: PageProps<"/validar">) {
-  const usuario = await requerirUsuario(["ADMIN", "VALIDADOR"]);
+  const usuario = await requerirUsuario(["ADMIN", "ORGANIZADOR", "VALIDADOR"]);
   const { contrasena } = await searchParams;
 
   return (
@@ -19,7 +19,7 @@ export default async function PaginaValidar({ searchParams }: PageProps<"/valida
       <header className="flex items-center justify-between gap-3 bg-tinta px-4 py-3 text-white">
         <span className="font-display font-extrabold">[TU MARCA] · Puerta</span>
         <div className="flex items-center gap-4 text-sm">
-          {usuario.rol === "ADMIN" && (
+          {usuario.rol !== "VALIDADOR" && (
             <Link href="/admin" className="text-white/80 underline hover:text-white">
               Panel
             </Link>

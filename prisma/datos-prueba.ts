@@ -1,9 +1,10 @@
-// Datos de prueba: un evento de ejemplo con sus tipos de entrada y lotes.
+// Datos de prueba: una productora y un evento de ejemplo con sus tipos de entrada y lotes.
 // Se pueden cargar varias veces: actualiza lo que existe, no duplica.
 // OJO: borrar este evento antes de empezar a vender de verdad.
 import type { PrismaClient } from "../src/generated/prisma/client";
 
 export const SLUG_EVENTO_PRUEBA = "evento-de-prueba";
+export const PRODUCTORA_PRUEBA = "Productora de prueba";
 
 const EVENTO = {
   nombre: "Evento de prueba",
@@ -35,9 +36,14 @@ const TIPOS = [
 ];
 
 export async function cargarDatosDePrueba(db: PrismaClient) {
+  const productora = await db.productora.upsert({
+    where: { nombre: PRODUCTORA_PRUEBA },
+    create: { nombre: PRODUCTORA_PRUEBA },
+    update: {},
+  });
   const evento = await db.evento.upsert({
     where: { slug: SLUG_EVENTO_PRUEBA },
-    create: { slug: SLUG_EVENTO_PRUEBA, ...EVENTO },
+    create: { slug: SLUG_EVENTO_PRUEBA, productoraId: productora.id, ...EVENTO },
     update: EVENTO,
   });
 

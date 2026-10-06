@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { requerirUsuario } from "@/lib/auth/actual";
+import { alcanceDe, filtroDeEventos } from "@/lib/auth/alcance";
 import { obtenerDb } from "@/lib/db";
 import { formatearFecha } from "@/lib/fechas";
 
@@ -11,10 +12,15 @@ const ESTADO = {
 } as const;
 
 export default async function PaginaEventos() {
-  await requerirUsuario(["ADMIN"]);
+  const usuario = await requerirUsuario(["ADMIN", "ORGANIZADOR"]);
+  const esAdmin = usuario.rol === "ADMIN";
   const eventos = await obtenerDb().evento.findMany({
+    where: filtroDeEventos(alcanceDe(usuario)),
     orderBy: { fecha: "desc" },
-    include: { tipos: { include: { lotes: { select: { cupo: true, vendidas: true } } } } },
+    include: {
+      productora: { select: { nombre: true } },
+      tipos: { include: { lotes: { select: { cupo: true, vendidas: true } } } },
+    },
   });
 
   return (
@@ -50,6 +56,7 @@ export default async function PaginaEventos() {
                     <span className="text-lg font-bold">{evento.nombre}</span>
                     <span className="text-sm text-tenue">
                       {formatearFecha(evento.fecha)} · {evento.lugar}
+                      {esAdmin && ` · ${evento.productora.nombre}`}
                     </span>
                   </div>
                   <div className="flex items-center gap-4 text-sm">

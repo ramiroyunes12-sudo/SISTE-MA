@@ -44,12 +44,16 @@ export function EditorEvento({
   infoLotes,
   cortesiasEmitidas,
   guardado,
+  productoras,
+  productoraNombre,
 }: {
   eventoId: string | null;
   inicial: EventoEditado;
   infoLotes: Record<string, InfoLote>;
   cortesiasEmitidas: number;
   guardado: boolean;
+  productoras?: { id: string; nombre: string }[]; // solo el ADMIN, al crear: para elegir
+  productoraNombre?: string; // solo el ADMIN, al editar: de quién es
 }) {
   const [original] = useState(() => conClaves(inicial));
   const [evento, setEvento] = useState(original);
@@ -170,6 +174,30 @@ export function EditorEvento({
       {/* ─── Datos del evento ─── */}
       <section className="flex flex-col gap-4 rounded-2xl border border-borde bg-superficie p-5">
         <h2 className="text-lg font-bold">Datos del evento</h2>
+        {productoraNombre && <p className="text-sm text-tenue">Productora: {productoraNombre}</p>}
+        {productoras && (
+          <div className="flex flex-col gap-1.5 sm:max-w-sm">
+            <label htmlFor="productoraId" className="text-sm font-semibold">
+              Productora
+            </label>
+            <select
+              id="productoraId"
+              value={evento.productoraId ?? ""}
+              onChange={(e) => cambiar("productoraId", e.target.value)}
+              aria-invalid={errores.productoraId ? true : undefined}
+              aria-describedby={errores.productoraId ? "productoraId-error" : undefined}
+              className={`h-12 ${ESTILO_CAMPO}`}
+            >
+              <option value="">Elegí de quién es el evento…</option>
+              {productoras.map((productora) => (
+                <option key={productora.id} value={productora.id}>
+                  {productora.nombre}
+                </option>
+              ))}
+            </select>
+            <ErrorDeCampo id="productoraId-error">{errores.productoraId}</ErrorDeCampo>
+          </div>
+        )}
         <div className="grid gap-4 sm:grid-cols-2">
           <Campo
             etiqueta="Nombre"
@@ -269,7 +297,21 @@ export function EditorEvento({
           />
           <ErrorDeCampo id="descripcion-error">{errores.descripcion}</ErrorDeCampo>
         </div>
-        <p className="text-sm text-tenue">El flyer (la imagen del evento) se sube en el próximo paso.</p>
+      </section>
+
+      {/* ─── Flyer: por ahora solo el lugar donde va ─── */}
+      <section className="flex flex-col gap-4 rounded-2xl border border-borde bg-superficie p-5">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-lg font-bold">Flyer</h2>
+          <p className="text-sm text-tenue">
+            Subir imágenes se habilita más adelante. Vas a poder agregarlas en cualquier momento, aunque el evento ya
+            esté a la venta.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-end gap-6">
+          <EspacioFlyer titulo="Historia de Instagram" medida="1080 × 1920" proporcion="aspect-[9/16]" ancho="w-36" />
+          <EspacioFlyer titulo="Publicación" medida="1080 × 1350" proporcion="aspect-[4/5]" ancho="w-48" />
+        </div>
       </section>
 
       {/* ─── Tipos de entrada y lotes ─── */}
@@ -414,6 +456,38 @@ export function EditorEvento({
         {sucio && !enviando && <span className="text-sm text-tenue">Tenés cambios sin guardar.</span>}
       </div>
     </form>
+  );
+}
+
+// Lugar marcado con líneas donde va a ir cada flyer, con su botón (todavía apagado).
+function EspacioFlyer({
+  titulo,
+  medida,
+  proporcion,
+  ancho,
+}: {
+  titulo: string;
+  medida: string;
+  proporcion: string;
+  ancho: string;
+}) {
+  return (
+    <div className={`flex ${ancho} flex-col gap-2`}>
+      <div
+        className={`${proporcion} flex w-full flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-borde-campo bg-fondo p-2 text-center text-xs text-tenue`}
+      >
+        <span className="font-semibold">{titulo}</span>
+        <span>{medida}</span>
+      </div>
+      <button
+        type="button"
+        disabled
+        title="Se habilita más adelante"
+        className="h-10 cursor-not-allowed rounded-lg border-[1.5px] border-dashed border-borde-campo text-sm font-semibold text-tenue"
+      >
+        Agregar imagen
+      </button>
+    </div>
   );
 }
 

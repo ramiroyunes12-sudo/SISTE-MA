@@ -5,10 +5,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { PrismaClient } from "@/generated/prisma/client";
 
+import { type Alcance, filtroDeEventos } from "@/lib/auth/alcance";
+
 import { type EventoEditado, type EventoValidado, validarEvento } from "./editor";
 import { guardarEvento } from "./guardar";
 
 const url = process.env.TEST_DATABASE_URL;
+const ADMIN: Alcance = { todo: true }; // el dueño de la plataforma ve todo
 
 function datos(cambios: Partial<EventoEditado> = {}): EventoValidado {
   const resultado = validarEvento({
@@ -39,10 +42,12 @@ function datos(cambios: Partial<EventoEditado> = {}): EventoValidado {
 
 describe.skipIf(!url)("guardar evento, tipos y lotes", { timeout: 60_000 }, () => {
   let db: PrismaClient;
+  let productoraId: string;
   const creados: string[] = [];
 
-  beforeAll(() => {
+  beforeAll(async () => {
     db = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
+    productoraId = (await db.productora.create({ data: { nombre: `Productora ${crypto.randomUUID()}` } })).id;
   });
 
   afterAll(async () => {
@@ -50,11 +55,12 @@ describe.skipIf(!url)("guardar evento, tipos y lotes", { timeout: 60_000 }, () =
     await db.entrada.deleteMany({ where: { eventoId: { in: creados } } });
     await db.orden.deleteMany({ where: { eventoId: { in: creados } } });
     await db.evento.deleteMany({ where: { id: { in: creados } } });
+    await db.productora.deleteMany({ where: { id: productoraId } });
     await db.$disconnect();
   });
 
   async function crear(cambios: Partial<EventoEditado> = {}) {
-    const resultado = await guardarEvento(db, null, datos(cambios));
+    const resultado = await guardarEvento(db, null, { ...datos(cambios), productoraId }, ADMIN);
     if (!resultado.ok) throw new Error(JSON.stringify(resultado.errores));
     creados.push(resultado.id);
     return leer(resultado.id);
@@ -109,7 +115,7 @@ describe.skipIf(!url)("guardar evento, tipos y lotes", { timeout: 60_000 }, () =
     pantalla.tipos[0].lotes[0].cupo = "35"; // justo lo ocupado: se puede
     pantalla.tipos[0].lotes.push({ nombre: "Lote 3", precio: "10000", cupo: "50" });
     pantalla.tipos[1].nombre = "Platea";
-    const resultado = await guardarEvento(db, evento.id, datos(pantalla));
+    const resultado = await guardarEvento(db, evento.id, datos(pantalla), ADMIN);
     expect(resultado).toEqual({ ok: true, id: evento.id });
 
     const despues = await leer(evento.id);
@@ -129,21 +135,21 @@ describe.skipIf(!url)("guardar evento, tipos y lotes", { timeout: 60_000 }, () =
 
     const cupoChico = comoEnPantalla(evento);
     cupoChico.tipos[0].lotes[0].cupo = "39";
-    expect(await guardarEvento(db, evento.id, datos(cupoChico))).toEqual({
+    expect(await guardarEvento(db, evento.id, datos(cupoChico), ADMIN)).toEqual({
       ok: false,
       errores: { "tipos.0.lotes.0.cupo": expect.stringMatching(/Ya hay 40/) },
     });
 
     const sinLote = comoEnPantalla(evento);
     sinLote.tipos[0].lotes.shift();
-    expect(await guardarEvento(db, evento.id, datos(sinLote))).toMatchObject({
+    expect(await guardarEvento(db, evento.id, datos(sinLote), ADMIN)).toMatchObject({
       ok: false,
       errores: { "tipos.0.nombre": expect.stringMatching(/No se puede quitar "Lote 1"/) },
     });
 
     const sinTipo = comoEnPantalla(evento);
     sinTipo.tipos.shift();
-    expect(await guardarEvento(db, evento.id, datos(sinTipo))).toMatchObject({
+    expect(await guardarEvento(db, evento.id, datos(sinTipo), ADMIN)).toMatchObject({
       ok: false,
       errores: { general: expect.stringMatching(/No se puede quitar "General"/) },
     });
@@ -158,7 +164,7 @@ describe.skipIf(!url)("guardar evento, tipos y lotes", { timeout: 60_000 }, () =
     pantalla.tipos[0].lotes.pop(); // Lote 2 sin ventas
     pantalla.tipos[0].lotes.push({ nombre: "Lote final", precio: "9000", cupo: "10" });
     pantalla.tipos.pop(); // VIP sin ventas
-    expect(await guardarEvento(db, evento.id, datos(pantalla))).toMatchObject({ ok: true });
+    expect(await guardarEvento(db, evento.id, datos(pantalla), ADMIN)).toMatchObject({ ok: true });
 
     const despues = await leer(evento.id);
     expect(despues.tipos.map((t) => t.nombre)).toEqual(["General"]);
@@ -174,7 +180,7 @@ describe.skipIf(!url)("guardar evento, tipos y lotes", { timeout: 60_000 }, () =
     pantalla.tipos[0].nombre = "VIP";
     pantalla.tipos[1].nombre = "General";
     pantalla.tipos.reverse();
-    expect(await guardarEvento(db, evento.id, datos(pantalla))).toMatchObject({ ok: true });
+    expect(await guardarEvento(db, evento.id, datos(pantalla), ADMIN)).toMatchObject({ ok: true });
     const despues = await leer(evento.id);
     expect(despues.tipos.map((t) => [t.nombre, t.lotes.length])).toEqual([
       ["General", 1], // el que era VIP (1 lote), ahora primero y con el otro nombre
@@ -187,13 +193,13 @@ describe.skipIf(!url)("guardar evento, tipos y lotes", { timeout: 60_000 }, () =
     const otro = await crear();
     const mezclado = comoEnPantalla(uno);
     mezclado.tipos[0].lotes[0].id = otro.tipos[0].lotes[0].id;
-    expect(await guardarEvento(db, uno.id, datos(mezclado))).toMatchObject({
+    expect(await guardarEvento(db, uno.id, datos(mezclado), ADMIN)).toMatchObject({
       ok: false,
       errores: { general: expect.stringMatching(/Recargá/) },
     });
     const tipoAjeno = comoEnPantalla(uno);
     tipoAjeno.tipos[1].id = otro.tipos[1].id;
-    expect(await guardarEvento(db, uno.id, datos(tipoAjeno))).toMatchObject({ ok: false });
+    expect(await guardarEvento(db, uno.id, datos(tipoAjeno), ADMIN)).toMatchObject({ ok: false });
     // el otro evento sigue intacto
     expect((await leer(otro.id)).tipos[0].lotes).toHaveLength(2);
   });
@@ -203,7 +209,7 @@ describe.skipIf(!url)("guardar evento, tipos y lotes", { timeout: 60_000 }, () =
     const otro = await crear();
     const mismaDireccion = comoEnPantalla(otro);
     mismaDireccion.slug = uno.slug;
-    expect(await guardarEvento(db, otro.id, datos(mismaDireccion))).toMatchObject({
+    expect(await guardarEvento(db, otro.id, datos(mismaDireccion), ADMIN)).toMatchObject({
       ok: false,
       errores: { slug: expect.stringMatching(/otra/) },
     });
@@ -211,9 +217,52 @@ describe.skipIf(!url)("guardar evento, tipos y lotes", { timeout: 60_000 }, () =
     await db.evento.update({ where: { id: uno.id }, data: { cortesiasEmitidas: 8 } });
     const menosCortesias = comoEnPantalla(uno);
     menosCortesias.cupoCortesias = "5";
-    expect(await guardarEvento(db, uno.id, datos(menosCortesias))).toMatchObject({
+    expect(await guardarEvento(db, uno.id, datos(menosCortesias), ADMIN)).toMatchObject({
       ok: false,
       errores: { cupoCortesias: expect.stringMatching(/Ya se dieron 8/) },
     });
+  });
+
+  // ─── Productoras ───────────────────────────────────────────────────────────
+
+  it("un organizador solo ve y toca los eventos de su productora", async () => {
+    const otra = (await db.productora.create({ data: { nombre: `Otra ${crypto.randomUUID()}` } })).id;
+    const organizadorDeOtra: Alcance = { todo: false, productoraId: otra };
+    try {
+      const ajeno = await crear(); // de la productora del test, no de "otra"
+      expect(await guardarEvento(db, ajeno.id, datos(comoEnPantalla(ajeno)), organizadorDeOtra)).toEqual({
+        ok: false,
+        errores: { general: "Ese evento ya no existe." },
+      });
+
+      // aunque mande otra productora, el evento queda en la suya
+      const propio = await guardarEvento(db, null, { ...datos(), productoraId }, organizadorDeOtra);
+      if (!propio.ok) throw new Error(JSON.stringify(propio.errores));
+      creados.push(propio.id);
+      expect((await leer(propio.id)).productoraId).toBe(otra);
+
+      const visibles = await db.evento.findMany({ where: filtroDeEventos(organizadorDeOtra), select: { id: true } });
+      expect(visibles.map((e) => e.id)).toEqual([propio.id]);
+      expect(await leer(ajeno.id)).toMatchObject({ productoraId }); // el ajeno, intacto
+    } finally {
+      await db.evento.deleteMany({ where: { productoraId: otra } });
+      await db.productora.delete({ where: { id: otra } });
+    }
+  });
+
+  it("el dueño tiene que elegir una productora activa al crear", async () => {
+    expect(await guardarEvento(db, null, datos(), ADMIN)).toEqual({
+      ok: false,
+      errores: { productoraId: "Elegí una productora." },
+    });
+    const inactiva = await db.productora.create({ data: { nombre: `Inactiva ${crypto.randomUUID()}`, activa: false } });
+    try {
+      expect(await guardarEvento(db, null, { ...datos(), productoraId: inactiva.id }, ADMIN)).toMatchObject({
+        ok: false,
+        errores: { productoraId: expect.any(String) },
+      });
+    } finally {
+      await db.productora.delete({ where: { id: inactiva.id } });
+    }
   });
 });

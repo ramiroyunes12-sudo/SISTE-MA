@@ -5,6 +5,8 @@
 // achicar un cupo por debajo de lo vendido ni quitar algo que ya tiene entradas
 // (además lo frena la propia base).
 import { Prisma, type PrismaClient } from "@/generated/prisma/client";
+import { type Alcance, filtroDeEventos } from "@/lib/auth/alcance";
+import { unicoRepetido } from "@/lib/errores-db";
 
 import type { Errores, EventoValidado } from "./editor";
 
@@ -33,10 +35,12 @@ async function guardarEnTransaccion(
   tx: Prisma.TransactionClient,
   eventoId: string | null,
   datos: EventoValidado,
+  alcance: Alcance,
 ): Promise<string> {
+  // Solo se encuentra si es de la productora de quien edita (el ADMIN, cualquiera).
   const actual = eventoId
-    ? await tx.evento.findUnique({
-        where: { id: eventoId },
+    ? await tx.evento.findFirst({
+        where: { id: eventoId, ...filtroDeEventos(alcance) },
         include: {
           tipos: {
             include: {
@@ -72,8 +76,14 @@ async function guardarEnTransaccion(
     await tx.evento.update({ where: { id: actual.id }, data: { ...datosEvento, slug } });
     id = actual.id;
   } else {
+    // Un organizador crea para su productora; el ADMIN, para la que elija (activa).
+    const productoraId = alcance.todo ? datos.productoraId : alcance.productoraId;
+    const productora = productoraId
+      ? await tx.productora.findFirst({ where: { id: productoraId, activa: true }, select: { id: true } })
+      : null;
+    if (!productora) throw new ErrorDeGuardado({ productoraId: "Elegí una productora." });
     const slug = datos.slugAutomatico ? await slugLibre(tx, datos.slug) : datos.slug;
-    id = (await tx.evento.create({ data: { ...datosEvento, slug }, select: { id: true } })).id;
+    id = (await tx.evento.create({ data: { ...datosEvento, slug, productoraId: productora.id }, select: { id: true } })).id;
   }
 
   // ─── Que todo lo que se manda sea de este evento ───
@@ -162,15 +172,19 @@ export async function guardarEvento(
   db: PrismaClient,
   eventoId: string | null,
   datos: EventoValidado,
+  alcance: Alcance,
 ): Promise<ResultadoGuardar> {
   try {
-    const id = await db.$transaction((tx) => guardarEnTransaccion(tx, eventoId, datos), { timeout: 20_000 });
+    const id = await db.$transaction((tx) => guardarEnTransaccion(tx, eventoId, datos, alcance), {
+      timeout: 20_000,
+    });
     return { ok: true, id };
   } catch (error) {
     if (error instanceof ErrorDeGuardado) return { ok: false, errores: error.errores };
     const mensaje = error instanceof Error ? error.message : "";
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return mensaje.includes("slug")
+    const repetido = unicoRepetido(error);
+    if (repetido) {
+      return repetido === "eventos_slug_key"
         ? { ok: false, errores: { slug: "Ya hay otro evento con esa dirección. Elegí otra." } }
         : { ok: false, errores: { general: "Hay dos tipos de entrada con el mismo nombre." } };
     }

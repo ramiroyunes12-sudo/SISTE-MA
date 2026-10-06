@@ -1,13 +1,24 @@
 import { requerirUsuario } from "@/lib/auth/actual";
+import { obtenerDb } from "@/lib/db";
 
 import { EditorEvento } from "../editor";
 
 export default async function PaginaNuevoEvento() {
-  await requerirUsuario(["ADMIN"]);
+  const usuario = await requerirUsuario(["ADMIN", "ORGANIZADOR"]);
+  // El dueño elige para qué productora es; un organizador, siempre la suya.
+  const productoras =
+    usuario.rol === "ADMIN"
+      ? await obtenerDb().productora.findMany({
+          where: { activa: true },
+          orderBy: { nombre: "asc" },
+          select: { id: true, nombre: true },
+        })
+      : undefined;
   return (
     <EditorEvento
       eventoId={null}
       inicial={{
+        productoraId: "",
         nombre: "",
         slug: "",
         fecha: "",
@@ -22,6 +33,7 @@ export default async function PaginaNuevoEvento() {
       infoLotes={{}}
       cortesiasEmitidas={0}
       guardado={false}
+      productoras={productoras}
     />
   );
 }

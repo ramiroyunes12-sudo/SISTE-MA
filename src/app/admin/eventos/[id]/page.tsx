@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { requerirUsuario } from "@/lib/auth/actual";
+import { alcanceDe, filtroDeEventos } from "@/lib/auth/alcance";
 import { obtenerDb } from "@/lib/db";
 import { pesosParaEditar } from "@/lib/dinero";
 import type { EventoEditado } from "@/lib/eventos/editor";
@@ -12,14 +13,16 @@ import { EditorEvento, type InfoLote } from "../editor";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export default async function PaginaEditarEvento({ params, searchParams }: PageProps<"/admin/eventos/[id]">) {
-  await requerirUsuario(["ADMIN"]);
+  const usuario = await requerirUsuario(["ADMIN", "ORGANIZADOR"]);
   const { id } = await params;
   const { guardado } = await searchParams;
   if (!UUID.test(id)) notFound();
 
-  const evento = await obtenerDb().evento.findUnique({
-    where: { id },
+  // Si es de otra productora, para este organizador "no existe".
+  const evento = await obtenerDb().evento.findFirst({
+    where: { id, ...filtroDeEventos(alcanceDe(usuario)) },
     include: {
+      productora: { select: { nombre: true } },
       tipos: { orderBy: [{ orden: "asc" }, { nombre: "asc" }], include: { lotes: { orderBy: { numero: "asc" } } } },
     },
   });
@@ -64,6 +67,7 @@ export default async function PaginaEditarEvento({ params, searchParams }: PageP
       infoLotes={infoLotes}
       cortesiasEmitidas={evento.cortesiasEmitidas}
       guardado={guardado === "1"}
+      productoraNombre={usuario.rol === "ADMIN" ? evento.productora.nombre : undefined}
     />
   );
 }

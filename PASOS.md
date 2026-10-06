@@ -22,10 +22,16 @@ Cada paso termina con algo para probar. Se marca `[x]` cuando está revisado.
   - Para más adelante (opcional): además del bloqueo por cuenta, limitar intentos por IP con el firewall de Vercel.
 - [x] **6. Pantalla "Evento y lotes"** — crear/editar evento, tipos y lotes. Panel → "Evento y lotes" (`/admin/eventos`).
   - Precios en pesos ("8.000"), fecha en hora argentina. No deja bajar un cupo por debajo de lo vendido ni quitar lotes o tipos con entradas.
-  - El flyer se sube en el paso 7 (junto con la página pública).
+  - El flyer se sube más adelante (por ahora, el espacio marcado).
+- [x] **6b. Productoras** — varias productoras usan la plataforma; cada una ve solo lo suyo.
+  - Roles: ADMIN (vos: todo), ORGANIZADOR (sus eventos y números), VALIDADOR (solo la puerta). Panel → "Productoras" (solo ADMIN): crear productora con su organizador, sumar gente, contraseña temporal nueva, desactivar.
+  - Cobros: cada productora con su propio Mercado Pago (pasos 11-12); vos cobrás un alquiler fijo por evento, aparte.
+  - Flyer: espacios marcados para historia (9:16) y publicación (4:5) con su botón; subir imágenes, más adelante.
+  - Revisado con 2 agentes (aislamiento entre productoras).
 
 ## Bloque 2 — Página pública
 - [ ] **7. Página del evento** — flyer, datos y el lote en venta de cada tipo.
+  - Flyer: por ahora el espacio marcado (las imágenes se suben más adelante).
   - El público ve SOLO el lote en venta (nombre y precio). Nada de cantidades vendidas ni disponibles, y los lotes siguientes no se muestran (ni se mandan al navegador) hasta que se agote el anterior. Si no queda nada: "Agotado".
 - [ ] **8. Lógica de lotes** — paso automático de lote sin vender de más (con tests).
   - A decidir: si alguien pide 4 y en el lote quedan 2, ¿2 de este lote y 2 del siguiente, o las 4 del siguiente?
@@ -34,22 +40,25 @@ Cada paso termina con algo para probar. Se marca `[x]` cuando está revisado.
 
 ## Bloque 3 — Cobrar con Mercado Pago
 - [ ] **11. Conectar Mercado Pago (modo prueba)** — Checkout Pro.
+  - Cada productora conecta su propio Mercado Pago desde su panel (OAuth): la plata le llega directo.
 - [ ] **12. Confirmar el pago (webhook)** — sin entradas dobles.
 
 ## Bloque 4 — Entrada, QR y mail
 - [ ] **13. Código de cada entrada** — token aleatorio firmado (HMAC).
 - [ ] **14. QR y PDF**
 - [ ] **15. Enviar el mail** — Gmail SMTP.
+  - Con varias productoras, el límite de Gmail (~500 por día) puede quedar corto: evaluar Resend con dominio propio.
 - [ ] **16. "Compra confirmada" y "Reenviar mis entradas"**
 
 ## Bloque 5 — Puerta
 - [ ] **17. Escáner** — cámara del celu, marcar usada de forma atómica.
-  - Incluye la pantalla "Validadores" del panel: crearlos, desactivarlos y darles contraseña temporal.
+  - Incluye la pantalla "Validadores" para que cada organizador maneje los suyos (hoy los suma el ADMIN desde Productoras).
 - [ ] **18. Búsqueda por DNI y contador**
 
 ## Bloque 6 — Admin completo
 - [ ] **19. Cortesías** — individual, carga masiva, cupo aparte.
 - [ ] **20. Ventas, resumen, exportar y reembolsos**
+  - Cada organizador ve las estadísticas de sus eventos; el ADMIN, de todos (y por productora).
 
 ## Bloque 7 — Salir a producción
 - [ ] **21. Publicarlo en internet** — Vercel + claves reales + compra de prueba real.

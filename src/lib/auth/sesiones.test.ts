@@ -37,6 +37,7 @@ describe("sesiones", () => {
 
   it("cada rol arranca en su pantalla y el email se compara sin mayúsculas ni espacios", () => {
     expect(inicioSegunRol("ADMIN")).toBe("/admin");
+    expect(inicioSegunRol("ORGANIZADOR")).toBe("/admin");
     expect(inicioSegunRol("VALIDADOR")).toBe("/validar");
     expect(normalizarEmail("  Ana.Gomez@Gmail.COM ")).toBe("ana.gomez@gmail.com");
     expect(normalizarEmail(null)).toBe("");

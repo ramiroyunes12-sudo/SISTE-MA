@@ -1,7 +1,9 @@
-// Crea un usuario del panel, o le resetea la contraseña si ya existe.
+// Crea una cuenta de ADMIN (dueño de la plataforma), o le resetea la
+// contraseña a cualquier cuenta que ya exista. Las cuentas de las productoras
+// (organizadores y validadores) se crean desde el panel → Productoras.
 // Le da una contraseña temporal (vence en 72 horas) que tiene que cambiar al entrar.
 //
-//   npm run usuario -- --email ana@gmail.com --nombre "Ana Gómez" --rol ADMIN
+//   npm run usuario -- --email vos@gmail.com --nombre "Tu Nombre" --rol ADMIN
 //   npm run usuario -- --email ana@gmail.com            (resetear contraseña)
 //
 // Usa DATABASE_URL del archivo .env. Con --sql no se conecta a nada: imprime
@@ -18,7 +20,7 @@ import { opcionesConexion } from "../src/lib/db-config";
 
 config({ quiet: true });
 
-const USO = 'Uso: npm run usuario -- --email ana@gmail.com [--nombre "Ana Gómez" --rol ADMIN|VALIDADOR] [--sql]';
+const USO = 'Uso: npm run usuario -- --email ana@gmail.com [--nombre "Ana Gómez" --rol ADMIN] [--sql]';
 
 function cortar(mensaje: string): never {
   console.error(mensaje);
@@ -37,8 +39,10 @@ const email = normalizarEmail(values.email);
 const nombre = values.nombre?.trim() ?? "";
 const rolTexto = values.rol?.toUpperCase();
 if (!/^[^\s@]+@[^\s@]+$/.test(email)) cortar(USO);
-if (rolTexto !== undefined && rolTexto !== "ADMIN" && rolTexto !== "VALIDADOR") cortar(USO);
-const rolPedido = rolTexto as "ADMIN" | "VALIDADOR" | undefined;
+if (rolTexto !== undefined && rolTexto !== "ADMIN") {
+  cortar("Acá solo se crean cuentas ADMIN. Las de las productoras se crean en el panel → Productoras.");
+}
+const rolPedido = rolTexto as "ADMIN" | undefined;
 
 function textoSql(valor: string) {
   return `'${valor.replaceAll("'", "''")}'`;
@@ -69,13 +73,9 @@ async function conectarYHacer() {
     if (existe && (nombre || rolPedido)) {
       cortar("Ese usuario ya existe: este comando solo le resetea la contraseña (sacá --nombre y --rol).");
     }
-    if (!existe && !nombre) cortar("Es un usuario nuevo: falta --nombre.");
+    if (!existe && (!nombre || !rolPedido)) cortar("Es un usuario nuevo: hacen falta --nombre y --rol ADMIN.");
 
-    const { usuario, temporal, venceEn } = await darContrasenaTemporal(db, {
-      email,
-      nombre,
-      rol: rolPedido ?? "VALIDADOR",
-    });
+    const { usuario, temporal, venceEn } = await darContrasenaTemporal(db, { email, nombre, rol: "ADMIN" });
     console.log(existe ? "Contraseña reseteada." : "Usuario creado.");
     console.log(`  ${usuario.nombre} <${usuario.email}> · ${usuario.rol}`);
     console.log(`  Contraseña temporal: ${temporal}`);
