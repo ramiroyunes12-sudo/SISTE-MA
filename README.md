@@ -119,7 +119,7 @@ La página pública es `/e/<dirección>` (por ejemplo, https://siste-ma.vercel.a
 - Se arma en cada visita (no queda guardada en caché), así el lote que se ve es siempre el de ese momento.
 - Borradores y eventos de productoras desactivadas: para el público no existen (404). El ADMIN y los organizadores de esa productora los ven como **vista previa**, con un cartel arriba.
 - Finalizado: se ve la información, sin venta.
-- "Continuar" lleva al checkout (`/e/<dirección>/datos?p=<pedido>`): el resumen con el reparto real por lote, un bloque por entrada con nombre y DNI, y email y celular de quien compra (`src/lib/ventas/datos.ts`, se revisa en el navegador y otra vez en el servidor). Todavía no reserva ni cobra: eso llega con los pasos 10 a 12. El flyer, cuando se puedan subir imágenes.
+- "Continuar" **reserva las entradas 10 minutos** y lleva a la compra (`/compra/<llave>`, un link secreto): reloj, resumen con el reparto real por lote, un bloque por entrada con nombre y DNI, y email y celular de quien compra (`src/lib/ventas/datos.ts`, se revisa en el navegador y otra vez en el servidor). El pago llega con los pasos 11 y 12. El flyer, cuando se puedan subir imágenes.
 
 ## Ventas: lotes y reservas
 
@@ -128,6 +128,7 @@ El motor de la venta está en `src/lib/ventas/` (la pantalla de compra llega en 
 - **Reparto** (`pedido.ts`): se vende primero el lote de menor número con lugar; si en ese no entra todo el pedido, el resto va al siguiente, a su precio. Ej.: piden 4 y al Lote 1 le quedan 2 → 2 del Lote 1 y 2 del Lote 2. Las reservas sin pagar ocupan lugar; si vencen, el lote anterior vuelve a estar en venta. Los mensajes de error nunca dicen cuántas quedan.
 - **Reservar, liberar y confirmar** (`reservas.ts`): siempre dentro de una transacción. Primero se toma el **turno del evento** (`turno.ts`, un bloqueo de PostgreSQL con fila justa): las compras y las ediciones de un mismo evento pasan de a una, en orden de llegada. Además la base no deja que vendidas + reservadas pasen el cupo.
 - Si hay tanta gente que alguien espera su turno más de unos segundos, la operación falla sin cambiar nada y se puede reconocer con `esperoDemasiado()` (`src/lib/errores-db.ts`).
+- **Reservas** (`ordenes.ts`): "Continuar" crea la orden PENDIENTE con sus entradas y aparta los lugares por 10 minutos. Si vence o se cancela, la orden se cierra una sola vez y los lugares vuelven. Límite de reservas abiertas: 3 por navegador (cookie) y 15 por conexión (IP); en la base solo quedan huellas de la llave del link, la cookie y la IP.
 - **Probar una compra**: en el panel, debajo de cada evento, muestra cómo se cobraría un pedido si alguien comprara ahora (mismas reglas, no reserva nada; `simulacion.ts`). Para ver el reparto entre lotes con el evento de prueba, bajale el cupo al Lote 1 (por ejemplo a 2) y probá 4 de General.
 
 ## Publicación (Vercel)

@@ -19,3 +19,12 @@ export async function tomarTurnoDelEvento(tx: Prisma.TransactionClient, eventoId
   await tx.$executeRaw`SELECT set_config('lock_timeout', ${`${Math.round(esperaMaximaMs)}ms`}, true)`;
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`evento:${eventoId}`}, 0))`;
 }
+
+// Como tomarTurnoDelEvento, pero sin hacer fila: si el turno está ocupado,
+// devuelve false enseguida. Para tareas que pueden esperar a otra ocasión
+// (liberar reservas vencidas al abrir una página).
+export async function intentarTomarTurnoDelEvento(tx: Prisma.TransactionClient, eventoId: string) {
+  const [{ tomado }] = await tx.$queryRaw<{ tomado: boolean }[]>`
+    SELECT pg_try_advisory_xact_lock(hashtextextended(${`evento:${eventoId}`}, 0)) AS tomado`;
+  return tomado;
+}

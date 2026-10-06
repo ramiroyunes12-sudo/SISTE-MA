@@ -7,6 +7,7 @@ import { pesosParaEditar } from "@/lib/dinero";
 import type { EventoEditado } from "@/lib/eventos/editor";
 import { estadosDeLotes } from "@/lib/eventos/lotes";
 import { aFechaLocal } from "@/lib/fechas";
+import { liberarVencidas } from "@/lib/ventas/ordenes";
 
 import { simularCompraAccion } from "../acciones";
 import { EditorEvento, type InfoLote } from "../editor";
@@ -21,8 +22,13 @@ export default async function PaginaEditarEvento({ params, searchParams }: PageP
   if (!UUID.test(id)) notFound();
 
   // Si es de otra productora, para este organizador "no existe".
+  const delAlcance = { id, ...filtroDeEventos(alcanceDe(usuario)) };
+  if (!(await obtenerDb().evento.findFirst({ where: delAlcance, select: { id: true } }))) notFound();
+  // Antes de mostrar los números, las reservas vencidas devuelven sus lugares.
+  await liberarVencidas(obtenerDb(), id).catch((error: unknown) => console.warn("[liberarVencidas] No se pudo:", error));
+
   const evento = await obtenerDb().evento.findFirst({
-    where: { id, ...filtroDeEventos(alcanceDe(usuario)) },
+    where: delAlcance,
     include: {
       productora: { select: { nombre: true } },
       tipos: { orderBy: [{ orden: "asc" }, { nombre: "asc" }], include: { lotes: { orderBy: { numero: "asc" } } } },

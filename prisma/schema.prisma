@@ -199,6 +199,14 @@ model Orden {
   mpPreferenciaId String?     @unique @map("mp_preferencia_id") // Mercado Pago: checkout creado
   emitidaPorId    String?     @map("emitida_por_id") @db.Uuid // admin que dio la cortesía
 
+  // El link de la compra (/compra/<llave>) es la llave para verla: acá solo
+  // se guarda su huella (SHA-256), como con las sesiones.
+  accesoHash    String? @unique @map("acceso_hash")
+  // De dónde salió la reserva (huellas SHA-256, para el límite de reservas
+  // abiertas): el navegador (cookie) y la conexión (IP).
+  compradorHash String? @map("comprador_hash")
+  ipHash        String? @map("ip_hash")
+
   // Mail con las entradas: si falló, se reintenta (paso 15).
   mailEnviadoEn DateTime? @map("mail_enviado_en") @db.Timestamptz(3)
   mailIntentos  Int       @default(0) @map("mail_intentos")
@@ -220,6 +228,8 @@ model Orden {
   @@index([email])
   @@index([estado, venceEn]) // para liberar reservas vencidas
   @@index([estado, mailEnviadoEn]) // para reintentar mails que fallaron
+  @@index([compradorHash, estado]) // reservas abiertas por navegador
+  @@index([ipHash, estado]) // y por conexión
   @@map("ordenes")
   @@schema("entradas")
 }

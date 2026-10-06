@@ -3,17 +3,29 @@
 // "Elegí tus entradas": el lote en venta de cada tipo, con + y −, y abajo el
 // total. Acá solo llega lo que puede ver el público (nombre y precio del lote
 // en venta): ni cantidades ni los lotes que siguen.
-import Link from "next/link";
-import { useState } from "react";
+import { useActionState, useState } from "react";
 
+import { MensajeError } from "@/components/formulario";
 import { formatearPesos } from "@/lib/dinero";
 import type { TipoPublico } from "@/lib/eventos/publico";
 import { pedidoATexto } from "@/lib/ventas/pedido";
 
+import type { EstadoReserva } from "./acciones";
+
 const ESTILO_CONTINUAR = "flex h-[52px] items-center rounded-xl bg-acento px-7 text-[17px] font-bold text-white";
 
-export function ElegirEntradas({ slug, tipos, maxPorCompra }: { slug: string; tipos: TipoPublico[]; maxPorCompra: number }) {
+export function ElegirEntradas({
+  tipos,
+  maxPorCompra,
+  accion: reservar,
+}: {
+  tipos: TipoPublico[];
+  maxPorCompra: number;
+  accion: (anterior: EstadoReserva, formulario: FormData) => Promise<EstadoReserva>;
+}) {
   const [cantidades, setCantidades] = useState<Record<string, number>>({});
+  // "Continuar" reserva las entradas por 10 minutos y lleva a la compra.
+  const [estado, accion, reservando] = useActionState(reservar, {});
   const enVenta = tipos.filter((tipo) => tipo.lote);
   const total = enVenta.reduce((suma, tipo) => suma + (cantidades[tipo.id] ?? 0), 0);
   const totalCentavos = enVenta.reduce((suma, tipo) => suma + (cantidades[tipo.id] ?? 0) * tipo.lote!.precioCentavos, 0);
@@ -81,10 +93,15 @@ export function ElegirEntradas({ slug, tipos, maxPorCompra }: { slug: string; ti
       {enVenta.length > 0 ? (
         <>
           <p className="text-sm leading-relaxed text-tenue">
-            Máximo {maxPorCompra} {maxPorCompra === 1 ? "entrada" : "entradas"} por compra. Las entradas son nominativas: en
-            el próximo paso te pedimos nombre y DNI de cada persona.
+            Máximo {maxPorCompra} {maxPorCompra === 1 ? "entrada" : "entradas"} por compra. Al tocar &quot;Continuar&quot; te
+            guardamos las entradas 10 minutos para que completes nombre y DNI de cada persona y pagues.
           </p>
-          <div className="sticky bottom-0 -mx-4 flex flex-col border-t border-borde bg-superficie px-4 py-4 lg:mx-0 lg:rounded-2xl lg:border">
+          <form
+            action={accion}
+            className="sticky bottom-0 -mx-4 flex flex-col gap-3 border-t border-borde bg-superficie px-4 py-4 lg:mx-0 lg:rounded-2xl lg:border"
+          >
+            <input type="hidden" name="p" value={pedidoATexto(pedido)} />
+            {!reservando && <MensajeError>{estado.error}</MensajeError>}
             <div className="flex items-center justify-between gap-3">
               <div className="flex flex-col">
                 <span className="text-[13px] text-tenue">
@@ -92,20 +109,15 @@ export function ElegirEntradas({ slug, tipos, maxPorCompra }: { slug: string; ti
                 </span>
                 <span className="text-[22px] font-bold">{formatearPesos(totalCentavos)}</span>
               </div>
-              {total > 0 ? (
-                <Link
-                  href={`/e/${slug}/datos?p=${pedidoATexto(pedido)}`}
-                  className={`${ESTILO_CONTINUAR} no-underline hover:bg-acento-hover hover:text-white`}
-                >
-                  Continuar
-                </Link>
-              ) : (
-                <button type="button" disabled className={`${ESTILO_CONTINUAR} cursor-not-allowed opacity-50`}>
-                  Continuar
-                </button>
-              )}
+              <button
+                type="submit"
+                disabled={total === 0 || reservando}
+                className={`${ESTILO_CONTINUAR} hover:bg-acento-hover disabled:cursor-not-allowed disabled:opacity-50`}
+              >
+                {reservando ? "Reservando…" : "Continuar"}
+              </button>
             </div>
-          </div>
+          </form>
         </>
       ) : (
         <p className="font-display text-2xl font-extrabold">Agotado</p>

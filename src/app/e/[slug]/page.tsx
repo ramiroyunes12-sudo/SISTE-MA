@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 
 import { formatearFechaLarga } from "@/lib/fechas";
 
+import { reservarAccion } from "./acciones";
 import { cargarEventoParaMostrar as cargar } from "./cargar";
 import { ElegirEntradas } from "./elegir-entradas";
 
@@ -68,7 +69,11 @@ export default async function PaginaEvento({ params }: PageProps<"/e/[slug]">) {
               Este evento ya pasó: la venta está cerrada.
             </p>
           ) : (
-            <ElegirEntradas slug={evento.slug} tipos={evento.tipos} maxPorCompra={evento.maxPorCompra} />
+            <ElegirEntradas
+              tipos={evento.tipos}
+              maxPorCompra={evento.maxPorCompra}
+              accion={reservarAccion.bind(null, evento.slug)}
+            />
           )}
 
           {evento.descripcion && (

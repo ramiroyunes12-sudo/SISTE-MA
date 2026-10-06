@@ -44,11 +44,12 @@ Cada paso termina con algo para probar. Se marca `[x]` cuando está revisado.
   - Un bloque por entrada ("Entrada 1 · General", "Entrada 2 · VIP"…) con nombre y apellido y DNI de quien la usa; abajo, email (dos veces) y celular (opcional).
   - Decidido: no hay límite por DNI (un mismo DNI puede tener varias entradas).
   - El resumen muestra el reparto real por lote (si el pedido cruza de lote, lo explica). Todavía no reserva ni cobra: al tocar "Continuar al pago" se revisan los datos y listo.
-- [ ] **10. Reserva temporal** — 10 minutos para pagar.
-  - "Continuar" pasa a reservar (orden PENDIENTE con sus entradas) y el checkout pasa a leer la orden (`/compra/<orden>`) en vez del pedido de la dirección, con el reloj de 10 minutos. Los datos del formulario se guardan en la orden y sus entradas.
-  - Crear la orden y sus entradas en la misma transacción que reservarEntradas, y que esa transacción sea corta (nada de llamadas a Mercado Pago adentro). Fijar maxWait/timeout de la transacción y traducir esperoDemasiado() a "Hay mucha gente comprando, probá de nuevo".
-  - Liberar vencidas: una orden por transacción. Primero el UPDATE condicionado (PENDIENTE → VENCIDA) y solo si cambió, liberarReservas con las porciones armadas desde las entradas de esa orden (así nunca se libera dos veces).
-  - Que nadie acapare el cupo con reservas repetidas (límite por persona o por IP).
+- [x] **10. Reserva temporal** — 10 minutos para pagar. Elegir entradas → "Continuar" → `/compra/<llave>`.
+  - "Continuar" crea la orden PENDIENTE con una entrada por persona y aparta los lugares, todo en la misma transacción. El link de la compra es secreto (solo se guarda su huella) y aguanta recargar la página.
+  - Reloj de 10 minutos (con la hora del servidor). Los datos de cada entrada se guardan en la orden y se pueden corregir hasta pagar. "Cambiar entradas" cancela y devuelve los lugares.
+  - Vencidas: se liberan al reservar en el evento (dentro de su turno), al abrir la página del evento, la de la compra o el panel (sin hacer fila si el turno está ocupado). Cada orden se cierra una sola vez (cambio de estado condicionado).
+  - Límite: 3 reservas abiertas por navegador y 15 por conexión (muchos celulares comparten la IP de la compañía). Si el mismo navegador vuelve a elegir en el mismo evento, la reserva anterior se cancela.
+  - Para más adelante (paso 21): una tarea programada que libere vencidas aunque nadie entre (hoy alcanza con lo de arriba).
 
 ## Bloque 3 — Cobrar con Mercado Pago
 - [ ] **11. Conectar Mercado Pago (modo prueba)** — Checkout Pro.
