@@ -60,11 +60,14 @@ export default async function PaginaEditarEvento({ params, searchParams }: PageP
     }
   }
 
+  // Al guardar cambia la fecha de actualización: el editor y el simulador
+  // arrancan de nuevo con lo guardado. (Cada uno con su propia key: si dos
+  // hermanos comparten key, React deja el editor viejo en pantalla.)
+  const version = evento.actualizadoEn.toISOString();
   return (
     <>
       <EditorEvento
-        // Al guardar cambia la fecha de actualización: el editor arranca de nuevo con lo guardado.
-        key={evento.actualizadoEn.toISOString()}
+        key={`editor-${version}`}
         eventoId={evento.id}
         inicial={inicial}
         infoLotes={infoLotes}
@@ -73,8 +76,7 @@ export default async function PaginaEditarEvento({ params, searchParams }: PageP
         productoraNombre={usuario.rol === "ADMIN" ? evento.productora.nombre : undefined}
       />
       <SimuladorCompra
-        // Se vuelve a armar al guardar: los tipos pueden haber cambiado.
-        key={evento.actualizadoEn.toISOString()}
+        key={`simulador-${version}`}
         accion={simularCompraAccion.bind(null, evento.id)}
         tipos={evento.tipos.map((tipo) => ({ id: tipo.id, nombre: tipo.nombre }))}
         maxPorCompra={evento.maxPorCompra}

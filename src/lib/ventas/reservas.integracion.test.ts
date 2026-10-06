@@ -6,11 +6,13 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { PrismaClient } from "@/generated/prisma/client";
-import { aFechaLocal } from "@/lib/fechas";
+import { esperoDemasiado } from "@/lib/errores-db";
 import { validarEvento } from "@/lib/eventos/editor";
 import { guardarEvento } from "@/lib/eventos/guardar";
+import { aFechaLocal } from "@/lib/fechas";
 
 import { confirmarReservas, liberarReservas, reservarEntradas } from "./reservas";
+import { tomarTurnoDelEvento } from "./turno";
 
 const url = process.env.TEST_DATABASE_URL;
 
@@ -254,12 +256,14 @@ describe.skipIf(!url)("reservas en los lotes", { timeout: 120_000 }, () => {
     expect(lotes.every((lote) => lote.vendidas + lote.reservadas <= 5)).toBe(true);
   });
 
-  it("editar el evento espera a la compra en curso, y después ve los números nuevos", async () => {
+  // Lo que mandaría la pantalla de "Evento y lotes" con el evento como está
+  // ahora, después de aplicarle `cambiar` a sus tipos y lotes.
+  type TipoEnPantalla = { id: string; nombre: string; lotes: { id: string; nombre: string; precio: string; cupo: string }[] };
+  async function formulario(cambiar: (tipos: TipoEnPantalla[]) => TipoEnPantalla[]) {
     const evento = await db.evento.findUniqueOrThrow({
       where: { id: eventoId },
       include: { tipos: { orderBy: { orden: "asc" }, include: { lotes: { orderBy: { numero: "asc" } } } } },
     });
-    // Lo que manda la pantalla: el Lote 1 de General baja a cupo 1 y se quita el Lote 3.
     const validado = validarEvento({
       nombre: evento.nombre,
       slug: evento.slug,
@@ -267,32 +271,35 @@ describe.skipIf(!url)("reservas en los lotes", { timeout: 120_000 }, () => {
       lugar: evento.lugar,
       direccion: "",
       descripcion: "",
-      maxPorCompra: "6",
+      maxPorCompra: String(evento.maxPorCompra),
       cupoCortesias: "0",
-      estado: "PUBLICADO",
-      tipos: evento.tipos.map((tipo) => ({
-        id: tipo.id,
-        nombre: tipo.nombre,
-        lotes: tipo.lotes
-          .filter((lote) => lote.id !== general.lotes[2])
-          .map((lote) => ({
+      estado: evento.estado,
+      tipos: cambiar(
+        evento.tipos.map((tipo) => ({
+          id: tipo.id,
+          nombre: tipo.nombre,
+          lotes: tipo.lotes.map((lote) => ({
             id: lote.id,
             nombre: lote.nombre,
             precio: String(lote.precioCentavos / 100),
-            cupo: lote.id === general.lotes[0] ? "1" : String(lote.cupo),
+            cupo: String(lote.cupo),
           })),
-      })),
+        })),
+      ),
     });
     if (!validado.ok) throw new Error(JSON.stringify(validado.errores));
+    return validado.datos;
+  }
 
-    // Una compra de 3 que todavía no terminó (tiene el evento bloqueado).
+  // Una compra que reservó y todavía no terminó (tiene el turno del evento).
+  async function compraAbierta(pedido: unknown) {
     let terminar!: () => void;
     const puerta = new Promise<void>((resolve) => (terminar = resolve));
     let reservo!: () => void;
     const yaReservo = new Promise<void>((resolve) => (reservo = resolve));
     const compra = db.$transaction(
       async (tx) => {
-        const plan = await reservarEntradas(tx, eventoId, [{ tipoId: general.id, cantidad: 3 }]);
+        const plan = await reservarEntradas(tx, eventoId, pedido);
         reservo();
         await puerta;
         return plan;
@@ -300,49 +307,135 @@ describe.skipIf(!url)("reservas en los lotes", { timeout: 120_000 }, () => {
       { timeout: 60_000 },
     );
     await yaReservo;
+    return { compra, terminar };
+  }
 
-    let guardado: Awaited<ReturnType<typeof guardarEvento>> | undefined;
-    const guardar = guardarEvento(db, eventoId, validado.datos, { todo: true }).then((r) => (guardado = r));
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    expect(guardado, "guardar espera a la compra").toBeUndefined();
+  // Espera hasta ver a alguien haciendo fila por el turno de este evento.
+  async function hayAlguienEsperandoElTurno() {
+    for (let i = 0; i < 200; i++) {
+      const [{ esperando }] = await db.$queryRaw<{ esperando: number }[]>`
+        SELECT count(*)::int AS esperando FROM pg_locks
+        WHERE locktype = 'advisory' AND NOT granted
+          AND ((classid::bigint << 32) | objid::bigint) = hashtextextended(${`evento:${eventoId}`}, 0)`;
+      if (esperando > 0) return true;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    return false;
+  }
+
+  it("editar el evento espera su turno detrás de la compra en curso, y después ve los números nuevos", async () => {
+    // El Lote 1 de General baja a cupo 1 y se quita el Lote 3.
+    const datos = await formulario(([g, v]) => [
+      { ...g, lotes: g.lotes.filter((l) => l.id !== general.lotes[2]).map((l) => (l.id === general.lotes[0] ? { ...l, cupo: "1" } : l)) },
+      v,
+    ]);
+    const { compra, terminar } = await compraAbierta([{ tipoId: general.id, cantidad: 3 }]);
+    const guardar = guardarEvento(db, eventoId, datos, { todo: true });
+    expect(await hayAlguienEsperandoElTurno(), "guardar hace fila por el turno del evento").toBe(true);
 
     terminar();
     expect(await compra).toMatchObject({ ok: true });
-    await guardar;
     // Vio las 3 reservadas del Lote 1: no lo deja bajar a 1.
-    expect(guardado).toEqual({
+    expect(await guardar).toEqual({
       ok: false,
       errores: { "tipos.0.lotes.0.cupo": "Ya hay 3 vendidas o reservadas: el cupo no puede ser menor." },
     });
     expect((await numeros()).general[0]).toEqual({ vendidas: 0, reservadas: 3 });
   });
 
+  it("no deja quitar un tipo mientras alguien lo está comprando", async () => {
+    const sinVip = await formulario(([g]) => [g]);
+    const { compra, terminar } = await compraAbierta([{ tipoId: vip.id, cantidad: 2 }]);
+    const guardar = guardarEvento(db, eventoId, sinVip, { todo: true });
+    expect(await hayAlguienEsperandoElTurno()).toBe(true);
+    terminar();
+    expect(await compra).toMatchObject({ ok: true });
+    expect(await guardar).toEqual({
+      ok: false,
+      errores: { general: 'No se puede quitar "VIP": ya tiene entradas vendidas, reservadas o regaladas.' },
+    });
+    expect((await numeros()).vip).toEqual({ vendidas: 0, reservadas: 2 });
+  });
+
   it("no se puede quitar un lote que tiene reservas", async () => {
     await reservar([{ tipoId: general.id, cantidad: 6 }]); // 5 del Lote 1 y 1 del Lote 2
-    const evento = await db.evento.findUniqueOrThrow({
-      where: { id: eventoId },
-      include: { tipos: { orderBy: { orden: "asc" }, include: { lotes: { orderBy: { numero: "asc" } } } } },
+    const sinLote2 = await formulario(([g, v]) => [{ ...g, lotes: g.lotes.filter((l) => l.id !== general.lotes[1]) }, v]);
+    expect(await guardarEvento(db, eventoId, sinLote2, { todo: true })).toEqual({
+      ok: false,
+      errores: { "tipos.0.nombre": 'No se puede quitar "Lote 2": ya tiene entradas vendidas o reservadas.' },
     });
-    const validado = validarEvento({
-      nombre: evento.nombre,
-      slug: evento.slug,
-      fecha: aFechaLocal(evento.fecha),
-      lugar: evento.lugar,
-      direccion: "",
-      descripcion: "",
-      maxPorCompra: "6",
-      cupoCortesias: "0",
-      estado: "PUBLICADO",
-      tipos: evento.tipos.map((tipo) => ({
-        id: tipo.id,
-        nombre: tipo.nombre,
-        lotes: tipo.lotes
-          .filter((lote) => lote.id !== general.lotes[1])
-          .map((lote) => ({ id: lote.id, nombre: lote.nombre, precio: String(lote.precioCentavos / 100), cupo: String(lote.cupo) })),
-      })),
-    });
-    if (!validado.ok) throw new Error(JSON.stringify(validado.errores));
-    expect(await guardarEvento(db, eventoId, validado.datos, { todo: true })).toMatchObject({ ok: false });
     expect((await numeros()).general[1]).toEqual({ vendidas: 0, reservadas: 1 });
+  });
+
+  it("con compras sin parar, editar el evento igual consigue su turno enseguida", async () => {
+    const otroPrecio = await formulario(([g, v]) => [
+      { ...g, lotes: g.lotes.map((l) => (l.id === general.lotes[2] ? { ...l, precio: "12345" } : l)) },
+      v,
+    ]);
+    let seguir = true;
+    let compras = 0;
+    const compradores = Array.from({ length: 8 }, async () => {
+      // Aunque esté agotado, cada intento toma el turno del evento.
+      while (seguir) {
+        await reservar([{ tipoId: general.id, cantidad: 1 }]);
+        compras++;
+      }
+    });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const antes = compras;
+    const resultado = await Promise.race([
+      guardarEvento(db, eventoId, otroPrecio, { todo: true }),
+      new Promise((resolve) => setTimeout(() => resolve("trabado"), 8_000)),
+    ]);
+    seguir = false;
+    await Promise.all(compradores);
+    expect(compras - antes, "las compras seguían entrando").toBeGreaterThan(0);
+    expect(resultado).toMatchObject({ ok: true });
+    expect((await db.lote.findUniqueOrThrow({ where: { id: general.lotes[2] } })).precioCentavos).toBe(1_234_500);
+    await db.lote.update({ where: { id: general.lotes[2] }, data: { precioCentavos: 1_000_000 } });
+  });
+
+  it("liberar y reservar en la misma transacción, mientras otros compran, no se traba", async () => {
+    await reservar([{ tipoId: general.id, cantidad: 6 }]); // 5 del Lote 1 y 1 del Lote 2
+    const tareas = [
+      db.$transaction(
+        async (tx) => {
+          await liberarReservas(tx, eventoId, [{ loteId: general.lotes[1], cantidad: 1 }]);
+          return reservarEntradas(tx, eventoId, [{ tipoId: general.id, cantidad: 1 }]);
+        },
+        { maxWait: 60_000, timeout: 60_000 },
+      ),
+      ...Array.from({ length: 10 }, () => reservar([{ tipoId: general.id, cantidad: 1 }])),
+    ];
+    const resultados = await Promise.allSettled(tareas);
+    expect(resultados.filter((r) => r.status === "rejected"), "nadie se trabó").toEqual([]);
+    const planes = resultados.map((r) => (r as PromiseFulfilledResult<Awaited<ReturnType<typeof reservar>>>).value);
+    const reservadas = (await numeros()).general.reduce((suma, lote) => suma + lote.reservadas, 0);
+    // quedaban 5 después de liberar 1; entran 10 más (cupo 15) y 1 rebota
+    expect(planes.filter((plan) => plan.ok)).toHaveLength(10);
+    expect(reservadas).toBe(15);
+  });
+
+  it("liberar y confirmar andan aunque el evento ya no esté a la venta", async () => {
+    await reservar([{ tipoId: general.id, cantidad: 4 }]);
+    await db.evento.update({ where: { id: eventoId }, data: { estado: "FINALIZADO" } });
+    await db.$transaction((tx) => liberarReservas(tx, eventoId, [{ loteId: general.lotes[0], cantidad: 1 }]));
+    await db.evento.update({ where: { id: eventoId }, data: { estado: "BORRADOR" } });
+    await db.$transaction((tx) => liberarReservas(tx, eventoId, [{ loteId: general.lotes[0], cantidad: 1 }]));
+    await db.productora.update({ where: { id: productoraId }, data: { activa: false } });
+    await db.$transaction((tx) => confirmarReservas(tx, eventoId, [{ loteId: general.lotes[0], cantidad: 2 }]));
+    expect((await numeros()).general[0]).toEqual({ vendidas: 2, reservadas: 0 });
+  });
+
+  it("si hay que esperar el turno demasiado, falla limpio y se puede reconocer", async () => {
+    const { compra, terminar } = await compraAbierta([{ tipoId: general.id, cantidad: 1 }]);
+    const error = await db
+      .$transaction((tx) => tomarTurnoDelEvento(tx, eventoId, 200))
+      .then(() => null)
+      .catch((e: unknown) => e);
+    terminar();
+    await compra;
+    expect(esperoDemasiado(error)).toBe(true);
+    expect(esperoDemasiado(new Error("otra cosa"))).toBe(false);
   });
 });

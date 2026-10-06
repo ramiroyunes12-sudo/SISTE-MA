@@ -35,16 +35,24 @@ Cada paso termina con algo para probar. Se marca `[x]` cuando está revisado.
   - El público ve SOLO el lote en venta (nombre y precio). Nada de cantidades vendidas ni disponibles, y los lotes siguientes no se muestran (ni se mandan al navegador) hasta que se agote el anterior. Si no queda nada: "Agotado".
   - Elegir cantidades con + y − (hasta el máximo por compra) y ver el total. "Continuar" queda deshabilitado hasta la compra (pasos 9-12).
   - Borradores: vista previa solo para el ADMIN y la gente de esa productora; para el resto, 404.
-- [ ] **8. Lógica de lotes** — paso automático de lote sin vender de más (con tests).
-  - A decidir: si alguien pide 4 y en el lote quedan 2, ¿2 de este lote y 2 del siguiente, o las 4 del siguiente?
-  - A decidir: si un lote se llena solo con reservas sin pagar, hoy se abre el siguiente; si esas reservas vencen, el lote anterior vuelve a estar en venta (y el precio baja). ¿Se acepta o se espera a que venzan?
+- [x] **8. Lógica de lotes** — paso automático de lote sin vender de más (con tests). Para probarlo: panel → evento → "Probar una compra".
+  - Decidido (1a): si alguien pide 4 y en el lote quedan 2, van 2 de ese lote y 2 del siguiente, cada una a su precio.
+  - Decidido (2a): las reservas sin pagar ocupan lugar; si vencen, el lote anterior (más barato) vuelve a estar en venta.
+  - Compras y ediciones de un mismo evento pasan de a una, en fila ("turno del evento"): nunca se vende de más ni se traba, y editar en plena venta no queda esperando para siempre.
+  - Revisado con 19 agentes: 8 hallazgos confirmados y arreglados (un editor duplicado en pantalla al guardar, editar trabado durante una ola de compras, y tests que no probaban lo que decían).
 - [ ] **9. Formulario de datos (checkout)** — nombre y DNI por entrada.
 - [ ] **10. Reserva temporal** — 10 minutos para pagar.
+  - Antes de pagar, mostrar el detalle por lote (decisión 1a): "2 × Lote 1 $ 6.000 + 2 × Lote 2 $ 8.000". El total de la página es estimado si el pedido cruza de lote.
+  - Crear la orden y sus entradas en la misma transacción que reservarEntradas, y que esa transacción sea corta (nada de llamadas a Mercado Pago adentro). Fijar maxWait/timeout de la transacción y traducir esperoDemasiado() a "Hay mucha gente comprando, probá de nuevo".
+  - Liberar vencidas: una orden por transacción. Primero el UPDATE condicionado (PENDIENTE → VENCIDA) y solo si cambió, liberarReservas con las porciones armadas desde las entradas de esa orden (así nunca se libera dos veces).
+  - Que nadie acapare el cupo con reservas repetidas (límite por persona o por IP).
 
 ## Bloque 3 — Cobrar con Mercado Pago
 - [ ] **11. Conectar Mercado Pago (modo prueba)** — Checkout Pro.
   - Cada productora conecta su propio Mercado Pago desde su panel (OAuth): la plata le llega directo.
 - [ ] **12. Confirmar el pago (webhook)** — sin entradas dobles.
+  - Igual que al liberar: UPDATE condicionado (PENDIENTE → PAGADA) y recién ahí confirmarReservas con las porciones de esa orden; un aviso repetido no hace nada.
+  - Pago que llega con la reserva ya vencida: dar las entradas solo si todavía hay lugar en ese lote; si no, devolver la plata.
 
 ## Bloque 4 — Entrada, QR y mail
 - [ ] **13. Código de cada entrada** — token aleatorio firmado (HMAC).

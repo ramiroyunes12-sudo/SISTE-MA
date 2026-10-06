@@ -121,6 +121,15 @@ La página pública es `/e/<dirección>` (por ejemplo, https://siste-ma.vercel.a
 - Finalizado: se ve la información, sin venta.
 - El botón "Continuar" se habilita cuando esté la compra (pasos 9 a 12). El flyer, cuando se puedan subir imágenes.
 
+## Ventas: lotes y reservas
+
+El motor de la venta está en `src/lib/ventas/` (la pantalla de compra llega en los pasos 9 a 12):
+
+- **Reparto** (`pedido.ts`): se vende primero el lote de menor número con lugar; si en ese no entra todo el pedido, el resto va al siguiente, a su precio. Ej.: piden 4 y al Lote 1 le quedan 2 → 2 del Lote 1 y 2 del Lote 2. Las reservas sin pagar ocupan lugar; si vencen, el lote anterior vuelve a estar en venta. Los mensajes de error nunca dicen cuántas quedan.
+- **Reservar, liberar y confirmar** (`reservas.ts`): siempre dentro de una transacción. Primero se toma el **turno del evento** (`turno.ts`, un bloqueo de PostgreSQL con fila justa): las compras y las ediciones de un mismo evento pasan de a una, en orden de llegada. Además la base no deja que vendidas + reservadas pasen el cupo.
+- Si hay tanta gente que alguien espera su turno más de unos segundos, la operación falla sin cambiar nada y se puede reconocer con `esperoDemasiado()` (`src/lib/errores-db.ts`).
+- **Probar una compra**: en el panel, debajo de cada evento, muestra cómo se cobraría un pedido si alguien comprara ahora (mismas reglas, no reserva nada; `simulacion.ts`). Para ver el reparto entre lotes con el evento de prueba, bajale el cupo al Lote 1 (por ejemplo a 2) y probá 4 de General.
+
 ## Publicación (Vercel)
 
 El proyecto `siste-ma` de Vercel está conectado a este repo: cada cambio que se sube a GitHub se publica solo en https://siste-ma.vercel.app. Las funciones corren en São Paulo (`gru1`, en `vercel.json`), al lado de la base.

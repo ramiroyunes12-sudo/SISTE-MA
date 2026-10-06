@@ -3,42 +3,54 @@
 // de una transacción, junto con la orden.
 //
 // Cómo se evita vender de más cuando compran muchos a la vez:
-// 1. Se bloquea el evento "para leer" (FOR SHARE): varias compras pueden ir a
-//    la vez, pero nadie puede editar el evento en el medio. Quien edita
-//    (guardar.ts) lo bloquea "para escribir" (FOR UPDATE), así espera o hace
-//    esperar, y nunca trabaja con números viejos.
-// 2. Se bloquean los lotes que se tocan (FOR UPDATE), siempre en el mismo
-//    orden (por id): dos compras del mismo tipo van una después de la otra y
-//    nunca se traban entre sí.
+// 1. Primero se toma el turno del evento (ver turno.ts): las compras y las
+//    ediciones de un mismo evento pasan de a una, en orden de llegada. Así
+//    nadie trabaja con números viejos y nada se traba.
+// 2. Por las dudas, también se bloquean las filas de los lotes que se tocan
+//    (FOR UPDATE, siempre en orden por id).
 // 3. Con los números ya bloqueados se reparte y se suma.
 // Y aunque algo de esto fallara, la base no deja que vendidas + reservadas
 // pasen el cupo (regla lotes_numeros_validos).
+//
+// Ojo, para quien llame a liberar y confirmar (pasos 10 y 12): estas funciones
+// solo mueven números; no saben de qué orden son. Cada orden se libera o se
+// confirma UNA sola vez: primero se cambia su estado con un UPDATE
+// condicionado (de PENDIENTE a VENCIDA o PAGADA) y, solo si cambió, se mueven
+// las porciones armadas con las entradas de esa orden.
 import type { EstadoEvento, Prisma } from "@/generated/prisma/client";
 
 import { type PlanCompra, planearCompra, type Rechazo, type TipoConLotes, validarPedido } from "./pedido";
+import { tomarTurnoDelEvento } from "./turno";
 
 type Tx = Prisma.TransactionClient;
 export type Porcion = { loteId: string; cantidad: number };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-async function bloquearEvento(tx: Tx, eventoId: string) {
+// Cuánto puede esperar su turno cada cosa antes de dar error.
+export const ESPERA_COMPRA_MS = 8_000;
+const ESPERA_LIBERAR_CONFIRMAR_MS = 15_000; // lo hace el sistema solo: puede esperar más
+
+// Toma el turno del evento y lo lee (null si no existe).
+async function tomarTurnoYLeer(tx: Tx, eventoId: string, esperaMaximaMs: number) {
   if (!UUID.test(eventoId)) return null;
+  await tomarTurnoDelEvento(tx, eventoId, esperaMaximaMs);
   const [evento] = await tx.$queryRaw<{ estado: EstadoEvento; maxPorCompra: number; productoraActiva: boolean }[]>`
     SELECT e.estado, e.max_por_compra AS "maxPorCompra", p.activa AS "productoraActiva"
     FROM entradas.eventos e JOIN entradas.productoras p ON p.id = e.productora_id
-    WHERE e.id = ${eventoId}::uuid
-    FOR SHARE OF e`;
+    WHERE e.id = ${eventoId}::uuid`;
   return evento ?? null;
 }
 
 // Reserva lo pedido: lo reparte en los lotes (si en uno no entra todo, sigue
-// en el próximo) y lo suma a "reservadas". O todo o nada.
+// en el próximo) y lo suma a "reservadas". O todo o nada. Si hay tanta gente
+// que espera su turno más de ESPERA_COMPRA_MS, tira un error que reconoce
+// esperoDemasiado() (para decir "probá de nuevo").
 export async function reservarEntradas(tx: Tx, eventoId: string, entrada: unknown): Promise<PlanCompra | Rechazo> {
   const validado = validarPedido(entrada);
   if (!validado.ok) return validado;
 
-  const evento = await bloquearEvento(tx, eventoId);
+  const evento = await tomarTurnoYLeer(tx, eventoId, ESPERA_COMPRA_MS);
   if (!evento || evento.estado !== "PUBLICADO" || !evento.productoraActiva) {
     return { ok: false, error: "Este evento no está a la venta." };
   }
@@ -93,7 +105,9 @@ async function moverReservadas(tx: Tx, eventoId: string, porciones: Porcion[], a
   }
   if (porLote.size === 0) return;
 
-  if (!(await bloquearEvento(tx, eventoId))) throw new Error(`No se puede ${accion}: el evento ${eventoId} no existe`);
+  if (!(await tomarTurnoYLeer(tx, eventoId, ESPERA_LIBERAR_CONFIRMAR_MS))) {
+    throw new Error(`No se puede ${accion}: el evento ${eventoId} no existe`);
+  }
   const ids = [...porLote.keys()];
   const lotes = await tx.$queryRaw<{ id: string; reservadas: number }[]>`
     SELECT l.id, l.reservadas

@@ -80,9 +80,15 @@ describe("lo que llega del navegador", () => {
       [{ tipoId: GENERAL, cantidad: -1 }],
       [{ tipoId: GENERAL, cantidad: 21 }],
       [{ tipoId: GENERAL, cantidad: 1 }, { tipoId: GENERAL, cantidad: 1 }], // repetido
-      Array.from({ length: 51 }, () => ({ tipoId: GENERAL, cantidad: 0 })),
     ];
     for (const malo of malos) expect(validarPedido(malo), JSON.stringify(malo)).toMatchObject({ ok: false });
+  });
+
+  it("hasta 50 tipos por pedido", () => {
+    const tipos = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({ tipoId: `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`, cantidad: i === 0 ? 1 : 0 }));
+    expect(validarPedido(tipos(50))).toMatchObject({ ok: true });
+    expect(validarPedido(tipos(51))).toMatchObject({ ok: false, error: expect.stringContaining("No entendimos") });
   });
 });
 

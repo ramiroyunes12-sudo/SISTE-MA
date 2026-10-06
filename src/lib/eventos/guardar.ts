@@ -6,7 +6,8 @@
 // (además lo frena la propia base).
 import { Prisma, type PrismaClient } from "@/generated/prisma/client";
 import { type Alcance, filtroDeEventos } from "@/lib/auth/alcance";
-import { unicoRepetido } from "@/lib/errores-db";
+import { esperoDemasiado, unicoRepetido } from "@/lib/errores-db";
+import { tomarTurnoDelEvento } from "@/lib/ventas/turno";
 
 import type { Errores, EventoValidado } from "./editor";
 
@@ -17,6 +18,9 @@ class ErrorDeGuardado extends Error {
     super("No se pudo guardar el evento");
   }
 }
+
+// Cuánto espera su turno si hay mucha gente comprando este evento.
+const ESPERA_GUARDAR_MS = 10_000;
 
 const DESACTUALIZADO = "Alguien cambió este evento mientras lo editabas. Recargá la página y volvé a cargar tus cambios.";
 
@@ -37,14 +41,15 @@ async function guardarEnTransaccion(
   datos: EventoValidado,
   alcance: Alcance,
 ): Promise<string> {
-  // Primero se bloquea el evento: si alguien está comprando, se espera a que
-  // termine, y nadie compra hasta que esto se guarde. Así los números de
-  // vendidas y reservadas que se leen abajo no cambian en el medio (ver
-  // src/lib/ventas/reservas.ts).
   if (eventoId) {
-    await tx.$queryRaw`SELECT id FROM entradas.eventos WHERE id = ${eventoId}::uuid FOR UPDATE`;
+    // Solo se encuentra si es de la productora de quien edita (el ADMIN, cualquiera).
+    const delAlcance = await tx.evento.findFirst({ where: { id: eventoId, ...filtroDeEventos(alcance) }, select: { id: true } });
+    if (!delAlcance) throw new ErrorDeGuardado({ general: "Ese evento ya no existe." });
+    // El turno del evento: espera a las compras en curso, y las que lleguen
+    // esperan a que esto se guarde. Así los números de vendidas y reservadas
+    // que se leen abajo no cambian en el medio (ver src/lib/ventas/turno.ts).
+    await tomarTurnoDelEvento(tx, eventoId, ESPERA_GUARDAR_MS);
   }
-  // Solo se encuentra si es de la productora de quien edita (el ADMIN, cualquiera).
   const actual = eventoId
     ? await tx.evento.findFirst({
         where: { id: eventoId, ...filtroDeEventos(alcance) },
@@ -190,6 +195,12 @@ export async function guardarEvento(
     return { ok: true, id };
   } catch (error) {
     if (error instanceof ErrorDeGuardado) return { ok: false, errores: error.errores };
+    if (esperoDemasiado(error)) {
+      return {
+        ok: false,
+        errores: { general: "Hay mucha gente comprando este evento en este momento. Esperá unos segundos y volvé a guardar." },
+      };
+    }
     const mensaje = error instanceof Error ? error.message : "";
     const repetido = unicoRepetido(error);
     if (repetido) {
