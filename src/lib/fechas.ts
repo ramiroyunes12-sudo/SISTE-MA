@@ -37,6 +37,19 @@ export function deFechaLocal(texto: string): Date | null {
   return fecha;
 }
 
+// Para la página del evento: "Sábado 21 de noviembre · 23:00 hs".
+export function formatearFechaLarga(fecha: Date) {
+  const texto = new Intl.DateTimeFormat("es-AR", {
+    timeZone: ZONA_ARGENTINA,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(fecha); // "sábado, 21 de noviembre"
+  const p = partes(fecha);
+  const dia = texto.replace(",", "");
+  return `${dia.charAt(0).toUpperCase()}${dia.slice(1)} · ${p.hour}:${p.minute} hs`;
+}
+
 // Para mostrar: "sáb 21/11/2026 23:00".
 export function formatearFecha(fecha: Date) {
   const dia = new Intl.DateTimeFormat("es-AR", { timeZone: ZONA_ARGENTINA, weekday: "short" })

@@ -158,7 +158,20 @@ export function EditorEvento({
     <form onSubmit={enviar} noValidate className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-3xl font-extrabold">{eventoId ? "Evento y lotes" : "Nuevo evento"}</h1>
-        {botonGuardar}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+          {eventoId && (
+            // Con lo guardado (no con lo que se está editando): es lo que ve la gente.
+            <a
+              href={`/e/${original.slug}`}
+              target="_blank"
+              rel="noopener"
+              className="font-semibold text-acento hover:text-acento-hover"
+            >
+              {original.estado === "BORRADOR" ? "Vista previa ↗" : "Ver página ↗"}
+            </a>
+          )}
+          {botonGuardar}
+        </div>
       </div>
 
       {guardado && !sucio && (

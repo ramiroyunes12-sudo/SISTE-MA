@@ -50,7 +50,7 @@ export type EventoValidado = {
 export type Errores = Record<string, string>;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+export const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 // "Fiesta de Primavera 2026!" → "fiesta-de-primavera-2026"
 export function slugDesde(texto: string) {

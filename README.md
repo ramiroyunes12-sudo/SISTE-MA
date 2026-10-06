@@ -111,6 +111,16 @@ En el panel, **Evento y lotes** (`/admin/eventos`): crear un evento, editar sus 
 - No se puede bajar el cupo de un lote por debajo de lo vendido + reservado, ni quitar lotes o tipos que ya tienen entradas (lo frena también la base).
 - Precios en pesos como se escriben acá ("8.000", "8000,50"); en la base van en centavos (`src/lib/dinero.ts`). Fechas en hora argentina (`src/lib/fechas.ts`).
 
+## Página del evento
+
+La página pública es `/e/<dirección>` (por ejemplo, https://siste-ma.vercel.app/e/evento-de-prueba). En el panel, el link **Ver página ↗** (o **Vista previa ↗** si es un borrador) lleva directo.
+
+- De cada tipo de entrada, el público ve **solo el lote en venta** (nombre y precio). Ni cantidades vendidas o disponibles, ni los lotes que siguen: esos datos no salen del servidor (`src/lib/eventos/publico.ts`). Cuando un lote se agota, aparece el siguiente; si no queda ninguno, "Agotado".
+- Se arma en cada visita (no queda guardada en caché), así el lote que se ve es siempre el de ese momento.
+- Borradores y eventos de productoras desactivadas: para el público no existen (404). El ADMIN y los organizadores de esa productora los ven como **vista previa**, con un cartel arriba.
+- Finalizado: se ve la información, sin venta.
+- El botón "Continuar" se habilita cuando esté la compra (pasos 9 a 12). El flyer, cuando se puedan subir imágenes.
+
 ## Publicación (Vercel)
 
 El proyecto `siste-ma` de Vercel está conectado a este repo: cada cambio que se sube a GitHub se publica solo en https://siste-ma.vercel.app. Las funciones corren en São Paulo (`gru1`, en `vercel.json`), al lado de la base.

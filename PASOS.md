@@ -30,11 +30,14 @@ Cada paso termina con algo para probar. Se marca `[x]` cuando está revisado.
   - Revisado con 2 agentes (aislamiento entre productoras).
 
 ## Bloque 2 — Página pública
-- [ ] **7. Página del evento** — flyer, datos y el lote en venta de cada tipo.
+- [x] **7. Página del evento** — flyer, datos y el lote en venta de cada tipo. `/e/<dirección>` (ej.: `/e/evento-de-prueba`); desde el panel, "Ver página ↗".
   - Flyer: por ahora el espacio marcado (las imágenes se suben más adelante).
   - El público ve SOLO el lote en venta (nombre y precio). Nada de cantidades vendidas ni disponibles, y los lotes siguientes no se muestran (ni se mandan al navegador) hasta que se agote el anterior. Si no queda nada: "Agotado".
+  - Elegir cantidades con + y − (hasta el máximo por compra) y ver el total. "Continuar" queda deshabilitado hasta la compra (pasos 9-12).
+  - Borradores: vista previa solo para el ADMIN y la gente de esa productora; para el resto, 404.
 - [ ] **8. Lógica de lotes** — paso automático de lote sin vender de más (con tests).
   - A decidir: si alguien pide 4 y en el lote quedan 2, ¿2 de este lote y 2 del siguiente, o las 4 del siguiente?
+  - A decidir: si un lote se llena solo con reservas sin pagar, hoy se abre el siguiente; si esas reservas vencen, el lote anterior vuelve a estar en venta (y el precio baja). ¿Se acepta o se espera a que venzan?
 - [ ] **9. Formulario de datos (checkout)** — nombre y DNI por entrada.
 - [ ] **10. Reserva temporal** — 10 minutos para pagar.
 
