@@ -87,3 +87,17 @@ export function planearCompra(tipos: TipoConLotes[], pedido: Pedido, maxPorCompr
   const totalCentavos = lineas.reduce((suma, linea) => suma + linea.cantidad * linea.precioCentavos, 0);
   return { ok: true, lineas, cantidad, totalCentavos };
 }
+
+// El pedido viaja en la dirección del checkout: "<tipoId>:2,<tipoId>:1".
+export function pedidoATexto(pedido: Pedido) {
+  return pedido.map((item) => `${item.tipoId}:${item.cantidad}`).join(",");
+}
+
+// Lo contrario. Si no tiene esa forma devuelve algo que validarPedido rechaza.
+export function pedidoDesdeTexto(texto: unknown): unknown {
+  if (typeof texto !== "string" || texto.length > 2_000) return null;
+  return texto.split(",").map((parte) => {
+    const [tipoId, cantidad, ...resto] = parte.split(":");
+    return resto.length || !/^\d{1,2}$/.test(cantidad ?? "") ? null : { tipoId, cantidad: Number(cantidad) };
+  });
+}

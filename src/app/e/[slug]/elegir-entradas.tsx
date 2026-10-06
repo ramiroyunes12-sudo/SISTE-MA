@@ -3,16 +3,22 @@
 // "Elegí tus entradas": el lote en venta de cada tipo, con + y −, y abajo el
 // total. Acá solo llega lo que puede ver el público (nombre y precio del lote
 // en venta): ni cantidades ni los lotes que siguen.
+import Link from "next/link";
 import { useState } from "react";
 
 import { formatearPesos } from "@/lib/dinero";
 import type { TipoPublico } from "@/lib/eventos/publico";
+import { pedidoATexto } from "@/lib/ventas/pedido";
 
-export function ElegirEntradas({ tipos, maxPorCompra }: { tipos: TipoPublico[]; maxPorCompra: number }) {
+const ESTILO_CONTINUAR = "flex h-[52px] items-center rounded-xl bg-acento px-7 text-[17px] font-bold text-white";
+
+export function ElegirEntradas({ slug, tipos, maxPorCompra }: { slug: string; tipos: TipoPublico[]; maxPorCompra: number }) {
   const [cantidades, setCantidades] = useState<Record<string, number>>({});
   const enVenta = tipos.filter((tipo) => tipo.lote);
   const total = enVenta.reduce((suma, tipo) => suma + (cantidades[tipo.id] ?? 0), 0);
   const totalCentavos = enVenta.reduce((suma, tipo) => suma + (cantidades[tipo.id] ?? 0) * tipo.lote!.precioCentavos, 0);
+
+  const pedido = enVenta.filter((tipo) => cantidades[tipo.id]).map((tipo) => ({ tipoId: tipo.id, cantidad: cantidades[tipo.id] }));
 
   function sumar(tipoId: string, cuanto: 1 | -1) {
     setCantidades((antes) => ({ ...antes, [tipoId]: Math.max(0, (antes[tipoId] ?? 0) + cuanto) }));
@@ -78,7 +84,7 @@ export function ElegirEntradas({ tipos, maxPorCompra }: { tipos: TipoPublico[]; 
             Máximo {maxPorCompra} {maxPorCompra === 1 ? "entrada" : "entradas"} por compra. Las entradas son nominativas: en
             el próximo paso te pedimos nombre y DNI de cada persona.
           </p>
-          <div className="sticky bottom-0 -mx-4 flex flex-col gap-2 border-t border-borde bg-superficie px-4 py-4 lg:mx-0 lg:rounded-2xl lg:border">
+          <div className="sticky bottom-0 -mx-4 flex flex-col border-t border-borde bg-superficie px-4 py-4 lg:mx-0 lg:rounded-2xl lg:border">
             <div className="flex items-center justify-between gap-3">
               <div className="flex flex-col">
                 <span className="text-[13px] text-tenue">
@@ -86,18 +92,19 @@ export function ElegirEntradas({ tipos, maxPorCompra }: { tipos: TipoPublico[]; 
                 </span>
                 <span className="text-[22px] font-bold">{formatearPesos(totalCentavos)}</span>
               </div>
-              <button
-                type="button"
-                disabled
-                aria-describedby="compra-pronto"
-                className="h-[52px] rounded-xl bg-acento px-7 text-[17px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Continuar
-              </button>
+              {total > 0 ? (
+                <Link
+                  href={`/e/${slug}/datos?p=${pedidoATexto(pedido)}`}
+                  className={`${ESTILO_CONTINUAR} no-underline hover:bg-acento-hover hover:text-white`}
+                >
+                  Continuar
+                </Link>
+              ) : (
+                <button type="button" disabled className={`${ESTILO_CONTINUAR} cursor-not-allowed opacity-50`}>
+                  Continuar
+                </button>
+              )}
             </div>
-            <p id="compra-pronto" className="text-[13px] text-tenue">
-              La compra online se habilita muy pronto.
-            </p>
           </div>
         </>
       ) : (

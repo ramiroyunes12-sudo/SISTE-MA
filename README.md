@@ -119,7 +119,7 @@ La página pública es `/e/<dirección>` (por ejemplo, https://siste-ma.vercel.a
 - Se arma en cada visita (no queda guardada en caché), así el lote que se ve es siempre el de ese momento.
 - Borradores y eventos de productoras desactivadas: para el público no existen (404). El ADMIN y los organizadores de esa productora los ven como **vista previa**, con un cartel arriba.
 - Finalizado: se ve la información, sin venta.
-- El botón "Continuar" se habilita cuando esté la compra (pasos 9 a 12). El flyer, cuando se puedan subir imágenes.
+- "Continuar" lleva al checkout (`/e/<dirección>/datos?p=<pedido>`): el resumen con el reparto real por lote, un bloque por entrada con nombre y DNI, y email y celular de quien compra (`src/lib/ventas/datos.ts`, se revisa en el navegador y otra vez en el servidor). Todavía no reserva ni cobra: eso llega con los pasos 10 a 12. El flyer, cuando se puedan subir imágenes.
 
 ## Ventas: lotes y reservas
 

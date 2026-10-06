@@ -2,30 +2,12 @@
 // entrada, solo el lote en venta (ver src/lib/eventos/publico.ts).
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { connection } from "next/server";
 import type { ReactNode } from "react";
-import { cache } from "react";
 
-import { obtenerSesionActual } from "@/lib/auth/actual";
-import { obtenerDb } from "@/lib/db";
-import { SLUG } from "@/lib/eventos/editor";
-import { buscarEventoPublico, loVeElPublico, puedeVerVistaPrevia } from "@/lib/eventos/publico";
 import { formatearFechaLarga } from "@/lib/fechas";
 
+import { cargarEventoParaMostrar as cargar } from "./cargar";
 import { ElegirEntradas } from "./elegir-entradas";
-
-// Una vez por pedido (la usan la página y los metadatos).
-const cargar = cache(async (slug: string) => {
-  // Siempre al momento: el lote en venta cambia con cada compra.
-  await connection();
-  if (!SLUG.test(slug) || slug.length > 100) return null;
-  const evento = await buscarEventoPublico(obtenerDb(), slug);
-  if (!evento) return null;
-  if (loVeElPublico(evento)) return { evento, vistaPrevia: false };
-  // Borrador, o productora desactivada: solo su gente lo ve, como vista previa.
-  const sesion = await obtenerSesionActual();
-  return puedeVerVistaPrevia(sesion?.usuario ?? null, evento) ? { evento, vistaPrevia: true } : null;
-});
 
 export async function generateMetadata({ params }: PageProps<"/e/[slug]">): Promise<Metadata> {
   const datos = await cargar((await params).slug);
@@ -86,7 +68,7 @@ export default async function PaginaEvento({ params }: PageProps<"/e/[slug]">) {
               Este evento ya pasó: la venta está cerrada.
             </p>
           ) : (
-            <ElegirEntradas tipos={evento.tipos} maxPorCompra={evento.maxPorCompra} />
+            <ElegirEntradas slug={evento.slug} tipos={evento.tipos} maxPorCompra={evento.maxPorCompra} />
           )}
 
           {evento.descripcion && (

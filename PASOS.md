@@ -40,9 +40,12 @@ Cada paso termina con algo para probar. Se marca `[x]` cuando está revisado.
   - Decidido (2a): las reservas sin pagar ocupan lugar; si vencen, el lote anterior (más barato) vuelve a estar en venta.
   - Compras y ediciones de un mismo evento pasan de a una, en fila ("turno del evento"): nunca se vende de más ni se traba, y editar en plena venta no queda esperando para siempre.
   - Revisado con 19 agentes: 8 hallazgos confirmados y arreglados (un editor duplicado en pantalla al guardar, editar trabado durante una ola de compras, y tests que no probaban lo que decían).
-- [ ] **9. Formulario de datos (checkout)** — nombre y DNI por entrada.
+- [x] **9. Formulario de datos (checkout)** — nombre y DNI por entrada. En la página del evento, elegir entradas → "Continuar" (`/e/<dirección>/datos`).
+  - Un bloque por entrada ("Entrada 1 · General", "Entrada 2 · VIP"…) con nombre y apellido y DNI de quien la usa; abajo, email (dos veces) y celular (opcional).
+  - Decidido: no hay límite por DNI (un mismo DNI puede tener varias entradas).
+  - El resumen muestra el reparto real por lote (si el pedido cruza de lote, lo explica). Todavía no reserva ni cobra: al tocar "Continuar al pago" se revisan los datos y listo.
 - [ ] **10. Reserva temporal** — 10 minutos para pagar.
-  - Antes de pagar, mostrar el detalle por lote (decisión 1a): "2 × Lote 1 $ 6.000 + 2 × Lote 2 $ 8.000". El total de la página es estimado si el pedido cruza de lote.
+  - "Continuar" pasa a reservar (orden PENDIENTE con sus entradas) y el checkout pasa a leer la orden (`/compra/<orden>`) en vez del pedido de la dirección, con el reloj de 10 minutos. Los datos del formulario se guardan en la orden y sus entradas.
   - Crear la orden y sus entradas en la misma transacción que reservarEntradas, y que esa transacción sea corta (nada de llamadas a Mercado Pago adentro). Fijar maxWait/timeout de la transacción y traducir esperoDemasiado() a "Hay mucha gente comprando, probá de nuevo".
   - Liberar vencidas: una orden por transacción. Primero el UPDATE condicionado (PENDIENTE → VENCIDA) y solo si cambió, liberarReservas con las porciones armadas desde las entradas de esa orden (así nunca se libera dos veces).
   - Que nadie acapare el cupo con reservas repetidas (límite por persona o por IP).
