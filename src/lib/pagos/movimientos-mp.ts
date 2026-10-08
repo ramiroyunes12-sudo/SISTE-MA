@@ -1,7 +1,7 @@
 // Prueba (paso 11): ¿las transferencias que entran a una cuenta de Mercado Pago
-// aparecen en su API? ¿Y cobran comisión? Lee los últimos movimientos con el
+// aparecen en su API? ¿Cuánta comisión cobra un cobro con Checkout Pro? Usa el
 // Access Token de esa cuenta (variable MERCADOPAGO_ACCESS_TOKEN, solo en Vercel
-// o en el .env). Solo lee: no crea cobros ni mueve plata.
+// o en el .env). Lee los movimientos y crea, si se pide, un cobro de prueba.
 import "server-only";
 
 const API = "https://api.mercadopago.com";
@@ -20,6 +20,7 @@ export type Movimiento = {
   totalPagadoCentavos: number | null; // lo que pagó quien pagó (con recargos)
   impuestosCentavos: number; // taxes_amount
   comisionCentavos: number; // suma de fee_details
+  liberacion: Date | null; // cuándo queda disponible la plata (money_release_date)
   quien: string; // nombre o email de la otra persona, si viene
   detalle: string; // descripción o referencia, si viene
   remitente: string; // datos del banco de quien transfirió, si vienen
@@ -80,6 +81,7 @@ export async function leerUltimosMovimientos(token: string | undefined): Promise
         totalPagadoCentavos: centavosONull(detalles.total_paid_amount),
         impuestosCentavos: aCentavos(pago.taxes_amount),
         comisionCentavos: comisiones.reduce((suma, c) => suma + aCentavos(c.amount), 0),
+        liberacion: texto(pago.money_release_date) ? new Date(texto(pago.money_release_date)) : null,
         quien: nombre || texto(pagador.email),
         detalle: texto(pago.description) || texto(pago.external_reference),
         remitente: [texto(remitente.long_name), texto(objeto(remitente.identification).number), texto(remitente.account_id)]
@@ -89,6 +91,47 @@ export async function leerUltimosMovimientos(token: string | undefined): Promise
       };
     });
     return { ok: true, cuenta: cuenta.nickname || cuenta.email || String(cuenta.id ?? ""), movimientos };
+  } catch {
+    return { ok: false, error: "No pudimos hablar con Mercado Pago (se cortó o tardó demasiado). Probá de nuevo." };
+  }
+}
+
+// Crea un cobro de $100 con Checkout Pro y devuelve el link que abre
+// Mercado Pago (en el celular, la app) con el monto ya puesto. Solo deja pagar
+// con dinero en cuenta: lo que queremos medir es la comisión de ese medio.
+export async function crearCobroDePrueba(
+  token: string | undefined,
+  volverA: string,
+): Promise<{ ok: true; link: string } | { ok: false; error: string }> {
+  if (!token) return { ok: false, error: "Falta cargar MERCADOPAGO_ACCESS_TOKEN en Vercel (o en el .env)." };
+  try {
+    const respuesta = await fetch(`${API}/checkout/preferences`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "X-Idempotency-Key": crypto.randomUUID(),
+      },
+      body: JSON.stringify({
+        items: [{ title: "Prueba sistema de entradas", quantity: 1, unit_price: 100, currency_id: "ARS" }],
+        external_reference: `prueba-${Date.now()}`,
+        payment_methods: {
+          excluded_payment_types: [{ id: "credit_card" }, { id: "debit_card" }, { id: "prepaid_card" }, { id: "ticket" }],
+        },
+        back_urls: { success: volverA, pending: volverA, failure: volverA },
+        auto_return: "approved",
+      }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
+    const datos = (await respuesta.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!respuesta.ok) {
+      const motivo = texto(datos.message) || texto(datos.error) || "sin detalle";
+      return { ok: false, error: `Mercado Pago no dejó crear el cobro (${respuesta.status}): ${motivo.slice(0, 200)}` };
+    }
+    const link = texto(datos.init_point);
+    if (!link.startsWith("https://")) return { ok: false, error: "Mercado Pago no devolvió el link del cobro." };
+    return { ok: true, link };
   } catch {
     return { ok: false, error: "No pudimos hablar con Mercado Pago (se cortó o tardó demasiado). Probá de nuevo." };
   }

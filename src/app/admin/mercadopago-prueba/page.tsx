@@ -6,13 +6,16 @@ import { formatearPesos } from "@/lib/dinero";
 import { formatearFecha } from "@/lib/fechas";
 import { leerUltimosMovimientos } from "@/lib/pagos/movimientos-mp";
 
+import { probarCobroAccion } from "./acciones";
+
 export const metadata: Metadata = { title: "Prueba Mercado Pago", robots: { index: false } };
 
 // Página de prueba, solo para el ADMIN (no está en el menú): muestra los
 // últimos movimientos de la cuenta de Mercado Pago para ver si las
 // transferencias aparecen y si les descuentan comisión.
-export default async function PaginaPruebaMercadoPago() {
+export default async function PaginaPruebaMercadoPago({ searchParams }: PageProps<"/admin/mercadopago-prueba">) {
   await requerirUsuario(["ADMIN"]);
+  const { error, volvio, status } = await searchParams;
   await connection();
   const resultado = await leerUltimosMovimientos(process.env.MERCADOPAGO_ACCESS_TOKEN);
 
@@ -24,6 +27,31 @@ export default async function PaginaPruebaMercadoPago() {
           Últimos 50 movimientos que Mercado Pago informa como pagos, leídos recién. Ojo: esta lista no es igual a la actividad de la app (ver abajo de cada uno los datos crudos).
         </p>
       </div>
+
+      <section className="flex flex-col gap-3 rounded-2xl border border-borde bg-superficie p-5">
+        <h2 className="text-lg font-bold">Probar un cobro de $100 (Checkout Pro)</h2>
+        <p className="text-sm text-tenue">
+          Abre Mercado Pago con el monto ya puesto, como lo vería un comprador. Hay que pagarlo desde{" "}
+          <strong>otra cuenta de Mercado Pago</strong> (no se puede pagar a uno mismo), con dinero en cuenta. Después
+          aparece acá abajo con la comisión que te descontaron.
+        </p>
+        <form action={probarCobroAccion}>
+          <button type="submit" className="h-11 rounded-xl bg-acento px-5 font-bold text-white">
+            Probar cobro de $100
+          </button>
+        </form>
+        {typeof error === "string" && (
+          <p role="alert" className="rounded-xl bg-error/10 px-4 py-3 font-semibold text-error">
+            {error}
+          </p>
+        )}
+        {volvio && (
+          <p role="status" className="rounded-xl bg-ok/10 px-4 py-3 font-semibold text-ok-oscuro">
+            Volviste de Mercado Pago{typeof status === "string" && ` (estado: ${status})`}. Si pagaste, el cobro aparece
+            primero en la lista.
+          </p>
+        )}
+      </section>
 
       {!resultado.ok ? (
         <p role="alert" className="rounded-xl bg-error/10 px-4 py-3 font-semibold text-error">
@@ -60,6 +88,7 @@ export default async function PaginaPruebaMercadoPago() {
                     )}
                     {m.impuestosCentavos > 0 && <> · Impuestos: {formatearPesos(m.impuestosCentavos)}</>}
                   </span>
+                  {m.entra && m.liberacion && <span>Plata disponible: {formatearFecha(m.liberacion)}</span>}
                   {m.quien && <span>De/para: {m.quien}</span>}
                   {m.remitente && <span>Datos del banco de quien mandó: {m.remitente}</span>}
                   {m.detalle && <span>Detalle: {m.detalle}</span>}
