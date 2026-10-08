@@ -51,12 +51,15 @@ Cada paso termina con algo para probar. Se marca `[x]` cuando está revisado.
   - Límite: 3 reservas abiertas por navegador y 15 por conexión (muchos celulares comparten la IP de la compañía). Si el mismo navegador vuelve a elegir en el mismo evento, la reserva anterior se cancela.
   - Para más adelante (paso 21): una tarea programada que libere vencidas aunque nadie entre (hoy alcanza con lo de arriba).
 
-## Bloque 3 — Cobrar con Mercado Pago
-- [ ] **11. Conectar Mercado Pago (modo prueba)** — Checkout Pro.
-  - Cada productora conecta su propio Mercado Pago desde su panel (OAuth): la plata le llega directo.
-- [ ] **12. Confirmar el pago (webhook)** — sin entradas dobles.
-  - Igual que al liberar: UPDATE condicionado (PENDIENTE → PAGADA) y recién ahí confirmarReservas con las porciones de esa orden; un aviso repetido no hace nada.
-  - Pago que llega con la reserva ya vencida: dar las entradas solo si todavía hay lugar en ese lote; si no, devolver la plata.
+## Bloque 3 — Cobrar
+- [ ] **11 y 12. Cobrar: transferencia o Mercado Pago, y confirmar sin entradas dobles.** En la compra, con los datos completos: "Pagar por transferencia" o "Pagar con Mercado Pago".
+  - Probado antes con plata real: una transferencia al alias entra sin comisión y aparece en la API de Mercado Pago con el monto exacto (sin datos de quien la mandó). Un cobro con Checkout Pro de $100 descontó $4,21 (4,21%) y la plata quedó a 18 días.
+  - Decidido (C): quien compra elige. Transferencia sin recargo, con monto único (centavos) para saber de quién es; Mercado Pago con cargo por servicio (4,4%, se cambia en el panel).
+  - Reserva de 15 minutos (antes 10): da tiempo a transferir.
+  - Se confirma solo: mirando los movimientos de la cuenta mientras quien compra espera, con el aviso de Mercado Pago y al volver del cobro. Cada orden se confirma una vez (UPDATE condicionado con el turno del evento) y cada pago se registra una vez.
+  - Pago tarde: si queda lugar en esos lotes, se confirma; si no, "para devolver". Pago repetido: "para devolver". Casos raros (sin los centavos): "Confirmar pago" a mano en el panel del evento.
+  - Por ahora la cuenta de Mercado Pago la conecta el ADMIN pegando el Access Token (cifrado en la base). Para más adelante: que cada productora la conecte con un botón (OAuth) y que el ADMIN vea "Cobros" de cada una.
+  - Para más adelante: devolver la plata desde el panel (paso 20) y avisar por mail (paso 15).
 
 ## Bloque 4 — Entrada, QR y mail
 - [ ] **13. Código de cada entrada** — token aleatorio firmado (HMAC).

@@ -7,7 +7,7 @@ Plataforma para vender entradas por lotes, enviar el QR por mail y validarlo en 
 | Área | Incluye |
 |---|---|
 | Lotes | Tipos de entrada (General, VIP…) con Lote 1 → 2 → 3. Cambio **automático por cantidad**: al agotarse un lote se abre el siguiente. |
-| Venta | Checkout con Mercado Pago, sin cargo extra al comprador. Reserva de stock ~10 min mientras paga. Máximo de entradas por compra. |
+| Venta | Quien compra elige: transferencia al alias de la productora (sin recargo, se confirma sola por el monto único) o Mercado Pago Checkout Pro (con cargo por servicio). Reserva de stock 15 min mientras paga. Máximo de entradas por compra. |
 | Entradas | Nominativas (nombre + DNI). Un QR firmado por entrada, enviado por mail (+ PDF adjunto). |
 | Comprador | "Mis entradas": reenviar el mail ingresando email + DNI. |
 | Cortesías | Individuales, carga masiva por Excel/CSV, cupo aparte del stock en venta. |
@@ -17,7 +17,7 @@ Plataforma para vender entradas por lotes, enviar el QR por mail y validarlo en 
 | Cobros | Cada productora conecta **su propio Mercado Pago**: la plata de las entradas le llega directo. El dueño cobra un **alquiler fijo por evento**, aparte del sistema. |
 | Mails | Gmail SMTP para arrancar (< 500 por día en total); con varias productoras conviene pasar a un servicio de mails con dominio propio (Resend). |
 
-**Fuera de alcance:** que las productoras se registren solas (las crea el dueño), comisión automática por entrada, lotes por fecha o manuales, cupones, links de RRPP, cuentas con login para compradores, transferencias, cargo por servicio, modo sin internet.
+**Fuera de alcance:** que las productoras se registren solas (las crea el dueño), comisión automática por entrada, lotes por fecha o manuales, cupones, links de RRPP, cuentas con login para compradores, modo sin internet.
 
 ## Seguridad del QR
 

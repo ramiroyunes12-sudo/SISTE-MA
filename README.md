@@ -119,7 +119,7 @@ La página pública es `/e/<dirección>` (por ejemplo, https://siste-ma.vercel.a
 - Se arma en cada visita (no queda guardada en caché), así el lote que se ve es siempre el de ese momento.
 - Borradores y eventos de productoras desactivadas: para el público no existen (404). El ADMIN y los organizadores de esa productora los ven como **vista previa**, con un cartel arriba.
 - Finalizado: se ve la información, sin venta.
-- "Continuar" **reserva las entradas 10 minutos** y lleva a la compra (`/compra/<llave>`, un link secreto): reloj, resumen con el reparto real por lote, un bloque por entrada con nombre y DNI, y email y celular de quien compra (`src/lib/ventas/datos.ts`, se revisa en el navegador y otra vez en el servidor). El pago llega con los pasos 11 y 12. El flyer, cuando se puedan subir imágenes.
+- "Continuar" **reserva las entradas 15 minutos** y lleva a la compra (`/compra/<llave>`, un link secreto): reloj, resumen con el reparto real por lote, un bloque por entrada con nombre y DNI, y email y celular de quien compra (`src/lib/ventas/datos.ts`, se revisa en el navegador y otra vez en el servidor). Con los datos completos, se elige cómo pagar (ver "Cobros"). El flyer, cuando se puedan subir imágenes.
 
 ## Ventas: lotes y reservas
 
@@ -128,8 +128,28 @@ El motor de la venta está en `src/lib/ventas/` (la pantalla de compra llega en 
 - **Reparto** (`pedido.ts`): se vende primero el lote de menor número con lugar; si en ese no entra todo el pedido, el resto va al siguiente, a su precio. Ej.: piden 4 y al Lote 1 le quedan 2 → 2 del Lote 1 y 2 del Lote 2. Las reservas sin pagar ocupan lugar; si vencen, el lote anterior vuelve a estar en venta. Los mensajes de error nunca dicen cuántas quedan.
 - **Reservar, liberar y confirmar** (`reservas.ts`): siempre dentro de una transacción. Primero se toma el **turno del evento** (`turno.ts`, un bloqueo de PostgreSQL con fila justa): las compras y las ediciones de un mismo evento pasan de a una, en orden de llegada. Además la base no deja que vendidas + reservadas pasen el cupo.
 - Si hay tanta gente que alguien espera su turno más de unos segundos, la operación falla sin cambiar nada y se puede reconocer con `esperoDemasiado()` (`src/lib/errores-db.ts`).
-- **Reservas** (`ordenes.ts`): "Continuar" crea la orden PENDIENTE con sus entradas y aparta los lugares por 10 minutos. Si vence o se cancela, la orden se cierra una sola vez y los lugares vuelven. Límite de reservas abiertas: 3 por navegador (cookie) y 15 por conexión (IP); en la base solo quedan huellas de la llave del link, la cookie y la IP.
+- **Reservas** (`ordenes.ts`): "Continuar" crea la orden PENDIENTE con sus entradas y aparta los lugares por 15 minutos. Si vence o se cancela, la orden se cierra una sola vez y los lugares vuelven. Límite de reservas abiertas: 3 por navegador (cookie) y 15 por conexión (IP); en la base solo quedan huellas de la llave del link, la cookie y la IP.
 - **Probar una compra**: en el panel, debajo de cada evento, muestra cómo se cobraría un pedido si alguien comprara ahora (mismas reglas, no reserva nada; `simulacion.ts`). Para ver el reparto entre lotes con el evento de prueba, bajale el cupo al Lote 1 (por ejemplo a 2) y probá 4 de General.
+
+## Cobros
+
+Quien compra elige (`/compra/<llave>`, después de completar los datos):
+
+- **Transferencia (sin recargo)**: ve el alias de la productora y un **monto único** (el total más de $0,01 a $9,99), con botones para copiar. Como una transferencia no dice quién la mandó, el monto exacto es lo que la ata a su compra (`montos_transferencia`: no se repite dentro de la productora y queda atado 48 horas después de cerrada la orden, por si la plata llega tarde).
+- **Mercado Pago (con cargo por servicio)**: se abre Mercado Pago (en el celu, la app) con todo cargado (Checkout Pro). El cargo cubre la comisión (por defecto 4,4%; la comisión que medimos fue 4,21% con la plata a 18 días). El cobro vence junto con la reserva.
+
+Cómo se sabe que entró la plata (`src/lib/pagos/cobros.ts`): se miran los pagos de la cuenta de Mercado Pago de la productora — mientras quien compra espera en la pantalla (como mucho una consulta cada 5 segundos por productora), cuando Mercado Pago avisa (`/api/mercadopago/aviso`) y cuando vuelve del cobro. Todo lo que se toma de Mercado Pago se pide con el token de la productora: un aviso inventado no confirma nada.
+
+Al confirmar (`src/lib/pagos/confirmar.ts`), con el turno del evento: la orden pasa a PAGADA una sola vez y sus reservadas, a vendidas. Cada pago se registra una sola vez. Si llega tarde (la reserva ya venció) y todavía hay lugar en esos lotes, se confirma igual; si no hay lugar, o si es un pago repetido, queda **para devolver** (el panel lo muestra).
+
+En el panel:
+- **Productoras → (una) → Cobros** (ADMIN): alias o CVU, a nombre de quién está, cargo por servicio y la cuenta de Mercado Pago (se pega el Access Token de producción; se guarda cifrado con `CLAVE_CIFRADO` y no se vuelve a mostrar). El alias tiene que ser de esa misma cuenta: es la que se revisa.
+- **Evento → Pagos**: lo cobrado, las compras esperando la plata (con **Confirmar pago** para los casos raros, por ejemplo si transfirió sin los centavos) y los pagos para devolver. "Buscar pagos ahora" revisa los movimientos en el momento.
+
+| Variable | Qué es |
+|---|---|
+| `CLAVE_CIFRADO` | Clave para cifrar los tokens de Mercado Pago en la base (32+ caracteres al azar). Si se cambia, hay que volver a conectar las cuentas. |
+| `URL_PUBLICA` | Opcional. A dónde vuelve y avisa Mercado Pago. En Vercel no hace falta. |
 
 ## Publicación (Vercel)
 
