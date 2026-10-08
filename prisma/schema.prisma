@@ -337,7 +337,7 @@ model Entrada {
   loteId         String?       @map("lote_id") @db.Uuid // vacío en las cortesías
   titular        String? // nombre y apellido (obligatorio desde que la orden se paga)
   dni            String? // solo números (obligatorio desde que la orden se paga)
-  codigo         String        @unique // va dentro del QR (se firma en el paso 13)
+  codigo         String        @unique // 128 bits al azar (hex); el QR lleva este código firmado (src/lib/entradas/codigo.ts)
   precioCentavos Int           @map("precio_centavos") // lo que se pagó por esta entrada
   estado         EstadoEntrada @default(PENDIENTE)
   usadaEn        DateTime?     @map("usada_en") @db.Timestamptz(3)

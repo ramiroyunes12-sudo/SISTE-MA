@@ -16,6 +16,7 @@
 // solo se liberan los lugares de las órdenes que cambiaron.
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { generarToken, huellaDeToken } from "@/lib/auth/sesiones";
+import { nuevoCodigo } from "@/lib/entradas/codigo";
 
 import { type DatosCompra, type ErroresDatos, validarDatosCompra } from "./datos";
 import { pedidoDesdeTexto, validarPedido } from "./pedido";
@@ -172,7 +173,7 @@ export async function crearReserva(
               tipoEntradaId: linea.tipoId,
               loteId: linea.loteId,
               precioCentavos: linea.precioCentavos,
-              codigo: generarToken(), // el del QR se arma en el paso 13
+              codigo: nuevoCodigo(),
             })),
           ),
         });
@@ -196,6 +197,8 @@ export type EntradaDeCompra = {
   precioCentavos: number;
   titular: string | null;
   dni: string | null;
+  estado: "PENDIENTE" | "VALIDA" | "USADA" | "ANULADA";
+  codigo: string; // sin firmar (el del QR se arma con firmarCodigo)
 };
 
 export type Compra = {
@@ -230,6 +233,8 @@ async function ordenPorLlave(db: PrismaClient | Tx, llave: string) {
           id: true,
           titular: true,
           dni: true,
+          estado: true,
+          codigo: true,
           precioCentavos: true,
           tipoEntrada: { select: { nombre: true, orden: true } },
           lote: { select: { nombre: true, numero: true } },
@@ -257,6 +262,8 @@ export async function buscarCompra(db: PrismaClient, llave: string, ahora = new 
       precioCentavos: entrada.precioCentavos,
       titular: entrada.titular,
       dni: entrada.dni,
+      estado: entrada.estado,
+      codigo: entrada.codigo,
     }));
   return {
     id: orden.id,

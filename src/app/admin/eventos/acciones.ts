@@ -6,10 +6,13 @@ import { redirect, unstable_rethrow } from "next/navigation";
 import { requerirUsuario } from "@/lib/auth/actual";
 import { alcanceDe, filtroDeEventos } from "@/lib/auth/alcance";
 import { obtenerDb } from "@/lib/db";
+import { verificarCodigo } from "@/lib/entradas/verificar";
+import { formatearFecha } from "@/lib/fechas";
 import { confirmarPagoManual, revisarCobros } from "@/lib/pagos/cobros";
 import { apiMercadoPago } from "@/lib/pagos/mercadopago";
 import { type Errores, validarEvento } from "@/lib/eventos/editor";
 import { guardarEvento } from "@/lib/eventos/guardar";
+import { formatearDni } from "@/lib/ventas/datos";
 import { type ResultadoSimulacion, simularCompra } from "@/lib/ventas/simulacion";
 
 export type EstadoGuardado = { errores?: Errores };
@@ -119,5 +122,55 @@ export async function buscarPagosAccion(eventoId: string): Promise<EstadoPagoMan
     unstable_rethrow(error);
     console.error("[buscarPagos] Falló:", error instanceof Error ? error.message : error);
     return { error: "No pudimos hablar con Mercado Pago. Probá de nuevo en un rato." };
+  }
+}
+
+// ─── Verificar una entrada ───────────────────────────────────────────────────
+
+export type EntradaVerificada = {
+  resultado: "valida" | "usada" | "sin_pagar" | "anulada" | "no_valida";
+  motivo?: "formato" | "firma" | "no_existe" | "otro_evento";
+  titular?: string;
+  dni?: string;
+  tipo?: string;
+  compra?: number;
+  usadaEn?: string; // "sáb 21/11/2026 23:40"
+};
+export type EstadoVerificacion = { error?: string; verificada?: EntradaVerificada };
+
+// "Verificar una entrada": pegar el código (el del QR) y ver si es válida y de
+// quién es. Solo mira: no la marca usada (eso es el escáner, paso 17).
+export async function verificarEntradaAccion(
+  eventoId: string,
+  _anterior: EstadoVerificacion,
+  datos: FormData,
+): Promise<EstadoVerificacion> {
+  const usuario = await requerirUsuario(["ADMIN", "ORGANIZADOR"]);
+  if (!UUID.test(String(eventoId))) return { error: "Datos no válidos. Recargá la página." };
+  const codigo = datos.get("codigo");
+  if (typeof codigo !== "string" || !codigo.trim()) return { error: "Pegá el código de la entrada." };
+  try {
+    const evento = await obtenerDb().evento.findFirst({
+      where: { id: eventoId, ...filtroDeEventos(alcanceDe(usuario)) },
+      select: { id: true },
+    });
+    if (!evento) return { error: "Ese evento ya no existe." };
+    const v = await verificarCodigo(obtenerDb(), evento.id, codigo);
+    if (v.resultado === "no_valida") return { verificada: { resultado: "no_valida", motivo: v.motivo } };
+    return {
+      verificada: {
+        resultado: v.resultado,
+        titular: v.entrada.titular ?? undefined,
+        dni: v.entrada.dni ? formatearDni(v.entrada.dni) : undefined,
+        tipo: v.entrada.tipo,
+        compra: v.entrada.compra,
+        usadaEn: v.entrada.usadaEn ? formatearFecha(v.entrada.usadaEn) : undefined,
+      },
+    };
+  } catch (error) {
+    unstable_rethrow(error);
+    // Solo el mensaje: nada de datos de la entrada en los logs.
+    console.error("[verificarEntrada] Falló:", error instanceof Error ? error.message : "error desconocido");
+    return { error: "No pudimos verificarla: falló la conexión con el sistema. Probá de nuevo." };
   }
 }

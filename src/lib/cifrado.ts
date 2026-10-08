@@ -6,7 +6,7 @@
 // AES-256-GCM: si alguien toca el texto cifrado, descifrar falla. El
 // "contexto" (por ejemplo, el id de la productora) va pegado al cifrado: un
 // token copiado a otra productora no se puede descifrar.
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } from "node:crypto";
 
 const VERSION = "v1";
 
@@ -23,6 +23,15 @@ function clave() {
 
 export function hayClaveDeCifrado() {
   return claveValida(process.env.CLAVE_CIFRADO);
+}
+
+// Otra clave sacada de CLAVE_CIFRADO, para otro uso (por ejemplo, firmar los
+// códigos de las entradas). Con HKDF y una etiqueta distinta por uso: saber
+// una de estas claves no sirve para calcular las otras ni la de cifrado.
+export function claveDerivada(etiqueta: string) {
+  const texto = process.env.CLAVE_CIFRADO;
+  if (!claveValida(texto)) throw new Error("Falta CLAVE_CIFRADO (al menos 32 caracteres al azar)");
+  return Buffer.from(hkdfSync("sha256", texto, "siste-ma", etiqueta, 32));
 }
 
 export function cifrar(texto: string, contexto: string) {

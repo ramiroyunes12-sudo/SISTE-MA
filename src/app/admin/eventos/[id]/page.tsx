@@ -9,9 +9,10 @@ import { estadosDeLotes } from "@/lib/eventos/lotes";
 import { aFechaLocal } from "@/lib/fechas";
 import { liberarVencidas } from "@/lib/ventas/ordenes";
 
-import { simularCompraAccion } from "../acciones";
+import { simularCompraAccion, verificarEntradaAccion } from "../acciones";
 import { EditorEvento, type InfoLote } from "../editor";
 import { SimuladorCompra } from "../simulador";
+import { VerificarEntrada } from "../verificar-entrada";
 import { PagosDelEvento } from "./pagos-del-evento";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -83,6 +84,7 @@ export default async function PaginaEditarEvento({ params, searchParams }: PageP
         productoraNombre={usuario.rol === "ADMIN" ? evento.productora.nombre : undefined}
       />
       <PagosDelEvento eventoId={evento.id} pagada={typeof pagada === "string" && /^\d{1,9}$/.test(pagada) ? Number(pagada) : undefined} />
+      <VerificarEntrada accion={verificarEntradaAccion.bind(null, evento.id)} />
       <SimuladorCompra
         key={`simulador-${version}`}
         accion={simularCompraAccion.bind(null, evento.id)}

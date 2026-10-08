@@ -149,8 +149,16 @@ En el panel:
 
 | Variable | Qué es |
 |---|---|
-| `CLAVE_CIFRADO` | Clave para cifrar los tokens de Mercado Pago en la base (32+ caracteres al azar). Si se cambia, hay que volver a conectar las cuentas. |
+| `CLAVE_CIFRADO` | Clave para cifrar los tokens de Mercado Pago en la base y para firmar los códigos de las entradas (32+ caracteres al azar). Si se cambia, hay que volver a conectar las cuentas y ningún QR emitido sirve más: guardala aparte. |
 | `URL_PUBLICA` | Opcional. A dónde vuelve y avisa Mercado Pago. En Vercel no hace falta. |
+
+## Entradas: el código
+
+Cada entrada tiene un código (`src/lib/entradas/codigo.ts`) que va dentro de su QR: `E1-<128 bits al azar>-<firma>`, en hexadecimal con mayúsculas. La firma es un HMAC-SHA256 con una clave que sale de `CLAVE_CIFRADO` (por HKDF, distinta de la que cifra los tokens); `E1` es la versión de esa clave.
+
+En la base (`entradas.codigo`) se guarda solo la parte al azar: con una copia de la base no se puede armar un QR válido, y con la clave sola tampoco. Al leer un código se revisa primero la firma (sin tocar la base) y después se busca la entrada.
+
+En el panel, **Evento → Verificar una entrada**: se pega un código y dice si es VÁLIDA (y de quién es), YA USADA, SIN PAGAR, ANULADA o NO VÁLIDA. Solo mira: no la marca usada. En una compra paga, el link de la compra muestra el código de cada entrada (en el paso 14, el QR).
 
 ## Publicación (Vercel)
 

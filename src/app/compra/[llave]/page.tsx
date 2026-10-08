@@ -11,6 +11,7 @@ import type { ReactNode } from "react";
 
 import { obtenerDb } from "@/lib/db";
 import { formatearPesos } from "@/lib/dinero";
+import { firmarCodigo } from "@/lib/entradas/codigo";
 import { opcionesDePago, revisarPagoDeCompra } from "@/lib/pagos/cobros";
 import { apiMercadoPago } from "@/lib/pagos/mercadopago";
 import { formatearDni } from "@/lib/ventas/datos";
@@ -59,10 +60,13 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
           <p>
             Compra N° <strong>{compra.numero}</strong> · {compra.evento.nombre}
           </p>
-          <ul className="flex flex-col gap-0.5 text-[15px]">
+          <ul className="flex flex-col gap-2 text-[15px]">
             {compra.entradas.map((entrada, i) => (
-              <li key={entrada.id}>
-                Entrada {i + 1} · {entrada.tipo}: {entrada.titular} · DNI {formatearDni(entrada.dni ?? "")}
+              <li key={entrada.id} className="flex flex-col gap-0.5">
+                <span>
+                  Entrada {i + 1} · {entrada.tipo}: {entrada.titular} · DNI {formatearDni(entrada.dni ?? "")}
+                </span>
+                <CodigoEntrada codigo={entrada.codigo} estado={entrada.estado} />
               </li>
             ))}
           </ul>
@@ -189,6 +193,24 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
       />
       <div className="h-6" />
     </Marco>
+  );
+}
+
+// El código de la entrada (lo que va en el QR, paso 14). Solo de las válidas.
+function CodigoEntrada({ codigo, estado }: { codigo: string; estado: string }) {
+  if (estado === "ANULADA") return <span className="text-[13px] font-semibold text-error">Anulada</span>;
+  if (estado !== "VALIDA" && estado !== "USADA") return null;
+  let firmado: string;
+  try {
+    firmado = firmarCodigo(codigo);
+  } catch (error) {
+    console.error("[firmarCodigo] No se pudo:", error instanceof Error ? error.message : "error desconocido");
+    return null;
+  }
+  return (
+    <span className="text-[13px] text-tenue">
+      Código: <code className="break-all font-mono text-tinta">{firmado}</code>
+    </span>
   );
 }
 

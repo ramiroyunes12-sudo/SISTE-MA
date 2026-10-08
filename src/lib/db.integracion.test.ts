@@ -5,6 +5,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { PrismaClient } from "@/generated/prisma/client";
+import { nuevoCodigo } from "@/lib/entradas/codigo";
 
 import { cargarDatosDePrueba, SLUG_EVENTO_PRUEBA } from "../../prisma/datos-prueba";
 
@@ -95,7 +96,7 @@ describe.skipIf(!url)("reglas de la base de datos", () => {
         ordenId: orden.id,
         eventoId,
         tipoEntradaId: tipoId,
-        codigo: `codigo-${crypto.randomUUID()}`,
+        codigo: nuevoCodigo(),
         precioCentavos: 800000,
       },
     });
@@ -130,7 +131,7 @@ describe.skipIf(!url)("reglas de la base de datos", () => {
             ordenId: orden.id,
             eventoId,
             tipoEntradaId: otro.tipos[0].id, // tipo de OTRO evento
-            codigo: `codigo-${crypto.randomUUID()}`,
+            codigo: nuevoCodigo(),
             precioCentavos: 0,
           },
         }),
@@ -165,11 +166,20 @@ describe.skipIf(!url)("reglas de la base de datos", () => {
       tipoEntradaId: tipoId,
       titular: "Persona de Prueba",
       dni: "30111222",
-      codigo: `codigo-${crypto.randomUUID()}`,
+      codigo: nuevoCodigo(),
       precioCentavos: 0,
     };
     await db.entrada.create({ data: datos });
     await expect(db.entrada.create({ data: { ...datos, dni: "30111223" } })).rejects.toThrow();
+  });
+
+  it("el código de una entrada tiene que ser 128 bits en hexadecimal con mayúsculas", async () => {
+    const orden = await db.orden.create({ data: { eventoId, totalCentavos: 0 } });
+    const datos = { ordenId: orden.id, eventoId, tipoEntradaId: tipoId, precioCentavos: 0 };
+    for (const codigo of [`codigo-${crypto.randomUUID()}`, nuevoCodigo().toLowerCase(), nuevoCodigo().slice(1), `E1-${nuevoCodigo()}`]) {
+      await expect(db.entrada.create({ data: { ...datos, codigo } }), codigo).rejects.toThrow(/entradas_codigo_formato/);
+    }
+    await db.entrada.create({ data: { ...datos, codigo: nuevoCodigo() } });
   });
 });
 

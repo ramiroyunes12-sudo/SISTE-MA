@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { cifrar, descifrar, hayClaveDeCifrado } from "./cifrado";
+import { createHash } from "node:crypto";
+
+import { cifrar, claveDerivada, descifrar, hayClaveDeCifrado } from "./cifrado";
 
 describe("cifrar secretos de la base", () => {
   const anterior = process.env.CLAVE_CIFRADO;
@@ -36,5 +38,15 @@ describe("cifrar secretos de la base", () => {
     process.env.CLAVE_CIFRADO = "corta";
     expect(hayClaveDeCifrado()).toBe(false);
     expect(() => cifrar("x", "y")).toThrow(/CLAVE_CIFRADO/);
+  });
+
+  it("claves derivadas: una por etiqueta, de 32 bytes, distintas entre sí y de la de cifrar", () => {
+    const a = claveDerivada("entradas/codigo/v1");
+    expect(a).toHaveLength(32);
+    expect(claveDerivada("entradas/codigo/v1").equals(a)).toBe(true);
+    expect(claveDerivada("otra/cosa").equals(a)).toBe(false);
+    expect(createHash("sha256").update(process.env.CLAVE_CIFRADO!).digest().equals(a)).toBe(false);
+    process.env.CLAVE_CIFRADO = "corta";
+    expect(() => claveDerivada("entradas/codigo/v1")).toThrow(/CLAVE_CIFRADO/);
   });
 });
