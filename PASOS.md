@@ -62,17 +62,23 @@ Cada paso termina con algo para probar. Se marca `[x]` cuando está revisado.
   - Revisado con 8 agentes: 34 hallazgos, arreglados (entre otros: una cuenta en dos productoras podía confirmar la compra de otra persona, transferencia ofrecida sin poder detectarla, "Cambiar entradas" después de pagar, volver de Mercado Pago con el pago rechazado, montos que se podían agotar, contracargos que seguían sumando).
   - Para más adelante: devolver la plata desde el panel y anular entradas de pagos revertidos (paso 20), avisar por mail (paso 15).
   - Probado en producción con plata real (8/10/2026): compra N° 1 por transferencia ($100,01, sin comisión) y N° 2 con Mercado Pago ($105 = $100 + $5 de cargo; Mercado Pago descontó $4,42 y quedaron $100,58). Las dos se confirmaron solas, sin errores; lote y entradas cuadran.
+  - Decidido (8/10): la transferencia sigue con centavos únicos. Investigado y descartado por ahora: monto exacto sin centavos (con 5 compras en 15 minutos, 1 de cada 4 queda en duda), QR por compra (no se escanea desde el mismo celular), CVU por compra (Talo/Cucuru: comisión y monotributo). Plan B para más adelante: que el comprador pegue el código del comprobante ("ID COELSA" = `e2e_id` en Mercado Pago), probándolo antes con 2-3 apps.
 
 ## Bloque 4 — Entrada, QR y mail
 - [ ] **13. Código de cada entrada** — token aleatorio firmado (HMAC).
+  - Notas: código al azar de 128 bits (`crypto.randomBytes`) + firma HMAC-SHA256 con una clave propia (no `CLAVE_CIFRADO`), con prefijo de versión para poder cambiar la clave. Verificar la firma con `timingSafeEqual` antes de tocar la base. En la base, solo la huella del código (índice único; si choca, reintentar).
 - [ ] **14. QR y PDF**
+  - Notas: QR y PDF se generan en nuestro servidor (sin APIs externas: llevan nombre y DNI). El QR lleva solo el código firmado. No guardar los PDF: se rearman desde la base.
 - [ ] **15. Enviar el mail** — Gmail SMTP.
   - Con varias productoras, el límite de Gmail (~500 por día) puede quedar corto: evaluar Resend con dominio propio.
+  - Notas: en Vercel no sirven las colas en memoria: marcar en la base qué mail falta (en la misma transacción que confirma el pago) y mandarlo después con `after()`; reintentar los pendientes. En Gmail el QR va como adjunto (CID) o en el PDF, no como imagen `data:`.
 - [ ] **16. "Compra confirmada" y "Reenviar mis entradas"**
+  - Notas: "Reenviar" por POST (nunca email o DNI en la URL), con límite, y la misma respuesta exista o no el email.
 
 ## Bloque 5 — Puerta
 - [ ] **17. Escáner** — cámara del celu, marcar usada de forma atómica.
   - Incluye la pantalla "Validadores" para que cada organizador maneje los suyos (hoy los suma el ADMIN desde Productoras).
+  - Notas: marcar usada con un solo UPDATE condicionado (`estado = VALIDA`) y mirar `count`; si da 0, decir "ya usada a las HH:MM". Ante cualquier error: NO VÁLIDA. Cámara: HTTPS, `facingMode: environment`, en iPhone `playsinline` + `muted`; Safari no tiene BarcodeDetector (hace falta una librería). Resultado con color + texto grande, usable con una mano y de noche. Se puede probar sin celular con la cámara falsa de Chromium.
 - [ ] **18. Búsqueda por DNI y contador**
 
 ## Bloque 6 — Admin completo
@@ -82,3 +88,4 @@ Cada paso termina con algo para probar. Se marca `[x]` cuando está revisado.
 
 ## Bloque 7 — Salir a producción
 - [ ] **21. Publicarlo en internet** — Vercel + claves reales + compra de prueba real.
+  - Lista antes de vender: Access Token de producción en cada productora; `CLAVE_CIFRADO` y la clave de los códigos guardadas aparte (si se pierden, hay que reconectar cuentas y reemitir entradas); borrar el evento y las compras de prueba; plan de Supabase (el gratis se pausa sin uso; backups según plan); límites de Vercel Hobby; límite de conexiones a la base (`max` del pool); consultar al contador (cargo por Mercado Pago, facturación).

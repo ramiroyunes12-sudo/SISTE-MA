@@ -156,6 +156,13 @@ En el panel:
 
 El proyecto `siste-ma` de Vercel está conectado a este repo: cada cambio que se sube a GitHub se publica solo en https://siste-ma.vercel.app. Las funciones corren en São Paulo (`gru1`, en `vercel.json`), al lado de la base.
 
+## Claude Code (`.claude/`)
+
+- `settings.json`: permisos. Prohíbe lo destructivo (resetear o empujar el esquema con Prisma, `git push --force`, borrar ramas, leer `.env` o las variables del entorno, migrar o pausar producción por el MCP de Supabase, comprar dominios) y pide confirmación para lo que toca producción (SQL en Supabase, claves y deploys de Vercel, mails, merges).
+- `skills/verificar`: cómo dar un paso por terminado (test que falla primero, typecheck, lint y tests con la base local, sin salteados).
+- `rules/`: reglas que se cargan solo al tocar esos archivos: `base-de-datos.md` (prisma, `src/lib`, `src/app/api`) y `datos-personales.md` (`src`).
+- Adaptado de [ECC](https://github.com/affaan-m/everything-claude-code) (2.2.3) a mano: sin hooks ni instalador.
+
 ## Comandos
 
 | Comando | Qué hace |
