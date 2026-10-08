@@ -18,7 +18,7 @@ import { buscarCompra, type Compra, liberarVencidas } from "@/lib/ventas/ordenes
 
 import { cancelarAccion, guardarDatosAccion, mercadoPagoAccion, revisarPagoAccion, transferenciaAccion } from "./acciones";
 import { FormularioDatos } from "./formulario-datos";
-import { DatosTransferencia, ElegirPago, EsperarPago } from "./pago";
+import { BotonCambiarEntradas, DatosTransferencia, ElegirPago, EsperarPago } from "./pago";
 import { Reloj } from "./reloj";
 
 export const metadata: Metadata = {
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
 export default async function PaginaCompra({ params, searchParams }: PageProps<"/compra/[llave]">) {
   await connection();
   const { llave } = await params;
-  const { editar, payment_id: pagoId } = await searchParams;
+  const { editar, payment_id: pagoId, status: estadoMp, collection_status: estadoCobro } = await searchParams;
   const db = obtenerDb();
 
   // Volvió de Mercado Pago con el número del pago: se mira ese pago primero.
@@ -46,7 +46,10 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
   if (!compra) notFound();
   const volver = `/e/${compra.evento.slug}`;
   const opciones = await opcionesDePago(db, llave);
-  const esperando = opciones?.metodo === "TRANSFERENCIA" || opciones?.metodo === "MERCADOPAGO";
+  const eligioPago = opciones?.metodo === "TRANSFERENCIA" || opciones?.metodo === "MERCADOPAGO";
+  // Volvió de Mercado Pago sin pagar (rechazado, o tocó "volver").
+  const vueltaMp = typeof estadoMp === "string" ? estadoMp : typeof estadoCobro === "string" ? estadoCobro : null;
+  const mpNoSeCompleto = vueltaMp !== null && !["approved", "pending", "in_process"].includes(vueltaMp);
 
   if (compra.estado === "PAGADA") {
     return (
@@ -63,8 +66,8 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
               </li>
             ))}
           </ul>
-          <p className="text-tenue">
-            Las entradas, cada una con su QR, van a llegar a <strong>{compra.email}</strong>. Guardá este link por las dudas.
+          <p className="text-tenue [overflow-wrap:anywhere]">
+            Guardá este link: es tu comprobante. Las entradas, cada una con su QR, te llegan a <strong>{compra.email}</strong>.
           </p>
         </section>
       </Marco>
@@ -80,6 +83,7 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
 
   if (compra.estado !== "PENDIENTE" || compra.vencida) {
     const cancelada = compra.estado === "CANCELADA";
+    const aDevolver = opciones?.aDevolverCentavos ?? 0;
     return (
       <Marco titulo="Tu compra" evento={compra.evento.nombre} volver={volver}>
         <div className="flex flex-col gap-3 rounded-2xl border border-borde bg-superficie p-5">
@@ -89,22 +93,31 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
               ? "Las entradas volvieron a estar a la venta."
               : "Pasaron los 15 minutos y las entradas volvieron a estar a la venta. Podés elegir de nuevo."}
           </p>
-          {esperando && (
-            <p className="text-[15px]">
-              <strong>¿Ya pagaste?</strong> Si la plata entra y todavía hay lugar, te confirmamos la compra igual (esta
-              página se actualiza sola). Si ya no queda lugar, te devolvemos la plata.
+          {aDevolver > 0 ? (
+            <p role="status" className="rounded-xl bg-alerta/10 p-3 text-[15px]">
+              <strong>Recibimos tu pago de {formatearPesos(aDevolver)}</strong>, pero ya no quedaba lugar. Te lo vamos a
+              devolver (compra N° {compra.numero}).
             </p>
+          ) : (
+            eligioPago && (
+              <p className="text-[15px]">
+                <strong>¿Ya pagaste?</strong> Si la plata entra y todavía hay lugar, te confirmamos la compra igual (esta
+                página se actualiza sola). Si ya no queda lugar, te devolvemos la plata.
+              </p>
+            )
           )}
           <Link href={volver} className="font-semibold text-acento hover:text-acento-hover">
             ← Volver a elegir entradas
           </Link>
         </div>
-        {esperando && <EsperarPago revisar={revisarPagoAccion.bind(null, llave)} mensaje="Revisando si entró tu pago…" />}
+        {eligioPago && aDevolver === 0 && (
+          <EsperarPago revisar={revisarPagoAccion.bind(null, llave)} mensaje="Revisando si entró tu pago…" estadoInicial={compra.estado} />
+        )}
       </Marco>
     );
   }
 
-  const cancelar = cancelarAccion.bind(null, llave);
+  const cancelar = <BotonCambiarEntradas cancelar={cancelarAccion.bind(null, llave)} pidePermiso={eligioPago} />;
   const reloj = <Reloj venceEnMs={compra.venceEn!.getTime()} ahoraServidorMs={ahora.getTime()} />;
 
   // Primero, los datos de cada entrada (o corregirlos).
@@ -144,18 +157,27 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
             </li>
           ))}
         </ul>
-        <p className="text-tenue">Las entradas llegan a {compra.email}</p>
+        <p className="text-tenue [overflow-wrap:anywhere]">Las entradas llegan a {compra.email}</p>
       </section>
 
       {opciones.metodo === "TRANSFERENCIA" && transferencia?.montoCentavos && (
         <>
           <DatosTransferencia alias={transferencia.alias} titular={transferencia.titular} montoCentavos={transferencia.montoCentavos} />
-          <EsperarPago revisar={revisarPagoAccion.bind(null, llave)} mensaje="Esperando tu transferencia…" />
+          <EsperarPago revisar={revisarPagoAccion.bind(null, llave)} mensaje="Esperando tu transferencia…" estadoInicial={compra.estado} />
         </>
       )}
-      {opciones.metodo === "MERCADOPAGO" && (
-        <EsperarPago revisar={revisarPagoAccion.bind(null, llave)} mensaje="Esperando la confirmación de Mercado Pago…" />
-      )}
+      {opciones.metodo === "MERCADOPAGO" &&
+        (mpNoSeCompleto ? (
+          <p role="alert" className="rounded-xl bg-error/10 px-4 py-3 font-semibold text-error">
+            El pago con Mercado Pago no se completó. Probá de nuevo o pagá por transferencia.
+          </p>
+        ) : (
+          <EsperarPago
+            revisar={revisarPagoAccion.bind(null, llave)}
+            mensaje="Esperando la confirmación de Mercado Pago…"
+            estadoInicial={compra.estado}
+          />
+        ))}
 
       <ElegirPago
         totalCentavos={compra.totalCentavos}
@@ -214,7 +236,7 @@ function Marco({
   titulo: string;
   evento: string;
   volver: string;
-  cancelar?: () => Promise<void>;
+  cancelar?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -225,13 +247,7 @@ function Marco({
             <h1 className="text-[17px] font-bold leading-tight">{titulo}</h1>
             <span className="truncate text-[13px] text-tenue">{evento}</span>
           </div>
-          {cancelar ? (
-            <form action={cancelar}>
-              <button type="submit" className="h-11 shrink-0 text-sm font-semibold text-acento underline hover:text-acento-hover">
-                Cambiar entradas
-              </button>
-            </form>
-          ) : (
+          {cancelar ?? (
             <Link href={volver} className="shrink-0 text-sm font-semibold text-acento hover:text-acento-hover">
               Ir al evento
             </Link>

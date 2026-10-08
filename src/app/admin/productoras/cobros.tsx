@@ -2,7 +2,7 @@
 
 // Cobros de la productora: alias para transferencias, cargo por servicio de
 // Mercado Pago y la cuenta de Mercado Pago conectada.
-import { useActionState } from "react";
+import { type FormEvent, startTransition, useActionState } from "react";
 
 import { BotonPrincipal, Campo, MensajeError } from "@/components/formulario";
 
@@ -33,6 +33,12 @@ export function FormularioCobros({
   const [estadoMp, accionMp, conectando] = useActionState(conectar, {});
   const [estadoDesconectar, accionDesconectar, desconectando] = useActionState(desconectar, {});
   const errores = estado.errores ?? {};
+  // Se manda "a mano" para que un error no borre lo que se escribió.
+  function alEnviar(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    const datos = new FormData(evento.currentTarget);
+    startTransition(() => accion(datos));
+  }
 
   return (
     <section className="flex flex-col gap-5 rounded-2xl border border-borde bg-superficie p-5">
@@ -41,10 +47,11 @@ export function FormularioCobros({
         <p className="text-sm text-tenue">
           Quien compra elige: transferencia al alias (sin recargo) o Mercado Pago (con cargo por servicio). Los dos se
           confirman solos revisando la cuenta de Mercado Pago conectada abajo: el alias tiene que ser de esa misma cuenta.
+          Sin cuenta conectada no se ofrece ninguna forma de pago.
         </p>
       </div>
 
-      <form action={accion} className="flex flex-col gap-4">
+      <form onSubmit={alEnviar} className="flex flex-col gap-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <Campo
             etiqueta="Alias (o CVU) para transferencias"
@@ -95,14 +102,21 @@ export function FormularioCobros({
               Conectada: <strong>{cuentaMp}</strong>
               {conectadaEl && <span className="text-tenue"> · desde {conectadaEl}</span>}
             </p>
-            <form action={accionDesconectar}>
+            <form
+              action={accionDesconectar}
+              onSubmit={(evento) => {
+                if (!window.confirm("¿Desconectar Mercado Pago? Mientras no haya cuenta conectada, no se puede cobrar.")) {
+                  evento.preventDefault();
+                }
+              }}
+            >
               <button type="submit" disabled={desconectando} className="h-11 text-sm font-semibold text-error underline">
                 {desconectando ? "Desconectando…" : "Desconectar"}
               </button>
             </form>
           </div>
         ) : (
-          <p className="text-sm text-tenue">Sin cuenta conectada: no se ofrece Mercado Pago y las transferencias se confirman a mano.</p>
+          <p className="text-sm font-semibold text-error">Sin cuenta conectada: todavía no se puede cobrar.</p>
         )}
         {!desconectando && <MensajeError>{estadoDesconectar.errores?.general}</MensajeError>}
         <form action={accionMp} className="flex flex-col gap-3">

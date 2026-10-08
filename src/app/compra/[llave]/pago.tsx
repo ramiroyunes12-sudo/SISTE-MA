@@ -3,10 +3,11 @@
 // Pagar: elegir transferencia o Mercado Pago, los datos para transferir (con
 // botones para copiar) y la espera hasta que entra la plata.
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState } from "react";
 
 import { BotonPrincipal, MensajeError } from "@/components/formulario";
 import { formatearPesos } from "@/lib/dinero";
+import type { EstadoDeCompra } from "@/lib/pagos/cobros";
 
 import type { EstadoPago } from "./acciones";
 
@@ -152,50 +153,89 @@ function BotonCopiar({ texto, etiqueta }: { texto: string; etiqueta: string }) {
 }
 
 // Pregunta cada 5 segundos si ya entró la plata (solo con la página a la
-// vista) y, cuando cambia el estado de la compra, recarga. Deja de preguntar
-// a los 40 minutos.
-export function EsperarPago({ revisar, mensaje }: { revisar: () => Promise<{ estado: string } | null>; mensaje: string }) {
+// vista) y recarga cuando cambia algo: el estado de la compra, o que entró un
+// pago que no dio entradas. Deja de preguntar a los 40 minutos.
+export function EsperarPago({
+  revisar,
+  mensaje,
+  estadoInicial,
+}: {
+  revisar: () => Promise<EstadoDeCompra | null>;
+  mensaje: string;
+  estadoInicial: string;
+}) {
   const router = useRouter();
-  const [revisando, setRevisando] = useState(false);
+  const [revisandoAMano, setRevisandoAMano] = useState(false);
+  const [termino, setTermino] = useState(false);
   const ocupado = useRef(false);
 
-  async function revisarAhora() {
+  const revisarAhora = useCallback(async () => {
     if (ocupado.current) return;
     ocupado.current = true;
-    setRevisando(true);
     try {
       const resultado = await revisar();
-      if (resultado && resultado.estado !== "PENDIENTE") router.refresh();
+      if (resultado && (resultado.estado !== estadoInicial || resultado.aDevolver)) router.refresh();
     } finally {
       ocupado.current = false;
-      setRevisando(false);
     }
-  }
+  }, [revisar, estadoInicial, router]);
 
   useEffect(() => {
     const inicio = Date.now();
     const intervalo = setInterval(() => {
-      if (Date.now() - inicio > 40 * 60_000) return clearInterval(intervalo);
+      if (Date.now() - inicio > 40 * 60_000) {
+        clearInterval(intervalo);
+        setTermino(true);
+        return;
+      }
       if (document.visibilityState === "visible") void revisarAhora();
     }, 5_000);
     return () => clearInterval(intervalo);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [revisarAhora]);
+
+  async function aMano() {
+    setRevisandoAMano(true);
+    await revisarAhora();
+    setRevisandoAMano(false);
+  }
 
   return (
-    <div role="status" className="flex flex-col items-center gap-2 rounded-2xl bg-superficie p-4 text-center">
-      <span className="flex items-center gap-2 font-semibold">
-        <span aria-hidden="true" className="inline-block size-3 animate-pulse rounded-full bg-acento" />
-        {mensaje}
-      </span>
+    <div className="flex flex-col items-center gap-2 rounded-2xl bg-superficie p-4 text-center">
+      <p role="status" className="flex items-center gap-2 font-semibold">
+        {!termino && <span aria-hidden="true" className="inline-block size-3 animate-pulse rounded-full bg-acento" />}
+        {termino ? "Dejamos de revisar solos. Recargá la página para ver si entró tu pago." : mensaje}
+      </p>
       <button
         type="button"
-        onClick={() => void revisarAhora()}
-        disabled={revisando}
+        onClick={() => void aMano()}
+        disabled={revisandoAMano}
         className="h-11 text-sm font-semibold text-acento underline disabled:opacity-60"
       >
-        {revisando ? "Revisando…" : "Ya pagué: revisar ahora"}
+        {revisandoAMano ? "Revisando…" : "Ya pagué: revisar ahora"}
       </button>
     </div>
+  );
+}
+
+// "Cambiar entradas": si ya eligió cómo pagar, pregunta antes (quizás ya pagó).
+export function BotonCambiarEntradas({ cancelar, pidePermiso }: { cancelar: () => Promise<void>; pidePermiso: boolean }) {
+  return (
+    <form
+      action={cancelar}
+      onSubmit={(evento) => {
+        if (
+          pidePermiso &&
+          !window.confirm(
+            "Si ya pagaste, no canceles: tu pago se confirma solo en unos minutos. ¿Cancelar esta reserva y elegir de nuevo?",
+          )
+        ) {
+          evento.preventDefault();
+        }
+      }}
+    >
+      <button type="submit" className="h-11 shrink-0 text-sm font-semibold text-acento underline hover:text-acento-hover">
+        Cambiar entradas
+      </button>
+    </form>
   );
 }

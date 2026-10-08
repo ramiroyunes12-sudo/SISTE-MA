@@ -4,7 +4,7 @@ import { redirect, unstable_rethrow } from "next/navigation";
 
 import { obtenerDb } from "@/lib/db";
 import { esperoDemasiado } from "@/lib/errores-db";
-import { elegirMercadoPago, elegirTransferencia, revisarPagoDeCompra } from "@/lib/pagos/cobros";
+import { elegirMercadoPago, elegirTransferencia, type EstadoDeCompra, revisarPagoDeCompra } from "@/lib/pagos/cobros";
 import { apiMercadoPago } from "@/lib/pagos/mercadopago";
 import { urlPublica } from "@/lib/url";
 import type { ErroresDatos } from "@/lib/ventas/datos";
@@ -21,7 +21,8 @@ const ERROR_CONEXION = "No pudimos conectar con el sistema. Probá de nuevo.";
 export async function guardarDatosAccion(llave: string, _anterior: EstadoDatos, formulario: FormData): Promise<EstadoDatos> {
   try {
     const resultado = await guardarDatosCompra(obtenerDb(), String(llave), (campo) => formulario.get(campo));
-    if (!resultado.ok) return { errores: resultado.errores, general: resultado.general };
+    // Si mientras corregía entró el pago, se muestra la compra confirmada.
+    if (!resultado.ok && !resultado.pagada) return { errores: resultado.errores, general: resultado.general };
   } catch (error) {
     unstable_rethrow(error);
     console.error("[guardarDatos] Falló:", error);
@@ -60,7 +61,7 @@ export async function mercadoPagoAccion(llave: string): Promise<EstadoPago> {
 }
 
 // La pantalla pregunta cada tanto si ya entró la plata.
-export async function revisarPagoAccion(llave: string): Promise<{ estado: string } | null> {
+export async function revisarPagoAccion(llave: string): Promise<EstadoDeCompra | null> {
   try {
     return await revisarPagoDeCompra(obtenerDb(), String(llave), apiMercadoPago);
   } catch (error) {

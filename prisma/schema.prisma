@@ -43,12 +43,14 @@ model Productora {
   recargoMpBps         Int       @default(440) @map("recargo_mp_bps")
   // Cuenta de Mercado Pago conectada: su número de usuario y el Access Token
   // cifrado (ver src/lib/cifrado.ts). Nunca el token tal cual.
-  mpUsuarioId          String?   @map("mp_usuario_id")
+  mpUsuarioId          String?   @unique @map("mp_usuario_id") // una cuenta, una sola productora
   mpCuenta             String?   @map("mp_cuenta") // nombre de la cuenta, para mostrar
   mpTokenCifrado       String?   @map("mp_token_cifrado")
   mpConectadaEn        DateTime? @map("mp_conectada_en") @db.Timestamptz(3)
-  // Última vez que se miraron los movimientos (para no consultar de más).
+  // Última vez que se miraron los movimientos (para no consultar de más) y
+  // hasta cuándo quedaron revisados (la próxima vez se pide solo lo nuevo).
   mpRevisadoEn         DateTime? @map("mp_revisado_en") @db.Timestamptz(3)
+  mpRevisadoHasta      DateTime? @map("mp_revisado_hasta") @db.Timestamptz(3)
 
   usuarios            Usuario[]
   eventos             Evento[]

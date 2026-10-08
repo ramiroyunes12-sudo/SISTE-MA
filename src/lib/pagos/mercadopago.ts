@@ -41,7 +41,7 @@ export type DatosPreferencia = {
   titulo: string;
   totalCentavos: number;
   recargoCentavos: number;
-  venceEn: Date; // después de esta hora Mercado Pago no deja pagar
+  venceEn: Date; // después de esta hora Mercado Pago no deja pagar (antes que la reserva)
   volverA: string; // a dónde vuelve quien paga
   avisoA: string | null; // a dónde avisa Mercado Pago (webhook); null en la compu (no es https)
 };
@@ -166,7 +166,8 @@ export const apiMercadoPago: ApiMercadoPago = {
         expiration_date_from: new Date().toISOString(),
         expiration_date_to: datos.venceEn.toISOString(),
         back_urls: { success: datos.volverA, pending: datos.volverA, failure: datos.volverA },
-        auto_return: "approved",
+        // Volver solo al aprobarse (Mercado Pago no lo acepta con direcciones locales).
+        ...(datos.volverA.startsWith("https://") ? { auto_return: "approved" } : {}),
         ...(datos.avisoA ? { notification_url: datos.avisoA } : {}),
       },
     });

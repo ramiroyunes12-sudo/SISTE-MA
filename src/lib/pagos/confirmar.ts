@@ -7,14 +7,18 @@
 // Qué pasa según cómo está la orden cuando llega la plata:
 // - PENDIENTE (aunque se le haya pasado la hora, si sus lugares siguen
 //   apartados): pasa a PAGADA y sus reservadas, a vendidas.
-// - VENCIDA o CANCELADA (sus lugares ya volvieron al lote): si en esos mismos
-//   lotes todavía hay lugar, se venden y pasa a PAGADA. Si no, el pago queda
-//   "a devolver".
+// - VENCIDA o CANCELADA (sus lugares ya volvieron al lote): primero se
+//   liberan las reservas vencidas del evento; si en esos mismos lotes queda
+//   lugar, se venden y pasa a PAGADA. Si no, el pago queda "a devolver".
 // - PAGADA: un pago repetido queda "a devolver". Salvo que la orden se haya
 //   confirmado a mano y este sea el pago de verdad: ese lo respalda.
 // - Faltan los datos de la compra (no debería pasar: se piden antes de
 //   pagar): "a devolver", porque la base no deja pagar sin ellos.
+// - Confirmar a mano una orden que ya tiene un pago "a devolver" (por
+//   ejemplo, llegó tarde sin lugar y después se hizo lugar): se usa ese pago,
+//   que deja de estar "a devolver".
 import type { MetodoPago, PrismaClient } from "@/generated/prisma/client";
+import { liberarVencidasEnTurno } from "@/lib/ventas/ordenes";
 import { confirmarReservas, type Porcion, venderSinReserva } from "@/lib/ventas/reservas";
 import { tomarTurnoDelEvento } from "@/lib/ventas/turno";
 
@@ -57,6 +61,9 @@ export async function registrarPago(
   const orden = await db.orden.findUnique({ where: { id: ordenId }, select: { eventoId: true, tipo: true } });
   if (!orden || orden.tipo !== "VENTA") throw new Error(`No existe la orden de venta ${ordenId}`);
   const { eventoId } = orden;
+  // Un pago ya registrado y sin cambios no necesita el turno del evento.
+  const yaVisto = await db.pago.findUnique({ where: { mpPagoId: pago.mpPagoId }, select: { estadoMp: true } });
+  if (yaVisto && yaVisto.estadoMp === pago.estadoMp) return "ya_registrado";
 
   return db.$transaction(
     async (tx): Promise<ResultadoPago> => {
@@ -75,7 +82,7 @@ export async function registrarPago(
           estado: true,
           email: true,
           entradas: { select: { loteId: true, titular: true, dni: true } },
-          pagos: { select: { metodo: true, aDevolver: true } },
+          pagos: { select: { id: true, metodo: true, aDevolver: true, estadoMp: true } },
         },
       });
       const base = {
@@ -97,6 +104,19 @@ export async function registrarPago(
 
       if (opciones.aDevolverPor) return aDevolver(opciones.aDevolverPor);
       const faltanDatos = !actual.email || actual.entradas.some((entrada) => !entrada.titular || !entrada.dni);
+      // Registra el pago con el que se confirmó. A mano: si ya entró un pago
+      // de verdad que quedó "a devolver", es ese (deja de estar a devolver).
+      const guardarPago = async (nota?: string) => {
+        const real = pago.metodo === "MANUAL" ? actual.pagos.find((p) => p.aDevolver && p.metodo !== "MANUAL" && p.estadoMp === "approved") : undefined;
+        if (real) {
+          await tx.pago.update({
+            where: { id: real.id },
+            data: { aDevolver: false, nota: "Se confirmó a mano con este pago.", registradoPorId: pago.registradoPorId ?? null },
+          });
+          return;
+        }
+        await tx.pago.create({ data: { ...base, ...(nota ? { nota } : {}) } });
+      };
 
       if (actual.estado === "PENDIENTE") {
         if (faltanDatos) return aDevolver("Faltaban los datos de la compra (email, nombre o DNI).");
@@ -107,12 +127,14 @@ export async function registrarPago(
         if (count !== 1) throw new Error(`La orden ${ordenId} cambió de estado en el medio`);
         await confirmarReservas(tx, eventoId, porciones(actual.entradas));
         await tx.entrada.updateMany({ where: { ordenId }, data: { estado: "VALIDA" } });
-        await tx.pago.create({ data: base });
+        await guardarPago();
         return "confirmada";
       }
 
       if (actual.estado === "VENCIDA" || actual.estado === "CANCELADA") {
         if (faltanDatos) return aDevolver("Faltaban los datos de la compra (email, nombre o DNI).");
+        // Los lugares de reservas vencidas que nadie liberó todavía también cuentan como libres.
+        await liberarVencidasEnTurno(tx, eventoId, ahora);
         if (!(await venderSinReserva(tx, eventoId, porciones(actual.entradas)))) {
           return aDevolver("Pagó con la reserva vencida y ya no quedaba lugar.");
         }
@@ -122,7 +144,7 @@ export async function registrarPago(
         });
         if (count !== 1) throw new Error(`La orden ${ordenId} cambió de estado en el medio`);
         await tx.entrada.updateMany({ where: { ordenId }, data: { estado: "VALIDA" } });
-        await tx.pago.create({ data: { ...base, nota: "Pagó con la reserva vencida; todavía había lugar." } });
+        await guardarPago("Pagó con la reserva vencida; todavía había lugar.");
         return "confirmada_tarde";
       }
 

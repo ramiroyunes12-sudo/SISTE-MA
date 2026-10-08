@@ -1,5 +1,6 @@
 // Sección "Pagos" del evento: lo cobrado, las compras esperando la plata (con
-// "Confirmar pago" para los casos raros) y los pagos que hay que devolver.
+// "Confirmar pago" para los casos raros), los pagos que hay que devolver y
+// los que Mercado Pago revirtió (devolución o contracargo).
 import { obtenerDb } from "@/lib/db";
 import { formatearPesos } from "@/lib/dinero";
 import { formatearFecha } from "@/lib/fechas";
@@ -12,11 +13,13 @@ const METODO = { TRANSFERENCIA: "Transferencia", MERCADOPAGO: "Mercado Pago", MA
 
 export async function PagosDelEvento({ eventoId, pagada }: { eventoId: string; pagada?: number }) {
   const db = obtenerDb();
-  const [esperando, aDevolver, cobrado] = await Promise.all([
+  const [esperando, aDevolver, validos, pagadas] = await Promise.all([
     db.orden.findMany({
       where: {
         eventoId,
         tipo: "VENTA",
+        // Las que ya recibieron un pago (que quedó para devolver) van en esa lista.
+        pagos: { none: {} },
         OR: [
           { estado: "PENDIENTE", metodoPago: { not: null } },
           // Las vencidas o canceladas que eligieron transferencia: la plata puede llegar tarde.
@@ -42,14 +45,34 @@ export async function PagosDelEvento({ eventoId, pagada }: { eventoId: string; p
       where: { aDevolver: true, orden: { eventoId } },
       orderBy: { creadoEn: "desc" },
       take: 100,
-      select: { id: true, montoCentavos: true, metodo: true, nota: true, creadoEn: true, mpPagoId: true, orden: { select: { numero: true, email: true } } },
+      select: {
+        id: true,
+        montoCentavos: true,
+        metodo: true,
+        nota: true,
+        creadoEn: true,
+        mpPagoId: true,
+        orden: { select: { id: true, numero: true, email: true, estado: true } },
+      },
     }),
-    db.pago.aggregate({
+    // Los pagos que dieron entradas, de compras pagas.
+    db.pago.findMany({
       where: { aDevolver: false, orden: { eventoId, estado: "PAGADA" } },
-      _sum: { montoCentavos: true, comisionCentavos: true },
+      select: { ordenId: true, metodo: true, estadoMp: true, montoCentavos: true, comisionCentavos: true, mpPagoId: true, creadoEn: true, orden: { select: { numero: true, email: true } } },
     }),
+    db.orden.count({ where: { eventoId, tipo: "VENTA", estado: "PAGADA" } }),
   ]);
-  const pagadas = await db.orden.count({ where: { eventoId, tipo: "VENTA", estado: "PAGADA" } });
+  // Cobrado: los pagos de verdad aprobados, más los confirmados a mano que
+  // todavía no tienen un pago de verdad (así no se cuenta dos veces).
+  const conPagoReal = new Set(validos.filter((pago) => pago.metodo !== "MANUAL").map((pago) => pago.ordenId));
+  let cobradoCentavos = 0;
+  let comisionesCentavos = 0;
+  for (const pago of validos) {
+    if (pago.metodo === "MANUAL" ? conPagoReal.has(pago.ordenId) : pago.estadoMp !== "approved") continue;
+    cobradoCentavos += pago.montoCentavos;
+    comisionesCentavos += pago.comisionCentavos;
+  }
+  const revertidos = validos.filter((pago) => pago.metodo !== "MANUAL" && pago.estadoMp !== "approved");
   const ahora = new Date();
 
   return (
@@ -58,8 +81,8 @@ export async function PagosDelEvento({ eventoId, pagada }: { eventoId: string; p
         <div className="flex flex-col gap-1">
           <h2 className="text-lg font-bold">Pagos</h2>
           <p className="text-sm text-tenue">
-            {pagadas} {pagadas === 1 ? "compra paga" : "compras pagas"} · Cobrado: {formatearPesos(cobrado._sum.montoCentavos ?? 0)}
-            {(cobrado._sum.comisionCentavos ?? 0) > 0 && ` · Comisiones de Mercado Pago: ${formatearPesos(cobrado._sum.comisionCentavos ?? 0)}`}
+            {pagadas} {pagadas === 1 ? "compra paga" : "compras pagas"} · Cobrado: {formatearPesos(cobradoCentavos)}
+            {comisionesCentavos > 0 && ` · Comisiones de Mercado Pago: ${formatearPesos(comisionesCentavos)}`}
           </p>
         </div>
         <BotonBuscarPagos accion={buscarPagosAccion.bind(null, eventoId)} />
@@ -121,13 +144,44 @@ export async function PagosDelEvento({ eventoId, pagada }: { eventoId: string; p
       {aDevolver.length > 0 && (
         <div className="flex flex-col gap-2 rounded-xl bg-error/10 p-4">
           <h3 className="font-bold text-error">Para devolver</h3>
-          <p className="text-sm">Estos pagos entraron pero no dieron entradas. Devolvé la plata desde tu Mercado Pago.</p>
-          <ul className="flex flex-col gap-2 text-sm">
+          <p className="text-sm">
+            Estos pagos entraron pero no dieron entradas. Devolvé la plata desde tu Mercado Pago. Si una compra vencida
+            pagó tarde y ahora hay lugar, podés darle las entradas con ese mismo pago.
+          </p>
+          <ul className="flex flex-col">
             {aDevolver.map((pago) => (
-              <li key={pago.id}>
-                <strong>{formatearPesos(pago.montoCentavos)}</strong> · {METODO[pago.metodo]} · compra N° {pago.orden.numero} (
-                {pago.orden.email ?? "sin email"}) · {formatearFecha(pago.creadoEn)} · pago {pago.mpPagoId}
-                {pago.nota && <span className="block text-tenue">{pago.nota}</span>}
+              <li key={pago.id} className="flex flex-wrap items-start justify-between gap-3 border-t border-error/20 py-2 text-sm">
+                <span className="min-w-0 [overflow-wrap:anywhere]">
+                  <strong>{formatearPesos(pago.montoCentavos)}</strong> · {METODO[pago.metodo]} · compra N° {pago.orden.numero} (
+                  {pago.orden.email ?? "sin email"}) · {formatearFecha(pago.creadoEn)} · pago {pago.mpPagoId}
+                  {pago.nota && <span className="block text-tenue">{pago.nota}</span>}
+                </span>
+                {(pago.orden.estado === "VENCIDA" || pago.orden.estado === "CANCELADA") && (
+                  <BotonConfirmarPago
+                    accion={confirmarPagoAccion.bind(null, eventoId, pago.orden.id)}
+                    numero={pago.orden.numero}
+                    monto={formatearPesos(pago.montoCentavos)}
+                    texto="Dar las entradas igual"
+                  />
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {revertidos.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-xl bg-alerta/10 p-4">
+          <h3 className="font-bold">Pagos revertidos</h3>
+          <p className="text-sm">
+            Mercado Pago devolvió o desconoció estos pagos (por ejemplo, un contracargo de la tarjeta), pero las entradas
+            siguen válidas. No suman en lo cobrado.
+          </p>
+          <ul className="flex flex-col gap-1 text-sm">
+            {revertidos.map((pago) => (
+              <li key={pago.mpPagoId} className="[overflow-wrap:anywhere]">
+                <strong>{formatearPesos(pago.montoCentavos)}</strong> · compra N° {pago.orden.numero} ({pago.orden.email ?? "sin email"}) ·
+                estado en Mercado Pago: {pago.estadoMp} · pago {pago.mpPagoId}
               </li>
             ))}
           </ul>

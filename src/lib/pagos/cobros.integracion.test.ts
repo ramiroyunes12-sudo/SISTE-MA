@@ -6,7 +6,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { PrismaClient } from "@/generated/prisma/client";
-import { liberarVencidas, crearReserva, guardarDatosCompra, MINUTOS_RESERVA } from "@/lib/ventas/ordenes";
+import { cancelarReserva, crearReserva, guardarDatosCompra, liberarVencidas, MINUTOS_RESERVA } from "@/lib/ventas/ordenes";
 import { pedidoATexto } from "@/lib/ventas/pedido";
 
 import {
@@ -29,7 +29,9 @@ const MINUTO = 60_000;
 function mercadoPagoFalso(mpUsuarioId: string) {
   const pagos: PagoMp[] = [];
   const preferencias: DatosPreferencia[] = [];
+  const desdes: Date[] = [];
   let consultas = 0;
+  let limite = false; // simula "demasiadas consultas" (429)
   const api: ApiMercadoPago = {
     async cuenta(token) {
       if (token.includes("malo")) throw new ErrorMercadoPago("Mercado Pago respondió 401", 401);
@@ -40,6 +42,8 @@ function mercadoPagoFalso(mpUsuarioId: string) {
     },
     async pagosRecientes(_token, desde) {
       consultas++;
+      desdes.push(desde);
+      if (limite) throw new ErrorMercadoPago("Mercado Pago respondió 429: too many requests", 429);
       return pagos
         .filter((pago) => !pago.creadoEn || pago.creadoEn >= desde)
         .sort((a, b) => (b.creadoEn?.getTime() ?? 0) - (a.creadoEn?.getTime() ?? 0));
@@ -66,7 +70,7 @@ function mercadoPagoFalso(mpUsuarioId: string) {
     pagos.push(pago);
     return pago;
   };
-  return { api, pagos, preferencias, entra, consultas: () => consultas };
+  return { api, pagos, preferencias, desdes, entra, consultas: () => consultas, conLimite: (si: boolean) => (limite = si) };
 }
 
 describe.skipIf(!url)("cobrar por transferencia o Mercado Pago", { timeout: 120_000 }, () => {
@@ -102,12 +106,20 @@ describe.skipIf(!url)("cobrar por transferencia o Mercado Pago", { timeout: 120_
   }
 
   // Reserva y completa los datos (como quien compra antes de elegir cómo pagar).
-  async function reservar(evento: { id: string; general: string }, cantidad: number, ahora = new Date()) {
+  async function reservar(
+    evento: { id: string; general: string },
+    cantidad: number,
+    ahora = new Date(),
+    origen?: { navegador: string; ip: string },
+  ) {
     const k = n++;
-    const reserva = await crearReserva(db, evento.id, pedidoATexto([{ tipoId: evento.general, cantidad }]), {
-      navegador: `nav-${unico}-${k}`,
-      ip: `10.0.${Math.floor(k / 200)}.${k % 200}`,
-    }, ahora);
+    const reserva = await crearReserva(
+      db,
+      evento.id,
+      pedidoATexto([{ tipoId: evento.general, cantidad }]),
+      origen ?? { navegador: `nav-${unico}-${k}`, ip: `10.0.${Math.floor(k / 200)}.${k % 200}` },
+      ahora,
+    );
     if (!reserva.ok) throw new Error(reserva.error);
     const campos: Record<string, string> = { email: "ana@gmail.com", email2: "ana@gmail.com", telefono: "" };
     for (let i = 0; i < cantidad; i++) Object.assign(campos, { [`nombre-${i}`]: "Ana Pérez", [`dni-${i}`]: `3012345${i}` });
@@ -172,11 +184,11 @@ describe.skipIf(!url)("cobrar por transferencia o Mercado Pago", { timeout: 120_
 
     // Sin la plata todavía: sigue pendiente.
     await db.productora.update({ where: { id: productoraId }, data: { mpRevisadoEn: null } });
-    expect(await revisarPagoDeCompra(db, reserva.llave, mp.api)).toEqual({ estado: "PENDIENTE" });
+    expect(await revisarPagoDeCompra(db, reserva.llave, mp.api)).toEqual({ estado: "PENDIENTE", aDevolver: false });
 
     const pago = mp.entra(monto);
     await db.productora.update({ where: { id: productoraId }, data: { mpRevisadoEn: null } });
-    expect(await revisarPagoDeCompra(db, reserva.llave, mp.api)).toEqual({ estado: "PAGADA" });
+    expect(await revisarPagoDeCompra(db, reserva.llave, mp.api)).toEqual({ estado: "PAGADA", aDevolver: false });
     const pagada = await orden(reserva.ordenId);
     expect(pagada.metodoPago).toBe("TRANSFERENCIA");
     expect(pagada.entradas.every((entrada) => entrada.estado === "VALIDA")).toBe(true);
@@ -294,9 +306,9 @@ describe.skipIf(!url)("cobrar por transferencia o Mercado Pago", { timeout: 120_
       volverA: `https://entradas.test/compra/${reserva.llave}`,
       avisoA: `https://entradas.test/api/mercadopago/aviso?p=${productoraId}`,
     });
-    // El cobro vence junto con la reserva.
+    // El cobro vence 2 minutos antes que la reserva.
     const guardada = await db.orden.findUniqueOrThrow({ where: { id: reserva.ordenId } });
-    expect(preferencia.venceEn.getTime()).toBe(guardada.venceEn!.getTime());
+    expect(preferencia.venceEn.getTime()).toBe(guardada.venceEn!.getTime() - 2 * MINUTO);
     expect(guardada).toMatchObject({ metodoPago: "MERCADOPAGO", recargoCentavos: 70_400 });
 
     // Un pago con la referencia de la orden pero otro monto: para devolver, sin dar entradas.
@@ -304,9 +316,10 @@ describe.skipIf(!url)("cobrar por transferencia o Mercado Pago", { timeout: 120_
     expect(await procesarAviso(db, { productoraId, pagoId: otroMonto.id }, mp.api)).toBe("a_devolver");
     expect((await orden(reserva.ordenId)).estado).toBe("PENDIENTE");
 
-    // El pago bueno llega por el aviso (sin ?p=, por la cuenta que cobró).
+    // El pago bueno llega por el aviso. Sin ?p= (la productora) el aviso no hace nada.
     const bueno = mp.entra(1_670_400, { tipo: "regular_payment", referencia: reserva.ordenId, comisionCentavos: 70_324 });
-    expect(await procesarAviso(db, { mpUsuarioId, pagoId: bueno.id }, mp.api)).toBe("confirmada");
+    expect(await procesarAviso(db, { productoraId: null, pagoId: bueno.id }, mp.api)).toBe("ignorado");
+    expect(await procesarAviso(db, { productoraId, pagoId: bueno.id }, mp.api)).toBe("confirmada");
     const pagada = await orden(reserva.ordenId);
     expect(pagada.estado).toBe("PAGADA");
     expect(pagada.pagos.find((pago) => pago.mpPagoId === bueno.id)).toMatchObject({ metodo: "MERCADOPAGO", comisionCentavos: 70_324, aDevolver: false });
@@ -316,9 +329,10 @@ describe.skipIf(!url)("cobrar por transferencia o Mercado Pago", { timeout: 120_
   it("un pago con la referencia de una orden de otra productora no se toca", async () => {
     const evento = await crearEvento([10]);
     const reserva = await reservar(evento, 1);
-    const otra = await db.productora.create({ data: { nombre: `Otra ${unico}`, mpUsuarioId: "4242", mpTokenCifrado: "v1.x.y.z" } });
-    const ajena: CuentaMp = { productoraId: otra.id, mpUsuarioId: "4242", token: "t" };
-    expect(await procesarPagoMp(db, ajena, mp.entra(800_000, { cobradorId: "4242", tipo: "regular_payment", referencia: reserva.ordenId }))).toBe("ignorado");
+    const otroId = String(Math.floor(Math.random() * 1e12));
+    const otra = await db.productora.create({ data: { nombre: `Otra ${unico}`, mpUsuarioId: otroId, mpTokenCifrado: "v1.x.y.z" } });
+    const ajena: CuentaMp = { productoraId: otra.id, mpUsuarioId: otroId, token: "t" };
+    expect(await procesarPagoMp(db, ajena, mp.entra(800_000, { cobradorId: otroId, tipo: "regular_payment", referencia: reserva.ordenId }))).toBe("ignorado");
     expect((await orden(reserva.ordenId)).estado).toBe("PENDIENTE");
   });
 
@@ -375,5 +389,152 @@ describe.skipIf(!url)("cobrar por transferencia o Mercado Pago", { timeout: 120_
     });
     expect(await db.pago.count({ where: { ordenId: reserva.ordenId } })).toBe(0);
     expect((await orden(reserva.ordenId)).estado).toBe("VENCIDA");
+  });
+
+  it("una cuenta de Mercado Pago no se puede conectar a dos productoras", async () => {
+    const otra = await db.productora.create({ data: { nombre: `Misma cuenta ${unico}` } });
+    expect(await conectarMercadoPago(db, otra.id, "APP_USR-1234567890123456-prueba-token-de-test", mp.api)).toEqual({
+      ok: false,
+      error: expect.stringContaining("ya está conectada a otra productora"),
+    });
+    expect((await db.productora.findUniqueOrThrow({ where: { id: otra.id } })).mpUsuarioId).toBeNull();
+  });
+
+  it("sin cuenta de Mercado Pago conectada no se ofrece ni se acepta transferencia", async () => {
+    const sinCuenta = await db.productora.create({
+      data: { nombre: `Sin cuenta ${unico}`, aliasTransferencia: "sin.cuenta", titularTransferencia: "Nadie" },
+    });
+    const evento = await db.evento.create({
+      data: {
+        productoraId: sinCuenta.id,
+        slug: `sin-cuenta-${unico}`,
+        nombre: "Fiesta",
+        fecha: new Date("2030-03-07T23:00:00-03:00"),
+        lugar: "Club",
+        estado: "PUBLICADO",
+        tipos: { create: { nombre: "General", lotes: { create: [{ numero: 1, nombre: "Lote 1", precioCentavos: 800_000, cupo: 5 }] } } },
+      },
+      include: { tipos: true },
+    });
+    const reserva = await reservar({ id: evento.id, general: evento.tipos[0].id }, 1);
+    expect(await opcionesDePago(db, reserva.llave)).toMatchObject({ transferencia: null, mercadoPago: null });
+    expect(await elegirTransferencia(db, reserva.llave)).toMatchObject({ ok: false });
+  });
+
+  it("una misma conexión no puede ocupar más de 15 montos sin pagar", async () => {
+    const evento = await crearEvento([100]);
+    const ip = `10.77.${n}.1`;
+    const resultados = [];
+    for (let i = 0; i < 16; i++) {
+      const reserva = await reservar(evento, 1, new Date(), { navegador: `nav-${unico}-ip-${i}`, ip });
+      resultados.push(await elegirTransferencia(db, reserva.llave));
+      if (i < 15) await cancelarReserva(db, reserva.llave); // aunque las cancele, el monto queda atado un rato
+    }
+    expect(resultados.slice(0, 15).every((r) => r.ok)).toBe(true);
+    expect(resultados[15]).toMatchObject({ ok: false, error: expect.stringContaining("desde esta conexión") });
+  });
+
+  it("volver a reservar con el mismo navegador no cancela una reserva que ya eligió cómo pagar", async () => {
+    const evento = await crearEvento([10]);
+    const origen = { navegador: `nav-${unico}-repite`, ip: "10.88.0.1" };
+    const primera = await reservar(evento, 1, new Date(), origen);
+    await elegirTransferencia(db, primera.llave);
+    await reservar(evento, 1, new Date(), origen);
+    expect((await orden(primera.ordenId)).estado).toBe("PENDIENTE");
+  });
+
+  it("confirmar a mano una compra cuyo pago quedó para devolver usa ese pago", async () => {
+    const evento = await crearEvento([1]);
+    const tarde = await reservar(evento, 1);
+    await elegirTransferencia(db, tarde.llave);
+    await liberarVencidas(db, evento.id, new Date(Date.now() + (MINUTOS_RESERVA + 1) * MINUTO));
+    const otra = await reservar(evento, 1); // se queda con el lugar
+    const pago = mp.entra(await montoDe(tarde.ordenId));
+    expect(await procesarPagoMp(db, cuenta, pago)).toBe("a_devolver");
+    // Se hace lugar (la otra cancela) y el organizador le da las entradas.
+    await cancelarReserva(db, otra.llave);
+    const usuario = await db.usuario.create({
+      data: { nombre: "Org", email: `org-${unico}-${n++}@x.com`, hashContrasena: "x", rol: "ORGANIZADOR", productoraId },
+    });
+    expect(await confirmarPagoManual(db, tarde.ordenId, usuario.id, async () => true)).toEqual({ ok: true, resultado: "confirmada_tarde" });
+    const pagada = await orden(tarde.ordenId);
+    expect(pagada.estado).toBe("PAGADA");
+    expect(pagada.pagos).toMatchObject([{ mpPagoId: pago.id, aDevolver: false, registradoPorId: usuario.id }]);
+    expect(await lote(evento.lotes[0])).toEqual({ vendidas: 1, reservadas: 0 });
+  });
+
+  it("pago tarde: las reservas vencidas que nadie liberó no cuentan como ocupadas", async () => {
+    const evento = await crearEvento([1]);
+    const tarde = await reservar(evento, 1);
+    await elegirTransferencia(db, tarde.llave);
+    const despues = new Date(Date.now() + (MINUTOS_RESERVA + 1) * MINUTO);
+    await reservar(evento, 1, despues); // libera la primera y toma el lugar; después la abandona
+    const muchoDespues = new Date(despues.getTime() + (MINUTOS_RESERVA + 1) * MINUTO);
+    expect(await procesarPagoMp(db, cuenta, mp.entra(await montoDe(tarde.ordenId)), muchoDespues)).toBe("confirmada_tarde");
+    expect(await lote(evento.lotes[0])).toEqual({ vendidas: 1, reservadas: 0 });
+  });
+
+  it("revisar pide solo lo nuevo, y ve un pago repetido de una compra ya paga", async () => {
+    const evento = await crearEvento([10]);
+    const reserva = await reservar(evento, 1);
+    await elegirTransferencia(db, reserva.llave);
+    const monto = await montoDe(reserva.ordenId);
+    mp.entra(monto);
+    const t0 = new Date();
+    await db.productora.update({ where: { id: productoraId }, data: { mpRevisadoEn: null } });
+    expect((await revisarCobros(db, productoraId, mp.api, t0)).confirmadas).toBe(1);
+
+    // Pagó dos veces: no hay ninguna otra compra esperando y la segunda transferencia igual se ve.
+    const repetida = mp.entra(monto);
+    const t1 = new Date(t0.getTime() + 10_000);
+    await revisarCobros(db, productoraId, mp.api, t1);
+    // Desde la revisión anterior (con 5 minutos de margen), no desde hace 48 horas.
+    expect(mp.desdes.at(-1)!.getTime()).toBeGreaterThanOrEqual(t0.getTime() - 5 * MINUTO);
+    expect(await db.pago.findUniqueOrThrow({ where: { mpPagoId: repetida.id } })).toMatchObject({ aDevolver: true });
+  });
+
+  it("si Mercado Pago dice 'demasiadas consultas', nadie vuelve a consultar por un minuto", async () => {
+    const evento = await crearEvento([10]);
+    const reserva = await reservar(evento, 1);
+    await elegirTransferencia(db, reserva.llave);
+    const t0 = new Date(Date.now() + 60 * MINUTO);
+    mp.conLimite(true);
+    await expect(revisarCobros(db, productoraId, mp.api, t0)).rejects.toThrow(/429/);
+    mp.conLimite(false);
+    expect((await revisarCobros(db, productoraId, mp.api, new Date(t0.getTime() + 30_000))).revisado).toBe(false);
+    expect((await revisarCobros(db, productoraId, mp.api, new Date(t0.getTime() + 66_000))).revisado).toBe(true);
+  });
+
+  it("Mercado Pago: el cargo queda fijo desde el primer cobro, y el cobro vence 2 minutos antes que la reserva", async () => {
+    const evento = await crearEvento([10]);
+    const reserva = await reservar(evento, 1);
+    await db.productora.update({ where: { id: productoraId }, data: { recargoMpBps: 0 } });
+    await elegirMercadoPago(db, reserva.llave, mp.api, "https://entradas.test");
+    await db.productora.update({ where: { id: productoraId }, data: { recargoMpBps: 440 } });
+    await elegirMercadoPago(db, reserva.llave, mp.api, "https://entradas.test");
+    expect(mp.preferencias.at(-1)!.recargoCentavos).toBe(0);
+    const guardada = await db.orden.findUniqueOrThrow({ where: { id: reserva.ordenId } });
+    expect(mp.preferencias.at(-1)!.venceEn.getTime()).toBe(guardada.venceEn!.getTime() - 2 * MINUTO);
+    expect(await procesarPagoMp(db, cuenta, mp.entra(800_000, { tipo: "regular_payment", referencia: reserva.ordenId }))).toBe("confirmada");
+  });
+
+  it("Mercado Pago con poco tiempo: la reserva se estira una vez para dar tiempo a pagar", async () => {
+    const evento = await crearEvento([10]);
+    const reserva = await reservar(evento, 1);
+    const casiAlFinal = new Date(Date.now() + (MINUTOS_RESERVA - 1) * MINUTO);
+    expect(await elegirMercadoPago(db, reserva.llave, mp.api, "https://entradas.test", casiAlFinal)).toMatchObject({ ok: true });
+    const guardada = await db.orden.findUniqueOrThrow({ where: { id: reserva.ordenId } });
+    expect(guardada.venceEn!.getTime()).toBe(casiAlFinal.getTime() + 5 * MINUTO);
+  });
+
+  it("la pantalla se entera de un pago que quedó para devolver", async () => {
+    const evento = await crearEvento([1]);
+    const tarde = await reservar(evento, 1);
+    await elegirTransferencia(db, tarde.llave);
+    await liberarVencidas(db, evento.id, new Date(Date.now() + (MINUTOS_RESERVA + 1) * MINUTO));
+    await reservar(evento, 1);
+    await procesarPagoMp(db, cuenta, mp.entra(await montoDe(tarde.ordenId)));
+    expect(await revisarPagoDeCompra(db, tarde.llave, mp.api)).toEqual({ estado: "VENCIDA", aDevolver: true });
+    expect((await opcionesDePago(db, tarde.llave))!.aDevolverCentavos).toBe(await montoDe(tarde.ordenId));
   });
 });

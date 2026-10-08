@@ -69,7 +69,8 @@ async function cerrarOrdenes(tx: Tx, eventoId: string, ids: string[], estado: "V
   return cerradas.length;
 }
 
-async function liberarVencidasEnTurno(tx: Tx, eventoId: string, ahora: Date) {
+// Hay que tener el turno del evento.
+export async function liberarVencidasEnTurno(tx: Tx, eventoId: string, ahora: Date) {
   const vencidas = await tx.orden.findMany({
     where: { eventoId, tipo: "VENTA", estado: "PENDIENTE", venceEn: { lte: ahora } },
     select: { id: true },
@@ -122,9 +123,11 @@ export async function crearReserva(
         await tomarTurnoDelEvento(tx, eventoId, ESPERA_COMPRA_MS);
         await liberarVencidasEnTurno(tx, eventoId, ahora);
 
-        // El mismo navegador vuelve a elegir en este evento: la reserva anterior se cancela.
+        // El mismo navegador vuelve a elegir en este evento: la reserva anterior
+        // se cancela. Salvo que ya haya elegido cómo pagar (quizás ya pagó):
+        // esa se deja vencer sola.
         const anteriores = await tx.orden.findMany({
-          where: { eventoId, compradorHash, tipo: "VENTA", estado: "PENDIENTE" },
+          where: { eventoId, compradorHash, tipo: "VENTA", estado: "PENDIENTE", metodoPago: null },
           select: { id: true },
         });
         await cerrarOrdenes(
@@ -276,9 +279,10 @@ export async function guardarDatosCompra(
   llave: string,
   leer: (campo: string) => unknown,
   ahora = new Date(),
-): Promise<{ ok: true; datos: DatosCompra } | { ok: false; errores?: ErroresDatos; general?: string }> {
+): Promise<{ ok: true; datos: DatosCompra } | { ok: false; errores?: ErroresDatos; general?: string; pagada?: true }> {
   const compra = await buscarCompra(db, llave, ahora);
   if (!compra) return { ok: false, general: "No encontramos tu reserva." };
+  if (compra.estado === "PAGADA") return { ok: false, pagada: true, general: "Tu compra ya está paga." };
   if (compra.estado !== "PENDIENTE" || compra.vencida) {
     return { ok: false, general: "Tu reserva ya no está vigente. Volvé al evento para elegir de nuevo." };
   }

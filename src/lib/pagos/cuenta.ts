@@ -6,6 +6,7 @@
 // productora. Más adelante, cada productora con un botón (OAuth).
 import type { PrismaClient } from "@/generated/prisma/client";
 import { cifrar, descifrar } from "@/lib/cifrado";
+import { unicoRepetido } from "@/lib/errores-db";
 
 import { ErrorMercadoPago, type ApiMercadoPago } from "./mercadopago";
 import { porcentajeABps } from "./montos";
@@ -16,6 +17,7 @@ const ALIAS = /^[a-z0-9.-]{6,20}$/;
 const CVU = /^\d{22}$/;
 // Los Access Token de Mercado Pago: "APP_USR-…" (o "TEST-…" en las cuentas de prueba viejas).
 const TOKEN = /^(APP_USR|TEST)-[A-Za-z0-9-]{20,200}$/;
+const CUENTA_EN_OTRA = "Esa cuenta de Mercado Pago ya está conectada a otra productora.";
 
 function texto(valor: unknown) {
   return typeof valor === "string" ? valor.trim() : "";
@@ -72,16 +74,27 @@ export async function conectarMercadoPago(
     return { ok: false, error: "No pudimos hablar con Mercado Pago. Probá de nuevo en un rato." };
   }
   if (!/^\d+$/.test(cuenta.id)) return { ok: false, error: "Mercado Pago no dijo de quién es la cuenta." };
-  const { count } = await db.productora.updateMany({
-    where: { id: productoraId },
-    data: {
-      mpUsuarioId: cuenta.id,
-      mpCuenta: cuenta.nombre.slice(0, 120),
-      mpTokenCifrado: cifrar(token, `mp-token:${productoraId}`),
-      mpConectadaEn: ahora,
-      mpRevisadoEn: null,
-    },
-  });
+  // Una cuenta, una sola productora (si no, una transferencia de una podría
+  // confirmar una compra de otra). La base también lo controla.
+  const otra = await db.productora.findFirst({ where: { mpUsuarioId: cuenta.id, id: { not: productoraId } }, select: { id: true } });
+  if (otra) return { ok: false, error: CUENTA_EN_OTRA };
+  let count: number;
+  try {
+    ({ count } = await db.productora.updateMany({
+      where: { id: productoraId },
+      data: {
+        mpUsuarioId: cuenta.id,
+        mpCuenta: cuenta.nombre.slice(0, 120),
+        mpTokenCifrado: cifrar(token, `mp-token:${productoraId}`),
+        mpConectadaEn: ahora,
+        mpRevisadoEn: null,
+        mpRevisadoHasta: null,
+      },
+    }));
+  } catch (error) {
+    if (unicoRepetido(error)?.includes("mp_usuario_id")) return { ok: false, error: CUENTA_EN_OTRA };
+    throw error;
+  }
   if (count !== 1) return { ok: false, error: "Esa productora ya no existe." };
   return { ok: true, cuenta: cuenta.nombre };
 }

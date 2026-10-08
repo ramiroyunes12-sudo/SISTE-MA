@@ -9,10 +9,12 @@ export function BotonConfirmarPago({
   accion: confirmar,
   numero,
   monto,
+  texto = "Confirmar pago",
 }: {
   accion: () => Promise<EstadoPagoManual>;
   numero: number;
   monto: string;
+  texto?: string;
 }) {
   const [estado, accion, enviando] = useActionState(confirmar, {});
   return (
@@ -30,7 +32,7 @@ export function BotonConfirmarPago({
         disabled={enviando}
         className="h-10 rounded-lg border-[1.5px] border-acento px-3 text-sm font-bold text-acento hover:bg-acento/5 disabled:opacity-60"
       >
-        {enviando ? "Confirmando…" : "Confirmar pago"}
+        {enviando ? "Confirmando…" : texto}
       </button>
       {!enviando && estado.error && (
         <span role="alert" className="text-sm font-semibold text-error">

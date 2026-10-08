@@ -58,8 +58,9 @@ Cada paso termina con algo para probar. Se marca `[x]` cuando está revisado.
   - Reserva de 15 minutos (antes 10): da tiempo a transferir.
   - Se confirma solo: mirando los movimientos de la cuenta mientras quien compra espera, con el aviso de Mercado Pago y al volver del cobro. Cada orden se confirma una vez (UPDATE condicionado con el turno del evento) y cada pago se registra una vez.
   - Pago tarde: si queda lugar en esos lotes, se confirma; si no, "para devolver". Pago repetido: "para devolver". Casos raros (sin los centavos): "Confirmar pago" a mano en el panel del evento.
-  - Por ahora la cuenta de Mercado Pago la conecta el ADMIN pegando el Access Token (cifrado en la base). Para más adelante: que cada productora la conecte con un botón (OAuth) y que el ADMIN vea "Cobros" de cada una.
-  - Para más adelante: devolver la plata desde el panel (paso 20) y avisar por mail (paso 15).
+  - Por ahora la cuenta de Mercado Pago la conecta el ADMIN pegando el Access Token (cifrado en la base). Una cuenta, una sola productora. Sin cuenta conectada no se ofrece ningún pago. Para más adelante: que cada productora la conecte con un botón (OAuth).
+  - Revisado con 8 agentes: 34 hallazgos, arreglados (entre otros: una cuenta en dos productoras podía confirmar la compra de otra persona, transferencia ofrecida sin poder detectarla, "Cambiar entradas" después de pagar, volver de Mercado Pago con el pago rechazado, montos que se podían agotar, contracargos que seguían sumando).
+  - Para más adelante: devolver la plata desde el panel y anular entradas de pagos revertidos (paso 20), avisar por mail (paso 15).
 
 ## Bloque 4 — Entrada, QR y mail
 - [ ] **13. Código de cada entrada** — token aleatorio firmado (HMAC).

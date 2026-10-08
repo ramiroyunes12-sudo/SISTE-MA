@@ -8,10 +8,10 @@ export function recargoMercadoPago(totalCentavos: number, bps: number) {
   return Math.ceil((totalCentavos * bps) / 10_000 / 100) * 100;
 }
 
-// Transferencia: al total se le suman de 1 a 999 centavos ($0,01 a $9,99)
-// para que el monto sea único. Nunca el total redondo: una transferencia sin
-// centavos no se confunde con ninguna orden.
-export const EXTRA_MAXIMO_CENTAVOS = 999;
+// Transferencia: al total se le suman de 1 a 9.999 centavos ($0,01 a $99,99;
+// primero los más chicos) para que el monto sea único. Nunca el total
+// redondo: una transferencia sin centavos no se confunde con ninguna orden.
+export const EXTRA_MAXIMO_CENTAVOS = 9_999;
 
 // "4,4" o "4.40" → 440. null si no es un porcentaje de 0 a 20 con hasta 2 decimales.
 export function porcentajeABps(texto: unknown): number | null {

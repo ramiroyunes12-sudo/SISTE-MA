@@ -10,15 +10,19 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
 
 const VERSION = "v1";
 
+// Al menos 32 caracteres, y no la de ejemplo de .env.example.
+function claveValida(texto: string | undefined): texto is string {
+  return Boolean(texto && texto.length >= 32 && !texto.includes("cambiame"));
+}
+
 function clave() {
   const texto = process.env.CLAVE_CIFRADO;
-  if (!texto || texto.length < 32) throw new Error("Falta CLAVE_CIFRADO (al menos 32 caracteres)");
+  if (!claveValida(texto)) throw new Error("Falta CLAVE_CIFRADO (al menos 32 caracteres al azar)");
   return createHash("sha256").update(texto).digest();
 }
 
 export function hayClaveDeCifrado() {
-  const texto = process.env.CLAVE_CIFRADO;
-  return Boolean(texto && texto.length >= 32);
+  return claveValida(process.env.CLAVE_CIFRADO);
 }
 
 export function cifrar(texto: string, contexto: string) {
@@ -32,7 +36,7 @@ export function cifrar(texto: string, contexto: string) {
 export function descifrar(guardado: string, contexto: string) {
   const [version, iv, datos, sello] = guardado.split(".");
   if (version !== VERSION || !iv || !datos || !sello) throw new Error("Dato cifrado con formato desconocido");
-  const descifrador = createDecipheriv("aes-256-gcm", clave(), Buffer.from(iv, "base64url"));
+  const descifrador = createDecipheriv("aes-256-gcm", clave(), Buffer.from(iv, "base64url"), { authTagLength: 16 });
   descifrador.setAAD(Buffer.from(contexto, "utf8"));
   descifrador.setAuthTag(Buffer.from(sello, "base64url"));
   return Buffer.concat([descifrador.update(Buffer.from(datos, "base64url")), descifrador.final()]).toString("utf8");
