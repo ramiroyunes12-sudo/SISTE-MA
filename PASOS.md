@@ -52,7 +52,7 @@ Cada paso termina con algo para probar. Se marca `[x]` cuando está revisado.
   - Para más adelante (paso 21): una tarea programada que libere vencidas aunque nadie entre (hoy alcanza con lo de arriba).
 
 ## Bloque 3 — Cobrar
-- [ ] **11 y 12. Cobrar: transferencia o Mercado Pago, y confirmar sin entradas dobles.** En la compra, con los datos completos: "Pagar por transferencia" o "Pagar con Mercado Pago".
+- [x] **11 y 12. Cobrar: transferencia o Mercado Pago, y confirmar sin entradas dobles.** En la compra, con los datos completos: "Pagar por transferencia" o "Pagar con Mercado Pago".
   - Probado antes con plata real: una transferencia al alias entra sin comisión y aparece en la API de Mercado Pago con el monto exacto (sin datos de quien la mandó). Un cobro con Checkout Pro de $100 descontó $4,21 (4,21%) y la plata quedó a 18 días.
   - Decidido (C): quien compra elige. Transferencia sin recargo, con monto único (centavos) para saber de quién es; Mercado Pago con cargo por servicio (4,4%, se cambia en el panel).
   - Reserva de 15 minutos (antes 10): da tiempo a transferir.
@@ -61,6 +61,7 @@ Cada paso termina con algo para probar. Se marca `[x]` cuando está revisado.
   - Por ahora la cuenta de Mercado Pago la conecta el ADMIN pegando el Access Token (cifrado en la base). Una cuenta, una sola productora. Sin cuenta conectada no se ofrece ningún pago. Para más adelante: que cada productora la conecte con un botón (OAuth).
   - Revisado con 8 agentes: 34 hallazgos, arreglados (entre otros: una cuenta en dos productoras podía confirmar la compra de otra persona, transferencia ofrecida sin poder detectarla, "Cambiar entradas" después de pagar, volver de Mercado Pago con el pago rechazado, montos que se podían agotar, contracargos que seguían sumando).
   - Para más adelante: devolver la plata desde el panel y anular entradas de pagos revertidos (paso 20), avisar por mail (paso 15).
+  - Probado en producción con plata real (8/10/2026): compra N° 1 por transferencia ($100,01, sin comisión) y N° 2 con Mercado Pago ($105 = $100 + $5 de cargo; Mercado Pago descontó $4,42 y quedaron $100,58). Las dos se confirmaron solas, sin errores; lote y entradas cuadran.
 
 ## Bloque 4 — Entrada, QR y mail
 - [ ] **13. Código de cada entrada** — token aleatorio firmado (HMAC).
