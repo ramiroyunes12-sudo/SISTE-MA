@@ -1,0 +1,76 @@
+// Prueba (paso 11): ¿las transferencias que entran a una cuenta de Mercado Pago
+// aparecen en su API? ¿Y cobran comisión? Lee los últimos movimientos con el
+// Access Token de esa cuenta (variable MERCADOPAGO_ACCESS_TOKEN, solo en Vercel
+// o en el .env). Solo lee: no crea cobros ni mueve plata.
+import "server-only";
+
+const API = "https://api.mercadopago.com";
+
+export type Movimiento = {
+  id: string;
+  fecha: Date | null;
+  entra: boolean; // true si la cuenta es la que cobra
+  estado: string;
+  tipo: string; // operation_type: "money_transfer", "account_fund", "regular_payment"…
+  medio: string; // payment_method_id / payment_type_id: "cvu", "account_money"…
+  montoCentavos: number;
+  netoCentavos: number | null; // lo que quedó después de comisiones
+  comisionCentavos: number; // suma de fee_details
+  quien: string; // nombre o email de la otra persona, si viene
+  detalle: string; // descripción o referencia, si viene
+};
+
+export type ResultadoMovimientos =
+  | { ok: true; cuenta: string; movimientos: Movimiento[] }
+  | { ok: false; error: string };
+
+const aCentavos = (valor: unknown) => (typeof valor === "number" && Number.isFinite(valor) ? Math.round(valor * 100) : 0);
+const texto = (valor: unknown) => (typeof valor === "string" ? valor : "");
+
+async function pedir(ruta: string, token: string) {
+  return fetch(`${API}${ruta}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+    signal: AbortSignal.timeout(10_000),
+  });
+}
+
+export async function leerUltimosMovimientos(token: string | undefined): Promise<ResultadoMovimientos> {
+  if (!token) return { ok: false, error: "Falta cargar MERCADOPAGO_ACCESS_TOKEN en Vercel (o en el .env)." };
+  try {
+    const yo = await pedir("/users/me", token);
+    if (yo.status === 401 || yo.status === 403) {
+      return { ok: false, error: "Mercado Pago no aceptó el Access Token. Revisá que esté bien copiado y que sea el de producción." };
+    }
+    if (!yo.ok) return { ok: false, error: `Mercado Pago respondió ${yo.status} al pedir los datos de la cuenta.` };
+    const cuenta = (await yo.json()) as { id?: number; nickname?: string; email?: string };
+
+    const respuesta = await pedir("/v1/payments/search?sort=date_created&criteria=desc&limit=30", token);
+    if (!respuesta.ok) return { ok: false, error: `Mercado Pago respondió ${respuesta.status} al pedir los movimientos.` };
+    const { results } = (await respuesta.json()) as { results?: Record<string, unknown>[] };
+
+    const movimientos = (results ?? []).map((pago): Movimiento => {
+      const pagador = (pago.payer ?? {}) as Record<string, unknown>;
+      const nombre = [texto(pagador.first_name), texto(pagador.last_name)].filter(Boolean).join(" ");
+      const detalles = (pago.transaction_details ?? {}) as Record<string, unknown>;
+      const comisiones = Array.isArray(pago.fee_details) ? (pago.fee_details as Record<string, unknown>[]) : [];
+      const fecha = texto(pago.date_created);
+      return {
+        id: String(pago.id ?? ""),
+        fecha: fecha ? new Date(fecha) : null,
+        entra: pago.collector_id === cuenta.id,
+        estado: texto(pago.status),
+        tipo: texto(pago.operation_type),
+        medio: [texto(pago.payment_method_id), texto(pago.payment_type_id)].filter(Boolean).join(" / "),
+        montoCentavos: aCentavos(pago.transaction_amount),
+        netoCentavos: typeof detalles.net_received_amount === "number" ? aCentavos(detalles.net_received_amount) : null,
+        comisionCentavos: comisiones.reduce((suma, c) => suma + aCentavos(c.amount), 0),
+        quien: nombre || texto(pagador.email),
+        detalle: texto(pago.description) || texto(pago.external_reference),
+      };
+    });
+    return { ok: true, cuenta: cuenta.nickname || cuenta.email || String(cuenta.id ?? ""), movimientos };
+  } catch {
+    return { ok: false, error: "No pudimos hablar con Mercado Pago (se cortó o tardó demasiado). Probá de nuevo." };
+  }
+}
