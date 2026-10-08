@@ -24,7 +24,7 @@ export function ElegirEntradas({
   accion: (anterior: EstadoReserva, formulario: FormData) => Promise<EstadoReserva>;
 }) {
   const [cantidades, setCantidades] = useState<Record<string, number>>({});
-  // "Continuar" reserva las entradas por 10 minutos y lleva a la compra.
+  // "Continuar" reserva las entradas por 15 minutos y lleva a la compra.
   const [estado, accion, reservando] = useActionState(reservar, {});
   const enVenta = tipos.filter((tipo) => tipo.lote);
   const total = enVenta.reduce((suma, tipo) => suma + (cantidades[tipo.id] ?? 0), 0);
@@ -94,7 +94,7 @@ export function ElegirEntradas({
         <>
           <p className="text-sm leading-relaxed text-tenue">
             Máximo {maxPorCompra} {maxPorCompra === 1 ? "entrada" : "entradas"} por compra. Al tocar &quot;Continuar&quot; te
-            guardamos las entradas 10 minutos para que completes nombre y DNI de cada persona y pagues.
+            guardamos las entradas 15 minutos para que completes nombre y DNI de cada persona y pagues.
           </p>
           <form
             action={accion}

@@ -1,10 +1,13 @@
 "use server";
 
+import { refresh } from "next/cache";
 import { redirect, unstable_rethrow } from "next/navigation";
 
 import { requerirUsuario } from "@/lib/auth/actual";
-import { alcanceDe } from "@/lib/auth/alcance";
+import { alcanceDe, filtroDeEventos } from "@/lib/auth/alcance";
 import { obtenerDb } from "@/lib/db";
+import { confirmarPagoManual, revisarCobros } from "@/lib/pagos/cobros";
+import { apiMercadoPago } from "@/lib/pagos/mercadopago";
 import { type Errores, validarEvento } from "@/lib/eventos/editor";
 import { guardarEvento } from "@/lib/eventos/guardar";
 import { type ResultadoSimulacion, simularCompra } from "@/lib/ventas/simulacion";
@@ -69,5 +72,52 @@ export async function simularCompraAccion(
     unstable_rethrow(error);
     console.error("[simularCompra] Falló:", error);
     return { error: "No pudimos hacer la prueba: falló la conexión con el sistema. Probá de nuevo." };
+  }
+}
+
+// ─── Pagos del evento ────────────────────────────────────────────────────────
+
+export type EstadoPagoManual = { error?: string; listo?: string };
+
+// "Confirmar pago": lo vio en su Mercado Pago (por ejemplo, transfirió sin los
+// centavos). Al confirmar, la compra sale de la lista: el aviso se muestra
+// arriba de la sección (?pagada=<N° de compra>).
+export async function confirmarPagoAccion(eventoId: string, ordenId: string): Promise<EstadoPagoManual> {
+  const usuario = await requerirUsuario(["ADMIN", "ORGANIZADOR"]);
+  if (!UUID.test(String(eventoId)) || !UUID.test(String(ordenId))) return { error: "Datos no válidos. Recargá la página." };
+  const filtro = filtroDeEventos(alcanceDe(usuario));
+  let numero: number;
+  try {
+    const resultado = await confirmarPagoManual(obtenerDb(), ordenId, usuario.id, async (id) =>
+      id === eventoId && Boolean(await obtenerDb().evento.findFirst({ where: { id, ...filtro }, select: { id: true } })),
+    );
+    if (!resultado.ok) return { error: resultado.error };
+    numero = (await obtenerDb().orden.findUniqueOrThrow({ where: { id: ordenId }, select: { numero: true } })).numero;
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("[confirmarPagoManual] Falló:", error);
+    return { error: "No pudimos confirmar el pago. Probá de nuevo." };
+  }
+  redirect(`/admin/eventos/${eventoId}?pagada=${numero}`);
+}
+
+// "Buscar pagos ahora": mira los movimientos de la cuenta de Mercado Pago.
+export async function buscarPagosAccion(eventoId: string): Promise<EstadoPagoManual> {
+  const usuario = await requerirUsuario(["ADMIN", "ORGANIZADOR"]);
+  if (!UUID.test(String(eventoId))) return { error: "Datos no válidos. Recargá la página." };
+  const evento = await obtenerDb().evento.findFirst({
+    where: { id: eventoId, ...filtroDeEventos(alcanceDe(usuario)) },
+    select: { productoraId: true },
+  });
+  if (!evento) return { error: "Ese evento ya no existe." };
+  try {
+    const { revisado, confirmadas } = await revisarCobros(obtenerDb(), evento.productoraId, apiMercadoPago);
+    refresh();
+    if (!revisado) return { listo: "Recién se revisó (o no hay cuenta de Mercado Pago conectada). Probá en unos segundos." };
+    return { listo: confirmadas ? `Se confirmaron ${confirmadas} compras.` : "No entró ningún pago nuevo." };
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("[buscarPagos] Falló:", error instanceof Error ? error.message : error);
+    return { error: "No pudimos hablar con Mercado Pago. Probá de nuevo en un rato." };
   }
 }

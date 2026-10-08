@@ -3,23 +3,69 @@
 import { redirect, unstable_rethrow } from "next/navigation";
 
 import { obtenerDb } from "@/lib/db";
-import type { DatosCompra, ErroresDatos } from "@/lib/ventas/datos";
+import { esperoDemasiado } from "@/lib/errores-db";
+import { elegirMercadoPago, elegirTransferencia, revisarPagoDeCompra } from "@/lib/pagos/cobros";
+import { apiMercadoPago } from "@/lib/pagos/mercadopago";
+import { urlPublica } from "@/lib/url";
+import type { ErroresDatos } from "@/lib/ventas/datos";
 import { buscarCompra, cancelarReserva, guardarDatosCompra } from "@/lib/ventas/ordenes";
 
-export type EstadoDatos = { errores?: ErroresDatos; general?: string; listo?: { datos: DatosCompra } };
+export type EstadoDatos = { errores?: ErroresDatos; general?: string };
+export type EstadoPago = { error?: string };
+
+const ERROR_CONEXION = "No pudimos conectar con el sistema. Probá de nuevo.";
 
 // Guarda nombre y DNI de cada entrada, y email y celular. Todo se vuelve a
-// revisar acá (lo que manda el navegador no es confiable). El pago llega en
-// el paso 11.
+// revisar acá (lo que manda el navegador no es confiable). Si está todo bien,
+// la página pasa a elegir cómo pagar.
 export async function guardarDatosAccion(llave: string, _anterior: EstadoDatos, formulario: FormData): Promise<EstadoDatos> {
   try {
     const resultado = await guardarDatosCompra(obtenerDb(), String(llave), (campo) => formulario.get(campo));
     if (!resultado.ok) return { errores: resultado.errores, general: resultado.general };
-    return { listo: { datos: resultado.datos } };
   } catch (error) {
     unstable_rethrow(error);
     console.error("[guardarDatos] Falló:", error);
     return { general: "No pudimos guardar tus datos: falló la conexión con el sistema. Probá de nuevo." };
+  }
+  redirect(`/compra/${llave}`);
+}
+
+// "Pagar por transferencia": le da a la orden su monto único y muestra el alias.
+export async function transferenciaAccion(llave: string): Promise<EstadoPago> {
+  try {
+    const resultado = await elegirTransferencia(obtenerDb(), String(llave));
+    if (!resultado.ok) return { error: resultado.error };
+  } catch (error) {
+    unstable_rethrow(error);
+    if (esperoDemasiado(error)) return { error: "Hay mucha gente pagando en este momento. Probá de nuevo en unos segundos." };
+    console.error("[elegirTransferencia] Falló:", error);
+    return { error: ERROR_CONEXION };
+  }
+  redirect(`/compra/${llave}`);
+}
+
+// "Pagar con Mercado Pago": crea el cobro y manda a Mercado Pago (en el celu, a la app).
+export async function mercadoPagoAccion(llave: string): Promise<EstadoPago> {
+  let link: string;
+  try {
+    const resultado = await elegirMercadoPago(obtenerDb(), String(llave), apiMercadoPago, await urlPublica());
+    if (!resultado.ok) return { error: resultado.error };
+    link = resultado.link;
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("[elegirMercadoPago] Falló:", error);
+    return { error: ERROR_CONEXION };
+  }
+  redirect(link);
+}
+
+// La pantalla pregunta cada tanto si ya entró la plata.
+export async function revisarPagoAccion(llave: string): Promise<{ estado: string } | null> {
+  try {
+    return await revisarPagoDeCompra(obtenerDb(), String(llave), apiMercadoPago);
+  } catch (error) {
+    console.error("[revisarPago] Falló:", error);
+    return null;
   }
 }
 
@@ -34,7 +80,7 @@ export async function cancelarAccion(llave: string): Promise<void> {
     }
   } catch (error) {
     unstable_rethrow(error);
-    // Si no se pudo cancelar ahora, la reserva vence sola en 10 minutos.
+    // Si no se pudo cancelar ahora, la reserva vence sola en 15 minutos.
     console.error("[cancelarReserva] Falló:", error);
   }
   redirect(destino);

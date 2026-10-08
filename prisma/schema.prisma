@@ -33,8 +33,26 @@ model Productora {
   creadaEn      DateTime @default(now()) @map("creada_en") @db.Timestamptz(3)
   actualizadaEn DateTime @updatedAt @map("actualizada_en") @db.Timestamptz(3)
 
-  usuarios Usuario[]
-  eventos  Evento[]
+  // Cobros (paso 11). Transferencia: el alias y a nombre de quién está (se
+  // le muestran al comprador). Tienen que ser de la misma cuenta de Mercado
+  // Pago conectada: es la que se revisa para ver si entró la plata.
+  aliasTransferencia   String?   @map("alias_transferencia")
+  titularTransferencia String?   @map("titular_transferencia")
+  // Cargo por servicio al pagar con Mercado Pago, en centésimos de por ciento
+  // (440 = 4,40%): cubre la comisión que descuenta Mercado Pago.
+  recargoMpBps         Int       @default(440) @map("recargo_mp_bps")
+  // Cuenta de Mercado Pago conectada: su número de usuario y el Access Token
+  // cifrado (ver src/lib/cifrado.ts). Nunca el token tal cual.
+  mpUsuarioId          String?   @map("mp_usuario_id")
+  mpCuenta             String?   @map("mp_cuenta") // nombre de la cuenta, para mostrar
+  mpTokenCifrado       String?   @map("mp_token_cifrado")
+  mpConectadaEn        DateTime? @map("mp_conectada_en") @db.Timestamptz(3)
+  // Última vez que se miraron los movimientos (para no consultar de más).
+  mpRevisadoEn         DateTime? @map("mp_revisado_en") @db.Timestamptz(3)
+
+  usuarios            Usuario[]
+  eventos             Evento[]
+  montosTransferencia MontoTransferencia[]
 
   @@map("productoras")
   @@schema("entradas")
@@ -64,6 +82,7 @@ model Usuario {
   sesiones          Sesion[]
   entradasValidadas Entrada[]   @relation("ValidadaPor")
   cortesiasEmitidas Orden[]     @relation("EmitidaPor")
+  pagosRegistrados  Pago[]      @relation("RegistradoPor")
   escaneos          Escaneo[]
 
   @@index([productoraId])
@@ -172,6 +191,15 @@ enum TipoOrden {
   @@schema("entradas")
 }
 
+// Cómo se pagó (o eligió pagar) una orden.
+enum MetodoPago {
+  TRANSFERENCIA // a alias de la productora, con monto único (sin recargo)
+  MERCADOPAGO // Checkout Pro (con cargo por servicio)
+  MANUAL // lo confirmó a mano alguien del panel
+
+  @@schema("entradas")
+}
+
 enum EstadoOrden {
   PENDIENTE // reservada, esperando el pago
   PAGADA // o cortesía emitida: las entradas son válidas
@@ -197,6 +225,8 @@ model Orden {
   pagadaEn        DateTime?   @map("pagada_en") @db.Timestamptz(3)
   reembolsadaEn   DateTime?   @map("reembolsada_en") @db.Timestamptz(3)
   mpPreferenciaId String?     @unique @map("mp_preferencia_id") // Mercado Pago: checkout creado
+  metodoPago      MetodoPago? @map("metodo_pago") // el último que eligió quien compra
+  recargoCentavos Int         @default(0) @map("recargo_centavos") // cargo por servicio de Mercado Pago
   emitidaPorId    String?     @map("emitida_por_id") @db.Uuid // admin que dio la cortesía
 
   // El link de la compra (/compra/<llave>) es la llave para verla: acá solo
@@ -223,6 +253,8 @@ model Orden {
   entradas   Entrada[]
   pagos      Pago[]
 
+  montoTransferencia MontoTransferencia?
+
   @@unique([id, eventoId]) // para que cada entrada quede atada al evento de su orden
   @@index([eventoId, estado])
   @@index([email])
@@ -234,21 +266,52 @@ model Orden {
   @@schema("entradas")
 }
 
-// Cada pago que avisa Mercado Pago. Una orden puede tener más de uno
-// (por ejemplo, si alguien paga dos veces): así se ve qué hay que devolver.
-model Pago {
-  id                  String   @id @default(uuid(7)) @db.Uuid
-  ordenId             String   @map("orden_id") @db.Uuid
-  mpPagoId            String   @unique @map("mp_pago_id") // evita procesar dos veces el mismo aviso
-  estadoMp            String   @map("estado_mp") // approved, refunded, etc. (como lo manda Mercado Pago)
-  montoCentavos       Int      @map("monto_centavos")
-  reembolsadoCentavos Int      @default(0) @map("reembolsado_centavos")
-  creadoEn            DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
-  actualizadoEn       DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+// El monto exacto (con centavos únicos) que tiene que transferir una orden.
+// Como la transferencia no dice quién la mandó, el monto es lo que la ata a la
+// orden: no se puede repetir dentro de la misma productora (misma cuenta).
+// Se borra recién 48 horas después de que la orden deja de estar pendiente,
+// por si la plata llega tarde.
+model MontoTransferencia {
+  ordenId       String   @id @map("orden_id") @db.Uuid
+  productoraId  String   @map("productora_id") @db.Uuid
+  montoCentavos Int      @map("monto_centavos")
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
 
-  orden Orden @relation(fields: [ordenId], references: [id], onDelete: Restrict)
+  orden      Orden      @relation(fields: [ordenId], references: [id], onDelete: Cascade)
+  productora Productora @relation(fields: [productoraId], references: [id], onDelete: Restrict)
+
+  @@unique([productoraId, montoCentavos])
+  @@map("montos_transferencia")
+  @@schema("entradas")
+}
+
+// Cada pago recibido para una orden. Una orden puede tener más de uno (por
+// ejemplo, si alguien paga dos veces): los que no dieron entradas quedan
+// marcados para devolver.
+model Pago {
+  id                  String     @id @default(uuid(7)) @db.Uuid
+  ordenId             String     @map("orden_id") @db.Uuid
+  // Número del pago en Mercado Pago (evita procesar dos veces el mismo pago).
+  // Los confirmados a mano llevan "manual:<id de la orden>".
+  mpPagoId            String     @unique @map("mp_pago_id")
+  metodo              MetodoPago @default(MERCADOPAGO)
+  estadoMp            String     @map("estado_mp") // approved, refunded, etc. (como lo manda Mercado Pago)
+  montoCentavos       Int        @map("monto_centavos")
+  comisionCentavos    Int        @default(0) @map("comision_centavos") // lo que descontó Mercado Pago
+  reembolsadoCentavos Int        @default(0) @map("reembolsado_centavos")
+  // No dio entradas (la orden ya estaba paga, o llegó tarde y no había
+  // lugar): hay que devolver la plata. `nota` dice por qué.
+  aDevolver           Boolean    @default(false) @map("a_devolver")
+  nota                String?
+  registradoPorId     String?    @map("registrado_por_id") @db.Uuid // quién lo confirmó a mano
+  creadoEn            DateTime   @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn       DateTime   @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  orden         Orden    @relation(fields: [ordenId], references: [id], onDelete: Restrict)
+  registradoPor Usuario? @relation("RegistradoPor", fields: [registradoPorId], references: [id], onDelete: SetNull)
 
   @@index([ordenId])
+  @@index([aDevolver])
   @@map("pagos")
   @@schema("entradas")
 }

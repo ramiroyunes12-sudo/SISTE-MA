@@ -1,4 +1,4 @@
-// La reserva de 10 minutos contra un PostgreSQL de verdad: crear la orden con
+// La reserva de 15 minutos contra un PostgreSQL de verdad: crear la orden con
 // sus entradas, los límites de reservas abiertas, el vencimiento, guardar los
 // datos y cancelar. Solo corre si está TEST_DATABASE_URL (ver README).
 import { PrismaPg } from "@prisma/adapter-pg";
@@ -14,6 +14,7 @@ import {
   liberarVencidas,
   MAX_ABIERTAS_POR_CONEXION,
   MAX_ABIERTAS_POR_NAVEGADOR,
+  MINUTOS_RESERVA,
 } from "./ordenes";
 import { pedidoATexto } from "./pedido";
 import { tomarTurnoDelEvento } from "./turno";
@@ -21,7 +22,7 @@ import { tomarTurnoDelEvento } from "./turno";
 const url = process.env.TEST_DATABASE_URL;
 const MINUTO = 60_000;
 
-describe.skipIf(!url)("reserva de 10 minutos", { timeout: 120_000 }, () => {
+describe.skipIf(!url)("reserva de 15 minutos", { timeout: 120_000 }, () => {
   let db: PrismaClient;
   let productoraId: string;
   const unico = crypto.randomUUID().slice(0, 8);
@@ -96,7 +97,7 @@ describe.skipIf(!url)("reserva de 10 minutos", { timeout: 120_000 }, () => {
 
     const orden = await db.orden.findUniqueOrThrow({ where: { id: resultado.ordenId } });
     expect(orden).toMatchObject({ estado: "PENDIENTE", tipo: "VENTA", totalCentavos: 5 * 600000 + 800000 });
-    expect(orden.venceEn!.getTime() - ahora.getTime()).toBe(10 * MINUTO);
+    expect(orden.venceEn!.getTime() - ahora.getTime()).toBe(MINUTOS_RESERVA * MINUTO);
     // la llave no se guarda: solo su huella
     expect(JSON.stringify(orden)).not.toContain(resultado.llave);
     expect(await lotes()).toEqual([
@@ -154,8 +155,8 @@ describe.skipIf(!url)("reserva de 10 minutos", { timeout: 120_000 }, () => {
     // otro navegador, misma conexión: sí puede
     expect(await crearReserva(db, otro.id, pedir(otro.general, 1), { navegador: navegador(), ip: "3.3.3.3" })).toMatchObject({ ok: true });
     // y cuando vencen, dejan de contar
-    const enOnceMinutos = new Date(Date.now() + 11 * MINUTO);
-    expect(await crearReserva(db, otro.id, pedir(otro.general, 1), { navegador: yo, ip: "3.3.3.3" }, enOnceMinutos)).toMatchObject({
+    const pasadaLaReserva = new Date(Date.now() + (MINUTOS_RESERVA + 1) * MINUTO);
+    expect(await crearReserva(db, otro.id, pedir(otro.general, 1), { navegador: yo, ip: "3.3.3.3" }, pasadaLaReserva)).toMatchObject({
       ok: true,
     });
   });
@@ -176,10 +177,10 @@ describe.skipIf(!url)("reserva de 10 minutos", { timeout: 120_000 }, () => {
     const ahora = new Date();
     const reserva = await crearReserva(db, evento.id, pedir(evento.general, 6), { navegador: navegador(), ip: "1.1.1.1" }, ahora);
     if (!reserva.ok) throw new Error(reserva.error);
-    expect(await liberarVencidas(db, evento.id, new Date(ahora.getTime() + 9 * MINUTO))).toBe(0);
-    expect((await buscarCompra(db, reserva.llave, new Date(ahora.getTime() + 10 * MINUTO)))!.vencida).toBe(true);
+    expect(await liberarVencidas(db, evento.id, new Date(ahora.getTime() + (MINUTOS_RESERVA - 1) * MINUTO))).toBe(0);
+    expect((await buscarCompra(db, reserva.llave, new Date(ahora.getTime() + MINUTOS_RESERVA * MINUTO)))!.vencida).toBe(true);
 
-    const despues = new Date(ahora.getTime() + 11 * MINUTO);
+    const despues = new Date(ahora.getTime() + (MINUTOS_RESERVA + 1) * MINUTO);
     expect(await liberarVencidas(db, evento.id, despues)).toBe(1);
     expect(await liberarVencidas(db, evento.id, despues)).toBe(0);
     expect(await db.orden.findUniqueOrThrow({ where: { id: reserva.ordenId } })).toMatchObject({ estado: "VENCIDA" });
@@ -193,7 +194,7 @@ describe.skipIf(!url)("reserva de 10 minutos", { timeout: 120_000 }, () => {
   it("al abrir una página, liberar vencidas no hace fila: si el turno está ocupado, sigue de largo", async () => {
     const ahora = new Date();
     await crearReserva(db, evento.id, pedir(evento.general, 2), { navegador: navegador(), ip: "1.1.1.1" }, ahora);
-    const despues = new Date(ahora.getTime() + 11 * MINUTO);
+    const despues = new Date(ahora.getTime() + (MINUTOS_RESERVA + 1) * MINUTO);
     let soltar!: () => void;
     const puerta = new Promise<void>((resolve) => (soltar = resolve));
     let tengo!: () => void;
@@ -218,7 +219,7 @@ describe.skipIf(!url)("reserva de 10 minutos", { timeout: 120_000 }, () => {
   it("reservar libera antes las vencidas del evento (el Lote 1 vuelve a estar en venta)", async () => {
     const ahora = new Date();
     await crearReserva(db, evento.id, pedir(evento.general, 5), { navegador: navegador(), ip: "1.1.1.1" }, ahora);
-    const despues = new Date(ahora.getTime() + 11 * MINUTO);
+    const despues = new Date(ahora.getTime() + (MINUTOS_RESERVA + 1) * MINUTO);
     const nueva = await crearReserva(db, evento.id, pedir(evento.general, 1), { navegador: navegador(), ip: "1.1.1.1" }, despues);
     if (!nueva.ok) throw new Error(nueva.error);
     expect((await buscarCompra(db, nueva.llave, despues))!.entradas[0]).toMatchObject({ lote: "Lote 1", precioCentavos: 600000 });
@@ -253,7 +254,7 @@ describe.skipIf(!url)("reserva de 10 minutos", { timeout: 120_000 }, () => {
       ok: false,
       errores: { "dni-1": "Poné el DNI." },
     });
-    const tarde = new Date(ahora.getTime() + 10 * MINUTO);
+    const tarde = new Date(ahora.getTime() + MINUTOS_RESERVA * MINUTO);
     expect(await guardarDatosCompra(db, reserva.llave, (c) => campos[c], tarde)).toMatchObject({
       ok: false,
       general: expect.stringContaining("ya no está vigente"),

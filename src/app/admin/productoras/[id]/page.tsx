@@ -5,7 +5,18 @@ import { requerirUsuario } from "@/lib/auth/actual";
 import { obtenerDb } from "@/lib/db";
 import { formatearFecha } from "@/lib/fechas";
 
-import { agregarPersonaAccion, cambiarActivoAccion, editarProductoraAccion, nuevaTemporalAccion } from "../acciones";
+import { bpsAPorcentaje } from "@/lib/pagos/montos";
+
+import {
+  agregarPersonaAccion,
+  cambiarActivoAccion,
+  conectarMpAccion,
+  desconectarMpAccion,
+  editarProductoraAccion,
+  guardarCobrosAccion,
+  nuevaTemporalAccion,
+} from "../acciones";
+import { FormularioCobros } from "../cobros";
 import { AccionesPersona, FormularioAgregarPersona, FormularioEditarProductora } from "../formularios";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -52,6 +63,17 @@ export default async function PaginaProductora({ params }: PageProps<"/admin/pro
         accion={editarProductoraAccion.bind(null, productora.id)}
         nombre={productora.nombre}
         activa={productora.activa}
+      />
+
+      <FormularioCobros
+        guardar={guardarCobrosAccion.bind(null, productora.id)}
+        conectar={conectarMpAccion.bind(null, productora.id)}
+        desconectar={desconectarMpAccion.bind(null, productora.id)}
+        alias={productora.aliasTransferencia ?? ""}
+        titular={productora.titularTransferencia ?? ""}
+        recargo={bpsAPorcentaje(productora.recargoMpBps)}
+        cuentaMp={productora.mpUsuarioId ? (productora.mpCuenta ?? productora.mpUsuarioId) : null}
+        conectadaEl={productora.mpConectadaEn ? formatearFecha(productora.mpConectadaEn) : null}
       />
 
       <section className="overflow-hidden rounded-2xl border border-borde bg-superficie">

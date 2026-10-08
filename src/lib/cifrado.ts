@@ -1,0 +1,39 @@
+// Cifrar datos secretos que se guardan en la base (por ahora, el Access Token
+// de Mercado Pago de cada productora). Así una copia de la base sola no
+// alcanza para usarlos: la clave está en la variable CLAVE_CIFRADO (solo en
+// Vercel o en el .env).
+//
+// AES-256-GCM: si alguien toca el texto cifrado, descifrar falla. El
+// "contexto" (por ejemplo, el id de la productora) va pegado al cifrado: un
+// token copiado a otra productora no se puede descifrar.
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+
+const VERSION = "v1";
+
+function clave() {
+  const texto = process.env.CLAVE_CIFRADO;
+  if (!texto || texto.length < 32) throw new Error("Falta CLAVE_CIFRADO (al menos 32 caracteres)");
+  return createHash("sha256").update(texto).digest();
+}
+
+export function hayClaveDeCifrado() {
+  const texto = process.env.CLAVE_CIFRADO;
+  return Boolean(texto && texto.length >= 32);
+}
+
+export function cifrar(texto: string, contexto: string) {
+  const iv = randomBytes(12);
+  const cifrador = createCipheriv("aes-256-gcm", clave(), iv);
+  cifrador.setAAD(Buffer.from(contexto, "utf8"));
+  const datos = Buffer.concat([cifrador.update(texto, "utf8"), cifrador.final()]);
+  return [VERSION, iv.toString("base64url"), datos.toString("base64url"), cifrador.getAuthTag().toString("base64url")].join(".");
+}
+
+export function descifrar(guardado: string, contexto: string) {
+  const [version, iv, datos, sello] = guardado.split(".");
+  if (version !== VERSION || !iv || !datos || !sello) throw new Error("Dato cifrado con formato desconocido");
+  const descifrador = createDecipheriv("aes-256-gcm", clave(), Buffer.from(iv, "base64url"));
+  descifrador.setAAD(Buffer.from(contexto, "utf8"));
+  descifrador.setAuthTag(Buffer.from(sello, "base64url"));
+  return Buffer.concat([descifrador.update(Buffer.from(datos, "base64url")), descifrador.final()]).toString("utf8");
+}

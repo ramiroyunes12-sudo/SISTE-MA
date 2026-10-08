@@ -4,7 +4,10 @@ import { refresh } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 
 import { requerirUsuario } from "@/lib/auth/actual";
+import { hayClaveDeCifrado } from "@/lib/cifrado";
 import { obtenerDb } from "@/lib/db";
+import { conectarMercadoPago, desconectarMercadoPago, guardarDatosCobro } from "@/lib/pagos/cuenta";
+import { apiMercadoPago } from "@/lib/pagos/mercadopago";
 import {
   agregarPersona,
   cambiarActivo,
@@ -114,6 +117,63 @@ export async function cambiarActivoAccion(
   } catch (error) {
     unstable_rethrow(error);
     console.error("[cambiarActivo] Falló:", error);
+    return { errores: ERROR_CONEXION };
+  }
+}
+
+// ─── Cobros: alias, cargo por servicio y cuenta de Mercado Pago ──────────────
+
+export type EstadoCobros = { errores?: Record<string, string>; guardado?: boolean; conectada?: string };
+
+export async function guardarCobrosAccion(productoraId: string, _anterior: EstadoCobros, datos: FormData): Promise<EstadoCobros> {
+  await requerirUsuario(["ADMIN"]);
+  if (!idValido(productoraId)) return { errores: { general: "Datos no válidos. Recargá la página." } };
+  try {
+    const resultado = await guardarDatosCobro(obtenerDb(), productoraId, {
+      alias: datos.get("alias"),
+      titular: datos.get("titular"),
+      recargo: datos.get("recargo"),
+    });
+    if (!resultado.ok) return { errores: resultado.errores };
+    refresh();
+    return { guardado: true };
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("[guardarCobros] Falló:", error);
+    return { errores: ERROR_CONEXION };
+  }
+}
+
+// Pegar el Access Token de la cuenta de Mercado Pago de la productora: se
+// revisa con Mercado Pago y se guarda cifrado. El token nunca vuelve a la pantalla.
+export async function conectarMpAccion(productoraId: string, _anterior: EstadoCobros, datos: FormData): Promise<EstadoCobros> {
+  await requerirUsuario(["ADMIN"]);
+  if (!idValido(productoraId)) return { errores: { general: "Datos no válidos. Recargá la página." } };
+  if (!hayClaveDeCifrado()) {
+    return { errores: { token: "Falta la variable CLAVE_CIFRADO en Vercel: sin ella no se puede guardar el token." } };
+  }
+  try {
+    const resultado = await conectarMercadoPago(obtenerDb(), productoraId, datos.get("token"), apiMercadoPago);
+    if (!resultado.ok) return { errores: { token: resultado.error } };
+    refresh();
+    return { conectada: resultado.cuenta };
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("[conectarMp] Falló:", error instanceof Error ? error.message : error);
+    return { errores: ERROR_CONEXION };
+  }
+}
+
+export async function desconectarMpAccion(productoraId: string): Promise<EstadoCobros> {
+  await requerirUsuario(["ADMIN"]);
+  if (!idValido(productoraId)) return { errores: { general: "Datos no válidos. Recargá la página." } };
+  try {
+    await desconectarMercadoPago(obtenerDb(), productoraId);
+    refresh();
+    return {};
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("[desconectarMp] Falló:", error);
     return { errores: ERROR_CONEXION };
   }
 }

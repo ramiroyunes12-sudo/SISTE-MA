@@ -92,10 +92,32 @@ export function confirmarReservas(tx: Tx, eventoId: string, porciones: Porcion[]
   return moverReservadas(tx, eventoId, porciones, "confirmar");
 }
 
-// Si los números no cierran (más de lo que hay reservado, un lote de otro
-// evento) es un error del sistema: tira una excepción y la transacción entera
-// se deshace.
-async function moverReservadas(tx: Tx, eventoId: string, porciones: Porcion[], accion: "liberar" | "confirmar") {
+// Un pago que llegó tarde (la reserva ya venció o se canceló y los lugares
+// volvieron al lote): vende esas mismas entradas solo si en cada lote todavía
+// hay lugar. O todo o nada: devuelve false sin tocar nada si alguno no alcanza.
+// No mira si el evento sigue a la venta: la plata ya entró.
+export async function venderSinReserva(tx: Tx, eventoId: string, porciones: Porcion[]) {
+  const porLote = agruparPorLote(porciones, "vender");
+  if (porLote.size === 0) return true;
+  if (!(await tomarTurnoYLeer(tx, eventoId, ESPERA_LIBERAR_CONFIRMAR_MS))) {
+    throw new Error(`No se puede vender: el evento ${eventoId} no existe`);
+  }
+  const ids = [...porLote.keys()];
+  const lotes = await tx.$queryRaw<{ id: string; cupo: number; vendidas: number; reservadas: number }[]>`
+    SELECT l.id, l.cupo, l.vendidas, l.reservadas
+    FROM entradas.lotes l JOIN entradas.tipos_entrada t ON t.id = l.tipo_entrada_id
+    WHERE t.evento_id = ${eventoId}::uuid AND l.id = ANY(${ids}::uuid[])
+    ORDER BY l.id
+    FOR UPDATE OF l`;
+  if (lotes.length !== ids.length) throw new Error("No se puede vender: hay lotes que no son de este evento");
+  if (lotes.some((lote) => lote.cupo - lote.vendidas - lote.reservadas < porLote.get(lote.id)!)) return false;
+  for (const lote of lotes) {
+    await tx.lote.update({ where: { id: lote.id }, data: { vendidas: { increment: porLote.get(lote.id)! } } });
+  }
+  return true;
+}
+
+function agruparPorLote(porciones: Porcion[], accion: string) {
   const porLote = new Map<string, number>();
   for (const { loteId, cantidad } of porciones) {
     if (!UUID.test(loteId) || !Number.isSafeInteger(cantidad) || cantidad < 1) {
@@ -103,6 +125,14 @@ async function moverReservadas(tx: Tx, eventoId: string, porciones: Porcion[], a
     }
     porLote.set(loteId, (porLote.get(loteId) ?? 0) + cantidad);
   }
+  return porLote;
+}
+
+// Si los números no cierran (más de lo que hay reservado, un lote de otro
+// evento) es un error del sistema: tira una excepción y la transacción entera
+// se deshace.
+async function moverReservadas(tx: Tx, eventoId: string, porciones: Porcion[], accion: "liberar" | "confirmar") {
+  const porLote = agruparPorLote(porciones, accion);
   if (porLote.size === 0) return;
 
   if (!(await tomarTurnoYLeer(tx, eventoId, ESPERA_LIBERAR_CONFIRMAR_MS))) {

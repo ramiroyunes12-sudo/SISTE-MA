@@ -12,13 +12,14 @@ import { liberarVencidas } from "@/lib/ventas/ordenes";
 import { simularCompraAccion } from "../acciones";
 import { EditorEvento, type InfoLote } from "../editor";
 import { SimuladorCompra } from "../simulador";
+import { PagosDelEvento } from "./pagos-del-evento";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export default async function PaginaEditarEvento({ params, searchParams }: PageProps<"/admin/eventos/[id]">) {
   const usuario = await requerirUsuario(["ADMIN", "ORGANIZADOR"]);
   const { id } = await params;
-  const { guardado } = await searchParams;
+  const { guardado, pagada } = await searchParams;
   if (!UUID.test(id)) notFound();
 
   // Si es de otra productora, para este organizador "no existe".
@@ -81,6 +82,7 @@ export default async function PaginaEditarEvento({ params, searchParams }: PageP
         guardado={guardado === "1"}
         productoraNombre={usuario.rol === "ADMIN" ? evento.productora.nombre : undefined}
       />
+      <PagosDelEvento eventoId={evento.id} pagada={typeof pagada === "string" && /^\d{1,9}$/.test(pagada) ? Number(pagada) : undefined} />
       <SimuladorCompra
         key={`simulador-${version}`}
         accion={simularCompraAccion.bind(null, evento.id)}

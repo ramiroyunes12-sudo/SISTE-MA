@@ -14,7 +14,7 @@ export type EstadoReserva = { error?: string };
 
 const MUCHA_GENTE = "Hay mucha gente comprando en este momento. Probá de nuevo en unos segundos.";
 
-// "Continuar": reserva las entradas por 10 minutos y lleva a la compra.
+// "Continuar": reserva las entradas por 15 minutos y lleva a la compra.
 export async function reservarAccion(slug: string, _anterior: EstadoReserva, formulario: FormData): Promise<EstadoReserva> {
   let llave: string;
   try {

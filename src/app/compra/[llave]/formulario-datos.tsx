@@ -2,7 +2,8 @@
 
 // Los datos de la compra: un bloque por entrada ("Entrada 1 · General") con
 // nombre y DNI de quien la usa, y a dónde mandar las entradas. Arranca con lo
-// que ya se guardó (se puede corregir hasta pagar).
+// que ya se guardó (se puede corregir hasta pagar). Al guardar, la página
+// pasa a elegir cómo pagar.
 import { type FormEvent, startTransition, useActionState, useState } from "react";
 
 import { BotonPrincipal, Campo, MensajeError } from "@/components/formulario";
@@ -125,31 +126,16 @@ export function FormularioDatos({
         <p className="text-[13px] text-tenue">Todas las entradas llegan a este email, cada una con su QR.</p>
       </section>
 
-      {!enviando && estado.listo && !Object.values(errores).some(Boolean) && (
-        <div role="status" className="flex flex-col gap-1.5 rounded-xl bg-ok/10 p-3 text-sm text-ok-oscuro">
-          <p className="font-bold">¡Listo, guardamos tus datos!</p>
-          <ul className="flex flex-col gap-0.5">
-            {estado.listo.datos.entradas.map((persona, i) => (
-              <li key={i}>
-                Entrada {i + 1} · {entradas[i].tipo}: {persona.nombre} · DNI {formatearDni(persona.dni)}
-              </li>
-            ))}
-          </ul>
-          <p>Van a llegar a {estado.listo.datos.email}. El pago con Mercado Pago se habilita en el próximo paso.</p>
-        </div>
-      )}
       <div className="sticky bottom-0 -mx-4 flex flex-col gap-2 border-t border-borde bg-superficie px-4 py-3 sm:mx-0 sm:rounded-2xl sm:border">
         {!enviando && <MensajeError>{estado.general}</MensajeError>}
         <div className="flex items-baseline justify-between gap-3">
-          <span className="text-[15px] text-tenue">Total a pagar</span>
+          <span className="text-[15px] text-tenue">Total de las entradas</span>
           <span className="text-2xl font-bold">{formatearPesos(totalCentavos)}</span>
         </div>
         <BotonPrincipal type="submit" disabled={enviando} className="h-[52px] text-[17px]">
           {enviando ? "Guardando…" : "Continuar al pago"}
         </BotonPrincipal>
-        <p className="text-center text-xs text-tenue">
-          Todavía no se cobra nada: el pago con Mercado Pago llega en el próximo paso.
-        </p>
+        <p className="text-center text-xs text-tenue">Todavía no se cobra nada: después elegís cómo pagar.</p>
       </div>
     </form>
   );

@@ -1,4 +1,4 @@
-// La reserva de 10 minutos: al tocar "Continuar" se crea una orden PENDIENTE
+// La reserva de 15 minutos: al tocar "Continuar" se crea una orden PENDIENTE
 // con una entrada por persona (todavía sin nombre ni DNI) y se apartan los
 // lugares en los lotes. Si no se paga a tiempo, vence y los lugares vuelven.
 //
@@ -24,7 +24,7 @@ import { intentarTomarTurnoDelEvento, tomarTurnoDelEvento } from "./turno";
 
 type Tx = Prisma.TransactionClient;
 
-export const MINUTOS_RESERVA = 10;
+export const MINUTOS_RESERVA = 15; // da tiempo a transferir
 export const MAX_ABIERTAS_POR_NAVEGADOR = 3;
 export const MAX_ABIERTAS_POR_CONEXION = 15;
 
@@ -197,6 +197,7 @@ export type EntradaDeCompra = {
 
 export type Compra = {
   id: string;
+  numero: number; // el "N° de orden" que ve la gente
   estado: "PENDIENTE" | "VENCIDA" | "CANCELADA" | "PAGADA" | "REEMBOLSADA";
   vencida: boolean; // pendiente, pero ya se le pasó la hora
   venceEn: Date | null;
@@ -213,6 +214,7 @@ async function ordenPorLlave(db: PrismaClient | Tx, llave: string) {
     where: { accesoHash: huellaDeToken(llave) },
     select: {
       id: true,
+      numero: true,
       tipo: true,
       estado: true,
       venceEn: true,
@@ -255,6 +257,7 @@ export async function buscarCompra(db: PrismaClient, llave: string, ahora = new 
     }));
   return {
     id: orden.id,
+    numero: orden.numero,
     estado: orden.estado,
     vencida: orden.estado === "PENDIENTE" && (!orden.venceEn || orden.venceEn <= ahora),
     venceEn: orden.venceEn,
