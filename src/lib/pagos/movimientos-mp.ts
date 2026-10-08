@@ -10,14 +10,20 @@ export type Movimiento = {
   id: string;
   fecha: Date | null;
   entra: boolean; // true si la cuenta es la que cobra
-  estado: string;
+  estado: string; // "approved", "authorized" (reservado, todavía no cobrado)…
+  estadoDetalle: string;
+  moneda: string; // "ARS", "USD"…
   tipo: string; // operation_type: "money_transfer", "account_fund", "regular_payment"…
   medio: string; // payment_method_id / payment_type_id: "cvu", "account_money"…
   montoCentavos: number;
   netoCentavos: number | null; // lo que quedó después de comisiones
+  totalPagadoCentavos: number | null; // lo que pagó quien pagó (con recargos)
+  impuestosCentavos: number; // taxes_amount
   comisionCentavos: number; // suma de fee_details
   quien: string; // nombre o email de la otra persona, si viene
   detalle: string; // descripción o referencia, si viene
+  remitente: string; // datos del banco de quien transfirió, si vienen
+  crudo: string; // el JSON tal cual lo manda Mercado Pago, para revisarlo
 };
 
 export type ResultadoMovimientos =
@@ -26,6 +32,8 @@ export type ResultadoMovimientos =
 
 const aCentavos = (valor: unknown) => (typeof valor === "number" && Number.isFinite(valor) ? Math.round(valor * 100) : 0);
 const texto = (valor: unknown) => (typeof valor === "string" ? valor : "");
+const centavosONull = (valor: unknown) => (typeof valor === "number" && Number.isFinite(valor) ? Math.round(valor * 100) : null);
+const objeto = (valor: unknown) => (valor && typeof valor === "object" ? (valor as Record<string, unknown>) : {});
 
 async function pedir(ruta: string, token: string) {
   return fetch(`${API}${ruta}`, {
@@ -45,7 +53,7 @@ export async function leerUltimosMovimientos(token: string | undefined): Promise
     if (!yo.ok) return { ok: false, error: `Mercado Pago respondió ${yo.status} al pedir los datos de la cuenta.` };
     const cuenta = (await yo.json()) as { id?: number; nickname?: string; email?: string };
 
-    const respuesta = await pedir("/v1/payments/search?sort=date_created&criteria=desc&limit=30", token);
+    const respuesta = await pedir("/v1/payments/search?sort=date_created&criteria=desc&limit=50", token);
     if (!respuesta.ok) return { ok: false, error: `Mercado Pago respondió ${respuesta.status} al pedir los movimientos.` };
     const { results } = (await respuesta.json()) as { results?: Record<string, unknown>[] };
 
@@ -55,18 +63,29 @@ export async function leerUltimosMovimientos(token: string | undefined): Promise
       const detalles = (pago.transaction_details ?? {}) as Record<string, unknown>;
       const comisiones = Array.isArray(pago.fee_details) ? (pago.fee_details as Record<string, unknown>[]) : [];
       const fecha = texto(pago.date_created);
+      // En transferencias por CVU, los datos de quien mandó pueden venir acá.
+      const banco = objeto(objeto(objeto(pago.point_of_interaction).transaction_data).bank_info);
+      const remitente = objeto(banco.payer);
       return {
         id: String(pago.id ?? ""),
         fecha: fecha ? new Date(fecha) : null,
         entra: pago.collector_id === cuenta.id,
         estado: texto(pago.status),
+        estadoDetalle: texto(pago.status_detail),
+        moneda: texto(pago.currency_id),
         tipo: texto(pago.operation_type),
         medio: [texto(pago.payment_method_id), texto(pago.payment_type_id)].filter(Boolean).join(" / "),
         montoCentavos: aCentavos(pago.transaction_amount),
-        netoCentavos: typeof detalles.net_received_amount === "number" ? aCentavos(detalles.net_received_amount) : null,
+        netoCentavos: centavosONull(detalles.net_received_amount),
+        totalPagadoCentavos: centavosONull(detalles.total_paid_amount),
+        impuestosCentavos: aCentavos(pago.taxes_amount),
         comisionCentavos: comisiones.reduce((suma, c) => suma + aCentavos(c.amount), 0),
         quien: nombre || texto(pagador.email),
         detalle: texto(pago.description) || texto(pago.external_reference),
+        remitente: [texto(remitente.long_name), texto(objeto(remitente.identification).number), texto(remitente.account_id)]
+          .filter(Boolean)
+          .join(" · "),
+        crudo: JSON.stringify(pago, null, 2),
       };
     });
     return { ok: true, cuenta: cuenta.nickname || cuenta.email || String(cuenta.id ?? ""), movimientos };
