@@ -2,8 +2,11 @@
 
 Venta de entradas por lotes con QR enviado por mail y validación en la puerta.
 
+- Estado actual y cómo trabajamos (empezar por acá): [CONTEXTO.md](CONTEXTO.md)
 - Plan general: [PLAN.md](PLAN.md)
 - Pasos y avance: [PASOS.md](PASOS.md)
+- Pendientes del dueño y temas sueltos: [PENDIENTES.md](PENDIENTES.md)
+- Historial por chat: [BITACORA.md](BITACORA.md)
 - Diseño de pantallas: https://claude.ai/artifact/TEQZ3qY3s5V2eufJfgSWtJ
 
 ## Correrlo en tu compu
@@ -171,6 +174,7 @@ El proyecto `siste-ma` de Vercel está conectado a este repo: cada cambio que se
 
 - `settings.json`: permisos. Prohíbe lo destructivo (resetear o empujar el esquema con Prisma, `git push --force`, borrar ramas, leer `.env` o las variables del entorno, migrar o pausar producción por el MCP de Supabase, comprar dominios) y pide confirmación para lo que toca producción (SQL en Supabase, claves y deploys de Vercel, mails, merges).
 - `skills/verificar`: cómo dar un paso por terminado (test que falla primero, typecheck, lint y tests con la base local, sin salteados).
+- `skills/empezar-paso` y `skills/cerrar-paso`: arrancar un chat con el contexto justo y, al cerrar cada etapa, dejar al día `PASOS.md`, `CONTEXTO.md`, `PENDIENTES.md` y `BITACORA.md`. `CLAUDE.md` importa `CONTEXTO.md`, así cada chat nuevo lo recibe solo.
 - `rules/`: reglas que se cargan solo al tocar esos archivos: `base-de-datos.md` (prisma, `src/lib`, `src/app/api`) y `datos-personales.md` (`src`).
 - Adaptado de [ECC](https://github.com/affaan-m/everything-claude-code) (2.2.3) a mano: sin hooks ni instalador.
 
