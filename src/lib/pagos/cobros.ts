@@ -443,6 +443,10 @@ export async function procesarAviso(
 }
 
 export type EstadoDeCompra = { estado: string; aDevolver: boolean };
+// `confirmoAlgo`: esta revisión confirmó alguna compra (puede ser de otra
+// persona: se miran todos los pagos de la productora) o falló en el medio y
+// no se sabe. Quien llama pide entonces los mails (src/lib/mails/despues.ts).
+export type RevisionDeCompra = EstadoDeCompra & { confirmoAlgo: boolean };
 
 // La pantalla de la compra pregunta si ya entró la plata. Si vuelve de
 // Mercado Pago con el número del pago (y no estaba registrado), se mira ese;
@@ -454,21 +458,27 @@ export async function revisarPagoDeCompra(
   api: ApiMercadoPago,
   pagoId: string | null = null,
   ahora = new Date(),
-): Promise<EstadoDeCompra | null> {
+): Promise<RevisionDeCompra | null> {
   const orden = await ordenParaCobrar(db, llave);
   if (!orden) return null;
   const esperando = orden.estado !== "PAGADA" && orden.metodoPago !== null && orden.pagos.length === 0;
+  let confirmoAlgo = false;
   if (esperando) {
     const { productora } = orden.evento;
     try {
       if (pagoId && /^\d{1,20}$/.test(pagoId)) {
         const ya = await db.pago.findUnique({ where: { mpPagoId: pagoId }, select: { id: true } });
-        if (!ya) await procesarAviso(db, { productoraId: productora.id, pagoId }, api, ahora);
+        if (!ya) {
+          const resultado = await procesarAviso(db, { productoraId: productora.id, pagoId }, api, ahora);
+          confirmoAlgo = resultado === "confirmada" || resultado === "confirmada_tarde";
+        }
       } else {
-        await revisarCobros(db, productora.id, api, ahora);
+        confirmoAlgo = (await revisarCobros(db, productora.id, api, ahora)).confirmadas > 0;
       }
     } catch (error) {
       // Si Mercado Pago no responde, se vuelve a mirar en la próxima consulta.
+      // (Puede haber confirmado alguna antes de fallar.)
+      confirmoAlgo = true;
       console.error("[revisarPagoDeCompra] Falló:", error instanceof Error ? error.message : error);
     }
   }
@@ -476,7 +486,7 @@ export async function revisarPagoDeCompra(
     where: { id: orden.id },
     select: { estado: true, pagos: { where: { aDevolver: true }, select: { id: true } } },
   });
-  return actual ? { estado: actual.estado, aDevolver: actual.pagos.length > 0 } : null;
+  return actual ? { estado: actual.estado, aDevolver: actual.pagos.length > 0, confirmoAlgo } : null;
 }
 
 // ─── Confirmar a mano (panel) ───────────────────────────────────────────────

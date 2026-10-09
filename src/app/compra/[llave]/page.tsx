@@ -9,10 +9,13 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
 
+import { whatsappDeAyuda } from "@/lib/ayuda";
 import { obtenerDb } from "@/lib/db";
 import { formatearPesos } from "@/lib/dinero";
-import { type EntradaConQr, entradasConQr } from "@/lib/entradas/imprimir";
+import { type EntradaConQr, entradasConQr, tipoYLote } from "@/lib/entradas/imprimir";
 import { qrParaSvg } from "@/lib/entradas/qr";
+import { mandarMailsDespues } from "@/lib/mails/despues";
+import { estadoDelMail } from "@/lib/mails/pendientes";
 import { opcionesDePago, revisarPagoDeCompra } from "@/lib/pagos/cobros";
 import { apiMercadoPago } from "@/lib/pagos/mercadopago";
 import { formatearDni } from "@/lib/ventas/datos";
@@ -37,16 +40,22 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
   const db = obtenerDb();
 
   // Volvió de Mercado Pago con el número del pago: se mira ese pago primero.
+  // Si confirmó alguna compra (esta u otra), los mails salen después de responder.
   if (typeof pagoId === "string") {
-    await revisarPagoDeCompra(db, llave, apiMercadoPago, pagoId).catch((error: unknown) =>
-      console.warn("[revisarPagoDeCompra] No se pudo:", error),
-    );
+    const revision = await revisarPagoDeCompra(db, llave, apiMercadoPago, pagoId).catch((error: unknown) => {
+      console.warn("[revisarPagoDeCompra] No se pudo:", error);
+      return null;
+    });
+    if (revision?.confirmoAlgo) mandarMailsDespues();
   }
 
   const ahora = new Date();
   const compra = await buscarCompra(db, llave, ahora);
   if (!compra) notFound();
   const volver = `/e/${compra.evento.slug}`;
+  // Para cualquier problema: el WhatsApp de la plataforma, con el N° de compra ya escrito.
+  const whatsapp = whatsappDeAyuda();
+  const ayuda = whatsapp ? { numero: whatsapp.numero, link: whatsapp.link(compra.numero) } : undefined;
   const opciones = await opcionesDePago(db, llave);
   const eligioPago = opciones?.metodo === "TRANSFERENCIA" || opciones?.metodo === "MERCADOPAGO";
   // Volvió de Mercado Pago sin pagar (rechazado, o tocó "volver").
@@ -54,13 +63,36 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
   const mpNoSeCompleto = vueltaMp !== null && !["approved", "pending", "in_process"].includes(vueltaMp);
 
   if (compra.estado === "PAGADA") {
+    // Si el mail todavía no salió (o falló), se intenta después de responder.
+    const mail = await estadoDelMail(db, compra.id);
+    if (mail === "enviando") mandarMailsDespues({ ordenId: compra.id });
+    // (Sin el envío configurado, o si es de antes de los mails: no se dice nada.)
     return (
-      <Marco titulo="Tu compra" evento={compra.evento.nombre} volver={volver}>
+      <Marco ayuda={ayuda} titulo="Tu compra" evento={compra.evento.nombre} volver={volver}>
         <section role="status" className="flex flex-col gap-2 rounded-2xl border-2 border-ok bg-superficie p-5">
           <h2 className="font-display text-2xl font-bold text-ok-oscuro">¡Pago confirmado!</h2>
           <p>
             Compra N° <strong>{compra.numero}</strong> · {compra.evento.nombre}
           </p>
+          {compra.email && mail !== "nada" && (
+            <p className="[overflow-wrap:anywhere]">
+              {mail === "enviado" && (
+                <>
+                  Te mandamos las entradas a <strong>{compra.email}</strong>. Si no lo ves, revisá en spam o promociones.
+                </>
+              )}
+              {mail === "enviando" && (
+                <>
+                  Te estamos mandando las entradas a <strong>{compra.email}</strong> (puede tardar unos minutos).
+                </>
+              )}
+              {mail === "no_salio" && (
+                <>
+                  No pudimos mandarte el mail a <strong>{compra.email}</strong>. Tus entradas están igual acá abajo.
+                </>
+              )}
+            </p>
+          )}
           <p className="text-tenue [overflow-wrap:anywhere]">
             Guardá este link: es tu comprobante. Tus entradas están acá abajo, cada una con su QR: descargalas en PDF.
           </p>
@@ -82,7 +114,7 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
     const cancelada = compra.estado === "CANCELADA";
     const aDevolver = opciones?.aDevolverCentavos ?? 0;
     return (
-      <Marco titulo="Tu compra" evento={compra.evento.nombre} volver={volver}>
+      <Marco ayuda={ayuda} titulo="Tu compra" evento={compra.evento.nombre} volver={volver}>
         <div className="flex flex-col gap-3 rounded-2xl border border-borde bg-superficie p-5">
           <h2 className="font-display text-xl font-bold">{cancelada ? "Cancelaste esta reserva" : "Se venció tu reserva"}</h2>
           <p className="text-tenue">
@@ -120,7 +152,7 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
   // Primero, los datos de cada entrada (o corregirlos).
   if (!opciones?.datosCompletos || editar === "1") {
     return (
-      <Marco titulo="Completá tus datos" evento={compra.evento.nombre} volver={volver} cancelar={cancelar}>
+      <Marco ayuda={ayuda} titulo="Completá tus datos" evento={compra.evento.nombre} volver={volver} cancelar={cancelar}>
         {reloj}
         <Resumen compra={compra} />
         <FormularioDatos
@@ -137,7 +169,7 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
   // Después, pagar.
   const transferencia = opciones.transferencia;
   return (
-    <Marco titulo="Pagá tu compra" evento={compra.evento.nombre} volver={volver} cancelar={cancelar}>
+    <Marco ayuda={ayuda} titulo="Pagá tu compra" evento={compra.evento.nombre} volver={volver} cancelar={cancelar}>
       {reloj}
       <Resumen compra={compra} />
       <section className="flex flex-col gap-1.5 rounded-2xl border border-borde bg-superficie p-4 text-[15px]">
@@ -150,7 +182,7 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
         <ul className="flex flex-col gap-0.5">
           {compra.entradas.map((entrada, i) => (
             <li key={entrada.id}>
-              Entrada {i + 1} · {entrada.tipo}: {entrada.titular} · DNI {formatearDni(entrada.dni ?? "")}
+              Entrada {i + 1} · {tipoYLote(entrada)}: {entrada.titular} · DNI {formatearDni(entrada.dni ?? "")}
             </li>
           ))}
         </ul>
@@ -228,7 +260,7 @@ function EntradasPagas({ llave, compra }: { llave: string; compra: Compra }) {
           return (
             <li key={entrada.id} className="flex flex-col gap-2 rounded-2xl border border-borde bg-superficie p-4">
               <h3 className="text-[15px] font-bold">
-                Entrada {i + 1} · {entrada.tipo}
+                Entrada {i + 1} · {tipoYLote(entrada)}
               </h3>
               <p className="text-[15px]">
                 {entrada.titular} · DNI {formatearDni(entrada.dni ?? "")}
@@ -318,12 +350,14 @@ function Marco({
   evento,
   volver,
   cancelar,
+  ayuda,
   children,
 }: {
   titulo: string;
   evento: string;
   volver: string;
   cancelar?: ReactNode;
+  ayuda?: { numero: string; link: string };
   children: ReactNode;
 }) {
   return (
@@ -341,7 +375,22 @@ function Marco({
           )}
         </div>
       </header>
-      <main className="mx-auto flex w-full max-w-xl flex-col gap-4 px-4 pt-4">{children}</main>
+      <main className="mx-auto flex w-full max-w-xl flex-col gap-4 px-4 pt-4">
+        {children}
+        {ayuda && (
+          <p className="pb-6 text-center text-sm text-tenue">
+            ¿Algún problema con tu compra? Escribinos por{" "}
+            <a
+              href={ayuda.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold whitespace-nowrap text-acento hover:text-acento-hover"
+            >
+              WhatsApp ({ayuda.numero})
+            </a>
+          </p>
+        )}
+      </main>
     </div>
   );
 }

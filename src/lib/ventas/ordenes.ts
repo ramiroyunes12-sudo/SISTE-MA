@@ -214,39 +214,54 @@ export type Compra = {
   entradas: EntradaDeCompra[]; // siempre en el mismo orden: Entrada 1, 2, 3…
 };
 
-async function ordenPorLlave(db: PrismaClient | Tx, llave: string) {
-  if (typeof llave !== "string" || !LLAVE.test(llave)) return null;
-  return db.orden.findUnique({
-    where: { accesoHash: huellaDeToken(llave) },
+const SELECT_COMPRA = {
+  id: true,
+  numero: true,
+  tipo: true,
+  estado: true,
+  venceEn: true,
+  totalCentavos: true,
+  email: true,
+  telefono: true,
+  evento: { select: { id: true, slug: true, nombre: true, fecha: true, lugar: true, direccion: true } },
+  entradas: {
     select: {
       id: true,
-      numero: true,
-      tipo: true,
+      titular: true,
+      dni: true,
       estado: true,
-      venceEn: true,
-      totalCentavos: true,
-      email: true,
-      telefono: true,
-      evento: { select: { id: true, slug: true, nombre: true, fecha: true, lugar: true, direccion: true } },
-      entradas: {
-        select: {
-          id: true,
-          titular: true,
-          dni: true,
-          estado: true,
-          codigo: true,
-          precioCentavos: true,
-          tipoEntrada: { select: { nombre: true, orden: true } },
-          lote: { select: { nombre: true, numero: true } },
-        },
-      },
+      codigo: true,
+      precioCentavos: true,
+      tipoEntrada: { select: { nombre: true, orden: true } },
+      lote: { select: { nombre: true, numero: true } },
     },
-  });
+  },
+} as const;
+
+async function ordenPorLlave(db: PrismaClient | Tx, llave: string) {
+  if (typeof llave !== "string" || !LLAVE.test(llave)) return null;
+  return db.orden.findUnique({ where: { accesoHash: huellaDeToken(llave) }, select: SELECT_COMPRA });
 }
+
+type OrdenLeida = NonNullable<Awaited<ReturnType<typeof ordenPorLlave>>>;
 
 export async function buscarCompra(db: PrismaClient, llave: string, ahora = new Date()): Promise<Compra | null> {
   const orden = await ordenPorLlave(db, llave);
   if (!orden || orden.tipo !== "VENTA") return null;
+  return aCompra(orden, ahora);
+}
+
+// La misma compra, por el id de la orden: para lo que no tiene el link (en
+// la base solo queda la huella de la llave), como el mail con las entradas.
+// Quien la pide tiene que saber que le corresponde.
+export async function buscarCompraPorId(db: PrismaClient, ordenId: string, ahora = new Date()): Promise<Compra | null> {
+  if (typeof ordenId !== "string" || !UUID.test(ordenId)) return null;
+  const orden = await db.orden.findUnique({ where: { id: ordenId }, select: SELECT_COMPRA });
+  if (!orden || orden.tipo !== "VENTA") return null;
+  return aCompra(orden, ahora);
+}
+
+function aCompra(orden: OrdenLeida, ahora: Date): Compra {
   const entradas = [...orden.entradas]
     .sort(
       (a, b) =>

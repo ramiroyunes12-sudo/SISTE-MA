@@ -239,10 +239,16 @@ model Orden {
   compradorHash String? @map("comprador_hash")
   ipHash        String? @map("ip_hash")
 
-  // Mail con las entradas: si falló, se reintenta (paso 15).
-  mailEnviadoEn DateTime? @map("mail_enviado_en") @db.Timestamptz(3)
-  mailIntentos  Int       @default(0) @map("mail_intentos")
-  mailError     String?   @map("mail_error")
+  // Mail con las entradas (src/lib/mails/pendientes.ts): falta mandarlo
+  // mientras la orden esté PAGADA sin mailEnviadoEn. Cada intento se "toma"
+  // con un UPDATE condicionado (mailIntentoEn: cuándo empezó el último), así
+  // dos envíos a la vez no lo mandan dos veces; si falló, se reintenta desde
+  // mailReintentarDesde.
+  mailEnviadoEn       DateTime? @map("mail_enviado_en") @db.Timestamptz(3)
+  mailIntentoEn       DateTime? @map("mail_intento_en") @db.Timestamptz(3)
+  mailReintentarDesde DateTime? @map("mail_reintentar_desde") @db.Timestamptz(3)
+  mailIntentos        Int       @default(0) @map("mail_intentos")
+  mailError           String?   @map("mail_error") // por qué falló (sin datos de la persona)
   // "Reenviar mis entradas": máximo 3 por día por orden (paso 16).
   reenviosCount Int       @default(0) @map("reenvios_count")
   reenviosDesde DateTime? @map("reenvios_desde") @db.Timestamptz(3)

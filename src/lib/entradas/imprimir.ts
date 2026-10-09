@@ -8,6 +8,7 @@ export type EntradaConQr = {
   id: string;
   numero: number; // la posición en la compra: "Entrada 2"
   tipo: string;
+  lote: string; // "" si no tiene (una cortesía)
   titular: string;
   dni: string;
   estado: "VALIDA" | "USADA";
@@ -26,6 +27,7 @@ export function entradasConQr(compra: Compra): EntradaConQr[] {
       id: entrada.id,
       numero: i + 1,
       tipo: entrada.tipo,
+      lote: entrada.lote,
       titular: entrada.titular,
       dni: entrada.dni,
       estado: entrada.estado,
@@ -33,4 +35,9 @@ export function entradasConQr(compra: Compra): EntradaConQr[] {
     });
   }
   return lista;
+}
+
+// Lo que dice cada entrada arriba de su nombre: "General · Lote 2".
+export function tipoYLote(entrada: { tipo: string; lote: string }) {
+  return entrada.lote ? `${entrada.tipo} · ${entrada.lote}` : entrada.tipo;
 }

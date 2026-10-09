@@ -128,6 +128,35 @@ describe("PDF de las entradas", () => {
     expect((await leerPagina(pdf, 0)).textos).toContain("PISTA µ Ñ");
   });
 
+  it("el tipo va con su lote; si es muy largo se acorta el tipo, no el lote", async () => {
+    const pdf = await armarPdfEntradas(
+      datos({
+        totalEntradas: 2,
+        entradas: [
+          { numero: 1, tipo: "General", lote: "Lote 2", titular: "Ana", dni: "30111222", codigoFirmado: CODIGO },
+          {
+            numero: 2,
+            tipo: "Campo VIP con acceso preferencial y barra libre toda la noche",
+            lote: "Preventa 1",
+            titular: "Ana",
+            dni: "30111222",
+            codigoFirmado: CODIGO,
+          },
+        ],
+      }),
+    );
+    expect((await leerPagina(pdf, 0)).textos).toContain("GENERAL · LOTE 2");
+    const largo = (await leerPagina(pdf, 1)).textos.find((texto) => texto.endsWith("· PREVENTA 1"));
+    expect(largo).toMatch(/^CAMPO VIP .+… · PREVENTA 1$/);
+  });
+
+  it("al pie, el WhatsApp para consultas (si está cargado)", async () => {
+    const con = await armarPdfEntradas(datos({ whatsapp: "+54 9 379 412-3456" }));
+    expect((await leerPagina(con, 0)).textos).toContain("¿Algún problema? WhatsApp +54 9 379 412-3456");
+    const sin = await armarPdfEntradas(datos());
+    expect((await leerPagina(sin, 0)).textos.some((texto) => texto.includes("WhatsApp"))).toBe(false);
+  });
+
   it("no se rompe con nombres raros ni textos muy largos", async () => {
     const largo = "Supercalifragilisticoespialidoso".repeat(6);
     const pdf = await armarPdfEntradas(

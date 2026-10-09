@@ -4,6 +4,7 @@ import { redirect, unstable_rethrow } from "next/navigation";
 
 import { obtenerDb } from "@/lib/db";
 import { esperoDemasiado } from "@/lib/errores-db";
+import { mandarMailsDespues } from "@/lib/mails/despues";
 import { elegirMercadoPago, elegirTransferencia, type EstadoDeCompra, revisarPagoDeCompra } from "@/lib/pagos/cobros";
 import { apiMercadoPago } from "@/lib/pagos/mercadopago";
 import { urlPublica } from "@/lib/url";
@@ -63,7 +64,12 @@ export async function mercadoPagoAccion(llave: string): Promise<EstadoPago> {
 // La pantalla pregunta cada tanto si ya entró la plata.
 export async function revisarPagoAccion(llave: string): Promise<EstadoDeCompra | null> {
   try {
-    return await revisarPagoDeCompra(obtenerDb(), String(llave), apiMercadoPago);
+    const revision = await revisarPagoDeCompra(obtenerDb(), String(llave), apiMercadoPago);
+    if (!revision) return null;
+    // Si se confirmó esta u otra compra (la revisión mira todos los pagos de
+    // la productora), los mails salen después de responder.
+    if (revision.confirmoAlgo || revision.estado === "PAGADA") mandarMailsDespues();
+    return { estado: revision.estado, aDevolver: revision.aDevolver };
   } catch (error) {
     console.error("[revisarPago] Falló:", error);
     return null;

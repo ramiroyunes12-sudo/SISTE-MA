@@ -1,4 +1,5 @@
 import { obtenerDb } from "@/lib/db";
+import { mandarMailsDespues } from "@/lib/mails/despues";
 import { procesarAviso } from "@/lib/pagos/cobros";
 import { apiMercadoPago } from "@/lib/pagos/mercadopago";
 
@@ -22,7 +23,9 @@ export async function POST(request: Request) {
   if (!productoraId || tipo !== "payment" || !/^\d{1,20}$/.test(pagoId)) return Response.json({ ok: true });
 
   try {
-    await procesarAviso(obtenerDb(), { productoraId, pagoId }, apiMercadoPago);
+    const resultado = await procesarAviso(obtenerDb(), { productoraId, pagoId }, apiMercadoPago);
+    // Si dio entradas, el mail sale después de responder.
+    if (resultado === "confirmada" || resultado === "confirmada_tarde") mandarMailsDespues();
     return Response.json({ ok: true });
   } catch (error) {
     console.error("[aviso Mercado Pago] Falló:", error instanceof Error ? error.message : error);

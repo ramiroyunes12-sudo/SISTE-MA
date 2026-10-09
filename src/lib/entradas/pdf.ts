@@ -16,6 +16,7 @@ import { aTextoPdf, entraEnWinAnsi } from "./texto-pdf";
 export type EntradaParaPdf = {
   numero: number; // "Entrada 2 de 3"
   tipo: string;
+  lote?: string; // "Lote 2" (va al lado del tipo; vacío en una cortesía)
   titular: string;
   dni: string;
   codigoFirmado: string; // lo que va en el QR
@@ -26,6 +27,7 @@ export type DatosPdf = {
   evento: { nombre: string; fecha: Date; lugar: string; direccion: string | null };
   compra: number;
   totalEntradas: number;
+  whatsapp?: string; // el WhatsApp para consultas (src/lib/ayuda.ts), al pie
   entradas: EntradaParaPdf[];
 };
 
@@ -106,6 +108,19 @@ function dibujarQr(pagina: PDFPage, texto: string, x: number, y: number) {
   }
 }
 
+// "GENERAL · LOTE 2" en un renglón: si no entra, más chico; si tampoco, se
+// acorta el tipo (el lote queda entero).
+function renglonTipoYLote(fuente: PDFFont, tipo: string, lote: string) {
+  const ancho = ANCHO - 2 * BORDE;
+  const sufijo = lote ? ` · ${lote}` : "";
+  for (const tamano of [13, 10]) {
+    if (fuente.widthOfTextAtSize(`${tipo}${sufijo}`, tamano) <= ancho) return { texto: `${tipo}${sufijo}`, tamano };
+  }
+  let corto = tipo;
+  while (corto.length > 1 && fuente.widthOfTextAtSize(`${corto}…${sufijo}`, 10) > ancho) corto = corto.slice(0, -1);
+  return { texto: `${corto.trimEnd()}…${sufijo}`, tamano: 10 };
+}
+
 function paginaDeEntrada(pdf: PDFDocument, fuentes: Fuentes, datos: DatosPdf, entrada: EntradaParaPdf) {
   const pagina = pdf.addPage([ANCHO, ALTO]);
   const { evento } = datos;
@@ -118,7 +133,8 @@ function paginaDeEntrada(pdf: PDFDocument, fuentes: Fuentes, datos: DatosPdf, en
 
   pagina.drawLine({ start: { x: BORDE, y: y - 6 }, end: { x: ANCHO - BORDE, y: y - 6 }, thickness: 0.6, color: TENUE });
   y -= 8;
-  y = escribir(pagina, aMayusculas(entrada.tipo), y, { fuente: fuentes.negrita, tamano: 13, maximo: 1 });
+  const tipo = renglonTipoYLote(fuentes.negrita, aMayusculas(entrada.tipo), entrada.lote ? aMayusculas(entrada.lote) : "");
+  y = escribir(pagina, tipo.texto, y, { fuente: fuentes.negrita, tamano: tipo.tamano, maximo: 1 });
   y = escribir(pagina, `Entrada ${entrada.numero} de ${datos.totalEntradas} · Compra N° ${datos.compra}`, y, {
     fuente: fuentes.normal,
     tamano: 8.5,
@@ -133,13 +149,17 @@ function paginaDeEntrada(pdf: PDFDocument, fuentes: Fuentes, datos: DatosPdf, en
   y = escribir(pagina, `DNI ${formatearDni(entrada.dni)}`, y, { fuente: fuentes.normal, tamano: 10, centrado: true });
   if (entrada.usada) escribir(pagina, "YA USADA", y, { fuente: fuentes.negrita, tamano: 9, color: TENUE, centrado: true });
 
-  escribir(pagina, "Mostrá este QR en la puerta junto con tu DNI. Cada QR sirve para entrar una sola vez: no lo publiques.", BORDE + 22, {
+  const pie = datos.whatsapp ? BORDE + 26 : BORDE + 22;
+  const abajo = escribir(pagina, "Mostrá este QR en la puerta junto con tu DNI. Cada QR sirve para entrar una sola vez: no lo publiques.", pie, {
     fuente: fuentes.normal,
     tamano: 7.5,
     color: TENUE,
     maximo: 2,
     centrado: true,
   });
+  if (datos.whatsapp) {
+    escribir(pagina, `¿Algún problema? WhatsApp ${datos.whatsapp}`, abajo, { fuente: fuentes.negrita, tamano: 7.5, color: TENUE, centrado: true });
+  }
 }
 
 export async function armarPdfEntradas(datos: DatosPdf): Promise<Uint8Array> {
