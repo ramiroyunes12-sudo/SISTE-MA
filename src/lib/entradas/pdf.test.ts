@@ -150,6 +150,13 @@ describe("PDF de las entradas", () => {
     expect(largo).toMatch(/^CAMPO VIP .+… · PREVENTA 1$/);
   });
 
+  it("al pie, el WhatsApp para consultas (si está cargado)", async () => {
+    const con = await armarPdfEntradas(datos({ whatsapp: "+54 9 379 412-3456" }));
+    expect((await leerPagina(con, 0)).textos).toContain("¿Algún problema? WhatsApp +54 9 379 412-3456");
+    const sin = await armarPdfEntradas(datos());
+    expect((await leerPagina(sin, 0)).textos.some((texto) => texto.includes("WhatsApp"))).toBe(false);
+  });
+
   it("no se rompe con nombres raros ni textos muy largos", async () => {
     const largo = "Supercalifragilisticoespialidoso".repeat(6);
     const pdf = await armarPdfEntradas(

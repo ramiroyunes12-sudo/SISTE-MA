@@ -99,12 +99,10 @@ export function FormularioEditarProductora({
   accion: accionEditar,
   nombre,
   activa,
-  emailContacto,
 }: {
   accion: Accion;
   nombre: string;
   activa: boolean;
-  emailContacto: string;
 }) {
   const [estado, accion, enviando] = useActionState(accionEditar, {});
   const errores = estado.errores ?? {};
@@ -122,17 +120,6 @@ export function FormularioEditarProductora({
             <option value="no">Desactivada (su gente no puede entrar)</option>
           </select>
         </div>
-        <Campo
-          etiqueta="Mail de contacto"
-          id="emailContacto"
-          name="emailContacto"
-          type="email"
-          defaultValue={emailContacto}
-          maxLength={200}
-          autoComplete="off"
-          error={errores.emailContacto}
-          ayuda="Si alguien responde el mail con sus entradas, le llega acá. Vacío: llega a la cuenta de mail de la plataforma."
-        />
       </div>
       {!enviando && <MensajeError>{errores.general}</MensajeError>}
       {!enviando && estado.guardado && (

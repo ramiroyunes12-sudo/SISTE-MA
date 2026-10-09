@@ -27,6 +27,7 @@ export type DatosPdf = {
   evento: { nombre: string; fecha: Date; lugar: string; direccion: string | null };
   compra: number;
   totalEntradas: number;
+  whatsapp?: string; // el WhatsApp para consultas (src/lib/ayuda.ts), al pie
   entradas: EntradaParaPdf[];
 };
 
@@ -148,13 +149,17 @@ function paginaDeEntrada(pdf: PDFDocument, fuentes: Fuentes, datos: DatosPdf, en
   y = escribir(pagina, `DNI ${formatearDni(entrada.dni)}`, y, { fuente: fuentes.normal, tamano: 10, centrado: true });
   if (entrada.usada) escribir(pagina, "YA USADA", y, { fuente: fuentes.negrita, tamano: 9, color: TENUE, centrado: true });
 
-  escribir(pagina, "Mostrá este QR en la puerta junto con tu DNI. Cada QR sirve para entrar una sola vez: no lo publiques.", BORDE + 22, {
+  const pie = datos.whatsapp ? BORDE + 26 : BORDE + 22;
+  const abajo = escribir(pagina, "Mostrá este QR en la puerta junto con tu DNI. Cada QR sirve para entrar una sola vez: no lo publiques.", pie, {
     fuente: fuentes.normal,
     tamano: 7.5,
     color: TENUE,
     maximo: 2,
     centrado: true,
   });
+  if (datos.whatsapp) {
+    escribir(pagina, `¿Algún problema? WhatsApp ${datos.whatsapp}`, abajo, { fuente: fuentes.negrita, tamano: 7.5, color: TENUE, centrado: true });
+  }
 }
 
 export async function armarPdfEntradas(datos: DatosPdf): Promise<Uint8Array> {

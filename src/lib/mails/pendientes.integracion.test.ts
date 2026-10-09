@@ -56,8 +56,8 @@ describe.skipIf(!url)("Mail con las entradas", () => {
   });
 
   // Un evento propio (con su productora) para cada prueba.
-  async function evento(emailContacto: string | null = null) {
-    const productora = await db.productora.create({ data: { nombre: `Productora ${crypto.randomUUID()}`, emailContacto } });
+  async function evento() {
+    const productora = await db.productora.create({ data: { nombre: `Productora ${crypto.randomUUID()}` } });
     const creado = await db.evento.create({
       data: {
         productoraId: productora.id,
@@ -112,7 +112,7 @@ describe.skipIf(!url)("Mail con las entradas", () => {
     });
 
   it("manda el mail de una compra paga una sola vez, con los QR y los PDF", async () => {
-    const ev = await evento("contacto@productora.com");
+    const ev = await evento();
     const id = await compra(ev);
     const { cartero, enviados } = carteroDePrueba();
 
@@ -122,7 +122,6 @@ describe.skipIf(!url)("Mail con las entradas", () => {
 
     const [mensaje] = enviados;
     expect(mensaje.para).toBe("comprador@ejemplo.com");
-    expect(mensaje.responderA).toBe("contacto@productora.com");
     expect(mensaje.asunto).toMatch(/^Tus entradas para Fiesta <del> mail \(compra N° \d+\)$/);
     // 2 QR dentro del mail + el PDF con todas + uno por persona.
     expect(mensaje.adjuntos.map((a) => a.archivo)).toEqual([

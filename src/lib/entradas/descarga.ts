@@ -1,5 +1,6 @@
 // El PDF que se baja desde el link de la compra (/compra/<llave>/pdf).
 import type { PrismaClient } from "@/generated/prisma/client";
+import { whatsappDeAyuda } from "@/lib/ayuda";
 import { buscarCompra } from "@/lib/ventas/ordenes";
 
 import { entradasConQr } from "./imprimir";
@@ -28,6 +29,7 @@ export async function pdfDeCompra(db: PrismaClient, llave: string, numero: numbe
     evento: compra.evento,
     compra: compra.numero,
     totalEntradas: compra.entradas.length,
+    whatsapp: whatsappDeAyuda()?.numero,
     entradas: entradas.map((entrada) => ({ ...entrada, usada: entrada.estado === "USADA" })),
   });
   const archivo = numero === null ? `entradas-compra-${compra.numero}.pdf` : `entrada-${numero}-compra-${compra.numero}.pdf`;

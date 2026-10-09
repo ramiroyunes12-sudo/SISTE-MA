@@ -18,7 +18,3 @@ ALTER TABLE "entradas"."ordenes" ADD COLUMN "mail_reintentar_desde" TIMESTAMPTZ(
 UPDATE "entradas"."ordenes"
 SET "mail_intentos" = 5, "mail_error" = 'Se pagó antes de que existieran los mails: no se mandó solo.'
 WHERE "estado" = 'PAGADA' AND "mail_enviado_en" IS NULL;
-
--- productoras.email_contacto: a dónde llegan las respuestas al mail con las
--- entradas (Reply-To). Vacío: a la cuenta de mail de la plataforma.
-ALTER TABLE "entradas"."productoras" ADD COLUMN "email_contacto" TEXT;

@@ -51,9 +51,6 @@ model Productora {
   // hasta cuándo quedaron revisados (la próxima vez se pide solo lo nuevo).
   mpRevisadoEn         DateTime? @map("mp_revisado_en") @db.Timestamptz(3)
   mpRevisadoHasta      DateTime? @map("mp_revisado_hasta") @db.Timestamptz(3)
-  // Mail de contacto (paso 15): las respuestas al mail con las entradas
-  // le llegan acá (Reply-To). Vacío: le llegan a la cuenta de la plataforma.
-  emailContacto        String?   @map("email_contacto")
 
   usuarios            Usuario[]
   eventos             Evento[]

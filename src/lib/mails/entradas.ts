@@ -1,11 +1,13 @@
 // El mail con las entradas de una compra (como el diseño "Mail con el QR"):
 // el evento, el QR de cada entrada con su nombre, DNI, tipo y lote, y
 // adjuntos el PDF con todas y, con 2 o más, uno por persona (para pasarle a
-// cada uno la suya).
+// cada uno la suya). El mail no recibe respuestas: para cualquier problema,
+// el WhatsApp de la plataforma (src/lib/ayuda.ts).
 //
 // Los QR van como imágenes adjuntas que el mail nombra por su cid: Gmail no
 // muestra SVG ni imágenes "data:". Todo se arma en el momento desde la base;
 // no se guarda nada.
+import type { WhatsappDeAyuda } from "@/lib/ayuda";
 import type { EntradaConQr } from "@/lib/entradas/imprimir";
 import { tipoYLote } from "@/lib/entradas/imprimir";
 import { armarPdfEntradas, type DatosPdf } from "@/lib/entradas/pdf";
@@ -17,7 +19,8 @@ import { type Adjunto, enUnRenglon, type Mensaje } from "./cartero";
 
 export type DatosMailEntradas = {
   para: string;
-  productora: { nombre: string; emailContacto: string | null };
+  productora: { nombre: string };
+  ayuda: WhatsappDeAyuda | null; // el WhatsApp para consultas (si está cargado)
   compra: number; // N° de compra
   totalEntradas: number; // todas las de la compra (también las anuladas): "Entrada 2 de 3"
   evento: { nombre: string; fecha: Date; lugar: string; direccion: string | null };
@@ -27,6 +30,7 @@ export type DatosMailEntradas = {
 const TINTA = "#15171C";
 const TENUE = "#5B5F69";
 const FONDO = "#EDEDE8";
+const ACENTO = "#3B3BE8";
 
 // Para meter texto de la gente (o del evento) en el HTML del mail.
 export function escaparHtml(texto: string) {
@@ -59,6 +63,7 @@ export async function armarMailEntradas(datos: DatosMailEntradas): Promise<Mensa
     evento,
     compra: datos.compra,
     totalEntradas: datos.totalEntradas,
+    whatsapp: datos.ayuda?.numero,
     entradas: entradas.map((entrada) => ({ ...entrada, usada: entrada.estado === "USADA" })),
   });
   const pdf = (archivo: string, contenido: Uint8Array): Adjunto => ({ archivo, contenido, tipo: "application/pdf" });
@@ -94,8 +99,14 @@ export async function armarMailEntradas(datos: DatosMailEntradas): Promise<Mensa
   const pdfs = una
     ? "También va adjunta en PDF."
     : "También van adjuntas en PDF: un archivo con todas y uno por persona, para mandarle a cada uno la suya.";
-  const responder = datos.productora.emailContacto
-    ? ` ¿Dudas? Respondé este mail y le llega a ${e(alFinal(datos.productora.nombre))}.`
+  const { ayuda } = datos;
+  const whatsapp = ayuda
+    ? `
+<tr><td style="height:12px;line-height:12px;font-size:0;">&nbsp;</td></tr>
+<tr><td style="background:#FFFFFF;border-radius:14px;padding:16px 20px;font-size:14px;line-height:1.6;">
+  <div style="font-weight:700;font-size:15px;">¿Algún problema?</div>
+  Escribinos por WhatsApp: <a href="${e(ayuda.link(datos.compra))}" style="color:${ACENTO};font-weight:700;">${e(ayuda.numero)}</a>
+</td></tr>`
     : "";
 
   const html = `<!doctype html>
@@ -128,9 +139,9 @@ ${tarjetas}
   • Cada QR sirve para entrar una sola vez: el primero que lo usa, entra.<br>
   • No lo publiques ni lo compartas con quien no va.<br>
   • ${pdfs}
-</td></tr>
+</td></tr>${whatsapp}
 <tr><td style="padding:16px 4px;font-size:12px;line-height:1.5;color:${TENUE};">
-  Te llega este mail porque compraste entradas para ${e(evento.nombre)} de ${e(datos.productora.nombre)} con esta dirección.${responder}
+  Te llega este mail porque compraste entradas para ${e(evento.nombre)} de ${e(datos.productora.nombre)} con esta dirección. Se manda solo: no respondas, nadie lo lee.
 </td></tr>
 </table>
 <!--[if mso]></td></tr></table><![endif]-->
@@ -156,14 +167,14 @@ ${tarjetas}
     ...lineas,
     "Importante: cada persona entra con su QR y su DNI. Cada QR sirve para entrar una sola vez (el primero que lo usa, entra). No lo publiques ni lo compartas con quien no va.",
     una ? `Adjunto: ${archivoTodas}.` : `Adjuntos: ${archivoTodas} (todas) y uno por persona.`,
+    ...(ayuda ? ["", `¿Algún problema? Escribinos por WhatsApp: ${ayuda.numero} (${ayuda.link(datos.compra)})`] : []),
     "",
-    `Te llega este mail porque compraste entradas para ${evento.nombre} de ${datos.productora.nombre} con esta dirección.${datos.productora.emailContacto ? ` ¿Dudas? Respondé este mail y le llega a ${alFinal(datos.productora.nombre)}.` : ""}`,
+    `Te llega este mail porque compraste entradas para ${evento.nombre} de ${datos.productora.nombre} con esta dirección. Se manda solo: no respondas, nadie lo lee.`,
   ].join("\n");
 
   return {
     para: datos.para,
     nombreRemitente: enUnRenglon(datos.productora.nombre, 80),
-    ...(datos.productora.emailContacto ? { responderA: datos.productora.emailContacto } : {}),
     // Con el N° de compra: si no, Gmail junta en una conversación las de un mismo evento.
     asunto: `Tus entradas para ${enUnRenglon(evento.nombre, 100)} (compra N° ${datos.compra})`,
     html,

@@ -64,7 +64,6 @@ export default async function PaginaProductora({ params }: PageProps<"/admin/pro
         accion={editarProductoraAccion.bind(null, productora.id)}
         nombre={productora.nombre}
         activa={productora.activa}
-        emailContacto={productora.emailContacto ?? ""}
       />
 
       <FormularioCobros

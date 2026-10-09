@@ -21,6 +21,7 @@
 // - Sin servidor de mail configurado o sin CLAVE_CODIGOS no se intenta nada
 //   (no gasta intentos): sale cuando se configure.
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
+import { whatsappDeAyuda } from "@/lib/ayuda";
 import { hayClaveDeCodigos } from "@/lib/entradas/codigo";
 import { entradasConQr } from "@/lib/entradas/imprimir";
 import { buscarCompraPorId } from "@/lib/ventas/ordenes";
@@ -76,11 +77,12 @@ export async function mailDeOrden(db: PrismaClient, ordenId: string, ahora = new
   if (entradas.length === 0) return null;
   const { productora } = await db.evento.findUniqueOrThrow({
     where: { id: compra.evento.id },
-    select: { productora: { select: { nombre: true, emailContacto: true } } },
+    select: { productora: { select: { nombre: true } } },
   });
   return armarMailEntradas({
     para: compra.email,
     productora,
+    ayuda: whatsappDeAyuda(),
     compra: compra.numero,
     totalEntradas: compra.entradas.length,
     evento: compra.evento,

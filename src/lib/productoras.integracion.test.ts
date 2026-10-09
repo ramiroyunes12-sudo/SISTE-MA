@@ -125,25 +125,6 @@ describe.skipIf(!url)("productoras y su gente", { timeout: 60_000 }, () => {
     expect(await ingresarConContrasena(db, una.email, una.cuenta.temporal)).toMatchObject({ ok: true });
   });
 
-  it("mail de contacto: se guarda en minúsculas, vacío lo borra y sin el campo no se toca", async () => {
-    const una = await nueva();
-    const nombre = (await db.productora.findUniqueOrThrow({ where: { id: una.productoraId } })).nombre;
-    const contacto = async () => (await db.productora.findUniqueOrThrow({ where: { id: una.productoraId } })).emailContacto;
-
-    expect(await editarProductora(db, una.productoraId, { nombre, activa: true, emailContacto: " Hola@Productora.com " })).toEqual({
-      ok: true,
-    });
-    expect(await contacto()).toBe("hola@productora.com");
-    expect(await editarProductora(db, una.productoraId, { nombre, activa: true })).toEqual({ ok: true });
-    expect(await contacto()).toBe("hola@productora.com");
-    expect(await editarProductora(db, una.productoraId, { nombre, activa: true, emailContacto: "no es un mail" })).toEqual({
-      ok: false,
-      errores: { emailContacto: "Poné un email válido (o dejalo vacío)." },
-    });
-    expect(await editarProductora(db, una.productoraId, { nombre, activa: true, emailContacto: "" })).toEqual({ ok: true });
-    expect(await contacto()).toBeNull();
-  });
-
   it("al desactivar la productora se cierran sus sesiones: reactivarla no las revive", async () => {
     const una = await nueva();
     const persona = await db.usuario.findUniqueOrThrow({ where: { email: una.email } });

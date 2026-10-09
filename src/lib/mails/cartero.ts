@@ -20,7 +20,6 @@ export type Adjunto = {
 export type Mensaje = {
   para: string;
   nombreRemitente: string; // el nombre de la productora
-  responderA?: string; // a dónde llegan las respuestas
   asunto: string;
   html: string;
   texto: string; // lo mismo, para los programas que no muestran HTML
@@ -71,7 +70,6 @@ export function carteroSmtp(env: Record<string, string | undefined> = process.en
       const envio = transporte.sendMail({
         from: { name: enUnRenglon(mensaje.nombreRemitente, 80), address: config.desde },
         to: mensaje.para,
-        ...(mensaje.responderA ? { replyTo: mensaje.responderA } : {}),
         subject: enUnRenglon(mensaje.asunto, 150),
         html: mensaje.html,
         text: mensaje.texto,

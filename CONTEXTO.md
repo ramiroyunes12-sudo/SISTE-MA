@@ -20,14 +20,14 @@ Sistema de venta de entradas por lotes para varias **productoras** (se alquila p
 
 - **Hechos y probados:** pasos 1 a 14 (base, login, productoras, evento y lotes, página pública, reparto entre lotes, datos del checkout, reserva, cobro por transferencia y Mercado Pago con plata real el 8/10/2026, código firmado de cada entrada, QR y PDF probados el 9/10/2026).
 - El panel todavía **no lista las compras pagas ni sus entradas** (llega en el paso 20): solo muestra cuántas, lo cobrado y los mails que no salieron. El código de cada entrada se ve en el link secreto de la compra y en el mail.
-- **Paso 15 (mail con las entradas): código terminado** (borrador + revisión con 3 agentes y sus arreglos). Gmail por SMTP, sale después de responder con `after()`, una sola vez, con reintentos y una tarea diaria de Vercel. Falta: que Ramiro cargue Gmail y `CRON_SECRET` en Vercel y lo pruebe. Después: paso 16 ("Compra confirmada" y "Reenviar mis entradas").
+- **Paso 15 (mail con las entradas): código terminado** (borrador + revisión con 3 agentes y sus arreglos). Gmail por SMTP, sale después de responder con `after()`, una sola vez, con reintentos y una tarea diaria de Vercel. Falta: que Ramiro cargue Gmail, `WHATSAPP_AYUDA` y `CRON_SECRET` en Vercel y lo pruebe. Después: paso 16 ("Compra confirmada" y "Reenviar mis entradas").
 
 ## Acciones del dueño pendientes
 
 Cosas que hace Ramiro a mano (no se pueden hacer desde el chat). Lista completa en `PENDIENTES.md`.
 
-1. Crear la cuenta de Gmail de la plataforma + contraseña de aplicación y cargar `SMTP_HOST`, `SMTP_PUERTO`, `SMTP_USUARIO`, `SMTP_CLAVE` y `CRON_SECRET` en Vercel (pasos en `PENDIENTES.md`).
-2. Cargar el "Mail de contacto" de cada productora y probar el paso 15 (qué probar: `PASOS.md`, paso 15).
+1. Crear la cuenta de Gmail de la plataforma + contraseña de aplicación y cargar `SMTP_HOST`, `SMTP_PUERTO`, `SMTP_USUARIO`, `SMTP_CLAVE`, `WHATSAPP_AYUDA` y `CRON_SECRET` en Vercel (pasos en `PENDIENTES.md`).
+2. Probar el paso 15 (qué probar: `PASOS.md`, paso 15).
 
 ## Cómo trabajamos
 
@@ -72,11 +72,11 @@ Detalle en `.claude/rules/` (se cargan solas al tocar esos archivos) y permisos 
 | `src/lib/ventas` | Reparto por lote, reservas, órdenes, turno del evento, simulación |
 | `src/lib/pagos` | Cobros, confirmar, montos únicos, cuenta de Mercado Pago |
 | `src/lib/entradas` | Código firmado (`codigo.ts`), verificar, QR (`qr.ts`, también el PNG del mail), entradas con QR (`imprimir.ts`), PDF (`pdf.ts`, `texto-pdf.ts`, `descarga.ts`) |
-| `src/lib/mails` | Mail con las entradas: SMTP (`cartero.ts`), contenido (`entradas.ts`), envío una sola vez y reintentos (`pendientes.ts`), `after()` (`despues.ts`) |
+| `src/lib/mails` | Mail con las entradas: SMTP (`cartero.ts`), contenido (`entradas.ts`), envío una sola vez y reintentos (`pendientes.ts`), `after()` (`despues.ts`). El WhatsApp para consultas: `src/lib/ayuda.ts` |
 | `prisma/` | `schema.prisma`, migraciones, datos de prueba |
 | `scripts/` | `migrar.mjs` (deploy), `usuario.ts` (crear ADMIN / resetear contraseña) |
 
 ## Traspaso (último chat)
 
-- **9/10/2026:** paso 14 marcado `[x]`. Paso 15 terminado en código: mail con QR de cada entrada + PDF (todas y una por persona), remitente la productora con respuestas a su "Mail de contacto", tipo y lote en la entrada, panel "Mails con las entradas", tarea diaria. Revisión con 3 agentes y sus arreglos (ver `PASOS.md`). 277 tests (0 salteados) y build.
+- **9/10/2026:** paso 14 marcado `[x]`. Paso 15 terminado en código: mail con QR de cada entrada + PDF (todas y una por persona), remitente la productora, sin respuestas (WhatsApp de Ramiro en el mail, el PDF y la página), tipo y lote en la entrada, panel "Mails con las entradas", tarea diaria. Revisión con 3 agentes y sus arreglos (ver `PASOS.md`). 277 tests (0 salteados) y build.
 - **Para el próximo chat:** si Ramiro confirma que le llegó el mail y lo probó, marcar el 15 `[x]` y arrancar el paso 16 (leer sus notas: `mailDeOrden` sirve para "Reenviar").
