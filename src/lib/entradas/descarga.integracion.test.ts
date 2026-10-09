@@ -10,7 +10,8 @@ import { generarToken, huellaDeToken } from "@/lib/auth/sesiones";
 import { buscarCompra } from "@/lib/ventas/ordenes";
 
 import { nuevoCodigo } from "./codigo";
-import { entradasConQr, pdfDeCompra } from "./imprimir";
+import { leerNumeroDeEntrada, pdfDeCompra } from "./descarga";
+import { entradasConQr } from "./imprimir";
 
 const url = process.env.TEST_DATABASE_URL;
 
@@ -96,6 +97,13 @@ describe.skipIf(!url)("PDF de las entradas de una compra", () => {
     expect(await pdfDeCompra(db, llave, 3)).toEqual({ ok: false, motivo: "sin_entradas" });
   });
 
+  it("el número de cada entrada es su lugar en la compra, contando las anuladas (como la página)", async () => {
+    const llave = await compra("PAGADA", ["ANULADA", "VALIDA"]);
+    expect(await paginas(await pdfDeCompra(db, llave, 2))).toBe(1);
+    expect(await pdfDeCompra(db, llave, 1)).toEqual({ ok: false, motivo: "sin_entradas" });
+    expect(entradasConQr((await buscarCompra(db, llave))!).map((e) => [e.numero, e.titular])).toEqual([[2, "Persona 2"]]);
+  });
+
   it("las anuladas no salen (ni sueltas)", async () => {
     const llave = await compra("PAGADA", ["VALIDA", "ANULADA"]);
     expect(await paginas(await pdfDeCompra(db, llave, null))).toBe(1);
@@ -114,6 +122,12 @@ describe.skipIf(!url)("PDF de las entradas de una compra", () => {
       const llave = await compra(estado, [...entradas]);
       expect(await pdfDeCompra(db, llave, null), estado).toEqual({ ok: false, motivo: "sin_entradas" });
     }
+  });
+
+  it("el número de entrada pedido en el link: solo 1 a 999", () => {
+    expect(leerNumeroDeEntrada(null)).toBeNull();
+    expect(leerNumeroDeEntrada("2")).toBe(2);
+    for (const malo of ["0", "abc", "1000", "-1", "1.5", "02", " 2", ""]) expect(leerNumeroDeEntrada(malo), malo).toBe("invalido");
   });
 
   it("con una llave que no existe o con otro formato, no encuentra nada", async () => {

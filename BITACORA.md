@@ -2,10 +2,11 @@
 
 Una entrada por chat, la más nueva arriba. Corta: qué se hizo, qué quedó y cómo se probó. El detalle está en los commits y en `PASOS.md`.
 
-## 9/10/2026 — Paso 14: QR y PDF (borrador)
+## 9/10/2026 — Paso 14: QR y PDF
 - QR por entrada en el link de la compra y PDF A6 (todas o una), armados en nuestro servidor con `qrcode` y `pdf-lib`, sin guardar nada.
-- Probado local: QR de la pantalla y del PDF leídos con jsQR; typecheck, lint, 228 tests (0 salteados) y build.
-- Quedó: revisión con agentes y la prueba de Ramiro.
+- Ramiro probó el borrador en producción: QR en la compra N° 2, VÁLIDA, PDF descargado y escaneado.
+- Revisión con 4 agentes: nada grave; arreglos en el mismo chat (234 tests, 0 salteados, build).
+- Quedó: la prueba de Ramiro de los arreglos.
 
 ## 9/10/2026 — Sistema de contexto entre chats
 - Se crearon `CONTEXTO.md` (se carga solo en cada chat), `PENDIENTES.md`, esta bitácora y las skills `empezar-paso` y `cerrar-paso`.

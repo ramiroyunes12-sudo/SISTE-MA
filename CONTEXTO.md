@@ -20,7 +20,7 @@ Sistema de venta de entradas por lotes para varias **productoras** (se alquila p
 
 - **Hechos y probados:** pasos 1 a 13 (base, login, productoras, evento y lotes, página pública, reparto entre lotes, datos del checkout, reserva, cobro por transferencia y Mercado Pago con plata real el 8/10/2026, código firmado de cada entrada probado el 9/10/2026).
 - El panel todavía **no lista las compras pagas ni sus entradas** (llega en el paso 20): solo muestra cuántas y lo cobrado. El código de cada entrada se ve en el link secreto de la compra.
-- **Paso 14 (QR y PDF): borrador hecho** (QR en el link de la compra, PDF con todas y cada una suelta). Falta: revisión con agentes, arreglos y la prueba de Ramiro. Después: paso 15 (mail).
+- **Paso 14 (QR y PDF): revisado y arreglado.** El borrador ya lo probó Ramiro en producción (QR, VÁLIDA, PDF). Falta: que Ramiro pruebe los arreglos y marcarlo `[x]`. Después: paso 15 (mail).
 
 ## Acciones del dueño pendientes
 
@@ -70,11 +70,11 @@ Detalle en `.claude/rules/` (se cargan solas al tocar esos archivos) y permisos 
 | `src/lib/eventos` | Guardar evento, lotes, vista pública |
 | `src/lib/ventas` | Reparto por lote, reservas, órdenes, turno del evento, simulación |
 | `src/lib/pagos` | Cobros, confirmar, montos únicos, cuenta de Mercado Pago |
-| `src/lib/entradas` | Código firmado (`codigo.ts`), verificar, QR (`qr.ts`), PDF (`pdf.ts`, `imprimir.ts`) |
+| `src/lib/entradas` | Código firmado (`codigo.ts`), verificar, QR (`qr.ts`), entradas con QR (`imprimir.ts`), PDF (`pdf.ts`, `descarga.ts`) |
 | `prisma/` | `schema.prisma`, migraciones, datos de prueba |
 | `scripts/` | `migrar.mjs` (deploy), `usuario.ts` (crear ADMIN / resetear contraseña) |
 
 ## Traspaso (último chat)
 
-- **9/10/2026:** paso 14 en borrador: QR de cada entrada en el link de la compra y PDF (todas o una), con tests (el QR se lee con un lector real). Decidido por Ramiro: PDF con todas + cada una suelta; nombre y DNI completo.
-- **Para el próximo chat:** revisión del paso 14 con agentes en paralelo (seguridad de la ruta `/compra/<llave>/pdf`, datos personales, PDF con textos raros, la página en el celu), arreglos y commit `Paso 14: arreglos de la revisión con agentes`.
+- **9/10/2026:** paso 14: borrador (QR + PDF), probado por Ramiro en producción; revisión con 4 agentes (nada grave) y arreglos (texto del mail, descarga `inline`, "YA USADA", nombres solo latinos, tests del QR del PDF).
+- **Para el próximo chat:** si Ramiro confirma la prueba de los arreglos, marcar el paso 14 `[x]` y arrancar el paso 15 (mail).

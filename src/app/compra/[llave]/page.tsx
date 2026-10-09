@@ -62,7 +62,7 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
             Compra N° <strong>{compra.numero}</strong> · {compra.evento.nombre}
           </p>
           <p className="text-tenue [overflow-wrap:anywhere]">
-            Guardá este link: es tu comprobante. Las entradas, cada una con su QR, te llegan a <strong>{compra.email}</strong>.
+            Guardá este link: es tu comprobante. Tus entradas están acá abajo, cada una con su QR: descargalas en PDF.
           </p>
         </section>
         <EntradasPagas llave={llave} compra={compra} />
@@ -210,8 +210,7 @@ function EntradasPagas({ llave, compra }: { llave: string; compra: Compra }) {
       {conQr.length > 0 && (
         <a
           href={pdf}
-          download
-          className="flex h-12 items-center justify-center rounded-xl bg-acento px-5 font-bold text-white no-underline hover:bg-acento-hover"
+          className="flex min-h-12 items-center justify-center rounded-xl bg-acento px-5 py-2 text-center font-bold text-white no-underline hover:bg-acento-hover"
         >
           {conQr.length === 1 ? "Descargar la entrada (PDF)" : `Descargar las ${conQr.length} entradas (PDF)`}
         </a>
@@ -235,13 +234,17 @@ function EntradasPagas({ llave, compra }: { llave: string; compra: Compra }) {
                     Código: <code className="break-all font-mono text-tinta">{qr.codigoFirmado}</code>
                   </p>
                   {conQr.length > 1 && (
-                    <a href={`${pdf}?entrada=${i + 1}`} download className="text-center text-sm font-semibold text-acento hover:text-acento-hover">
+                    <a href={`${pdf}?entrada=${i + 1}`} className="text-center text-sm font-semibold text-acento hover:text-acento-hover">
                       Descargar solo esta (PDF)
                     </a>
                   )}
                 </>
               ) : (
-                <p className="text-[13px] font-semibold text-error">{entrada.estado === "ANULADA" ? "Anulada" : "Sin QR"}</p>
+                <p className="text-[13px] font-semibold text-error">
+                  {entrada.estado === "ANULADA"
+                    ? "Esta entrada fue anulada: ya no sirve para entrar. Si tenés dudas, consultá a quien organiza."
+                    : "Esta entrada todavía no tiene QR."}
+                </p>
               )}
             </li>
           );

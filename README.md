@@ -168,11 +168,12 @@ En el panel, **Evento → Verificar una entrada**: se pega un código y dice si 
 
 ## Entradas: QR y PDF
 
-En una compra paga, el link de la compra (`/compra/<llave>`) muestra cada entrada con su **QR** y el código escrito abajo (por si no se puede escanear). El QR lleva solo el código firmado, nunca nombre ni DNI (`src/lib/entradas/qr.ts`).
+En una compra paga, el link de la compra (`/compra/<llave>`) muestra cada entrada con su **QR** y el código escrito abajo (por si no se puede escanear). El QR lleva solo el código firmado, nunca nombre ni DNI (`src/lib/entradas/qr.ts`). La página es siempre clara, para que el modo oscuro del celu no invierta el QR.
 
-- **Descargar las N entradas (PDF)**: un PDF con una página (A6) por entrada: evento, fecha, lugar, tipo, nombre, DNI y QR. **Descargar solo esta**: la de una persona, para pasársela.
-- Los PDF se arman en el momento en nuestro servidor (`src/lib/entradas/pdf.ts`, con `pdf-lib`) y no se guardan: se vuelven a armar desde la base cuando hace falta. La ruta es `/compra/<llave>/pdf` (`?entrada=N` para una sola); como la página, la llave del link es el permiso.
-- Solo salen las entradas válidas o usadas de compras pagas; las anuladas dicen "Anulada", sin QR.
+- **Descargar las N entradas (PDF)**: un PDF con una página (A6) por entrada: evento, fecha, lugar, tipo, nombre, DNI y QR (y "YA USADA" si ya entró). **Descargar solo esta**: la de una persona, para pasársela (aparece con 2 entradas o más). Se abre en el visor del celu; desde ahí se guarda o se comparte.
+- Los PDF se arman en el momento en nuestro servidor (`src/lib/entradas/pdf.ts`, con `pdf-lib`) y no se guardan: se vuelven a armar desde la base cuando hace falta. La ruta es `/compra/<llave>/pdf` (`?entrada=N` para una sola, `src/lib/entradas/descarga.ts`); como la página, la llave del link es el permiso.
+- Solo salen las entradas válidas o usadas de compras pagas; las anuladas lo dicen, sin QR.
+- Los nombres de cada entrada se aceptan solo con letras latinas (con acentos), como en el DNI, para poder imprimirlos.
 
 ## Publicación (Vercel)
 
