@@ -150,12 +150,13 @@ export async function verificarEntradaAccion(
   const codigo = datos.get("codigo");
   if (typeof codigo !== "string" || !codigo.trim()) return { error: "Pegá el código de la entrada." };
   try {
+    const alcance = alcanceDe(usuario);
     const evento = await obtenerDb().evento.findFirst({
-      where: { id: eventoId, ...filtroDeEventos(alcanceDe(usuario)) },
+      where: { id: eventoId, ...filtroDeEventos(alcance) },
       select: { id: true },
     });
     if (!evento) return { error: "Ese evento ya no existe." };
-    const v = await verificarCodigo(obtenerDb(), evento.id, codigo);
+    const v = await verificarCodigo(obtenerDb(), evento.id, alcance, codigo);
     if (v.resultado === "no_valida") return { verificada: { resultado: "no_valida", motivo: v.motivo } };
     return {
       verificada: {

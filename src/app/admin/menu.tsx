@@ -12,6 +12,7 @@ const SECCIONES: { texto: string; href?: string; paso?: number; soloAdmin?: bool
   { texto: "Ventas", paso: 20 },
   { texto: "Cortesías", paso: 19 },
   { texto: "Validadores", paso: 17 },
+  { texto: "Claves", href: "/admin/claves", soloAdmin: true },
 ];
 
 const base = "flex min-h-11 items-center justify-between gap-2 rounded-lg px-3 text-[15px]";

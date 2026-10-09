@@ -66,10 +66,12 @@ Cada paso termina con algo para probar. Se marca `[x]` cuando está revisado.
 
 ## Bloque 4 — Entrada, QR y mail
 - [ ] **13. Código de cada entrada** — token aleatorio firmado (HMAC). Para probarlo: en una compra paga aparece el código de cada entrada; en el panel del evento, "Verificar una entrada".
-  - Formato `E1-<128 bits al azar>-<firma>` en hexadecimal con mayúsculas (QR más chico). La firma es HMAC-SHA256 con una clave sacada de `CLAVE_CIFRADO` por HKDF (distinta de la que cifra los tokens de Mercado Pago); `E1` es la versión de la clave, para poder cambiarla.
+  - Formato `E1-<128 bits al azar>-<firma>` en hexadecimal con mayúsculas (QR más chico). La firma es HMAC-SHA256 con su propia clave, `CLAVE_CODIGOS` (no la de los tokens de Mercado Pago); `E1` es la versión de la clave, para poder cambiarla.
   - En la base va solo la parte al azar (con índice único y un control de formato). Con la base sola no se arma un QR válido (falta la clave); con la clave sola tampoco (no se conoce ninguna entrada). La firma se revisa con `timingSafeEqual` antes de buscar en la base.
   - "Verificar una entrada" solo mira (no marca usada): VÁLIDA, YA USADA (con la hora), SIN PAGAR, ANULADA o NO VÁLIDA (código trucho, inexistente o de otro evento, sin mostrar datos).
   - Las entradas que ya existían recibieron un código nuevo (eran de prueba, sin QR emitido).
+  - Revisado con 4 agentes: nada grave. Arreglado: clave propia (`CLAVE_CODIGOS`), la verificación filtra por productora adentro de la función (con test), test con la firma exacta (si alguien cambia cómo se firma, falla), si cambia `CLAVE_CIFRADO` la cuenta de Mercado Pago queda "a reconectar" en vez de romper la página, el resultado de "Verificar" se esconde al cambiar el código.
+  - Seguridad: `CLAVE_CIFRADO` se había creado desde el chat (su valor quedó en la conversación): se cambia por una nueva generada en el panel (Claves), sin pasar por el chat, y se reconecta la cuenta de Mercado Pago.
 - [ ] **14. QR y PDF**
   - Notas: QR y PDF se generan en nuestro servidor (sin APIs externas: llevan nombre y DNI). El QR lleva solo el código firmado. No guardar los PDF: se rearman desde la base.
 - [ ] **15. Enviar el mail** — Gmail SMTP.
@@ -91,4 +93,4 @@ Cada paso termina con algo para probar. Se marca `[x]` cuando está revisado.
 
 ## Bloque 7 — Salir a producción
 - [ ] **21. Publicarlo en internet** — Vercel + claves reales + compra de prueba real.
-  - Lista antes de vender: Access Token de producción en cada productora; `CLAVE_CIFRADO` y la clave de los códigos guardadas aparte (si se pierden, hay que reconectar cuentas y reemitir entradas); borrar el evento y las compras de prueba; plan de Supabase (el gratis se pausa sin uso; backups según plan); límites de Vercel Hobby; límite de conexiones a la base (`max` del pool); consultar al contador (cargo por Mercado Pago, facturación).
+  - Lista antes de vender: Access Token de producción en cada productora; `CLAVE_CIFRADO` y `CLAVE_CODIGOS` guardadas aparte (si se pierden, hay que reconectar cuentas y reemitir entradas); borrar el evento y las compras de prueba; plan de Supabase (el gratis se pausa sin uso; backups según plan); límites de Vercel Hobby; límite de conexiones a la base (`max` del pool); consultar al contador (cargo por Mercado Pago, facturación).

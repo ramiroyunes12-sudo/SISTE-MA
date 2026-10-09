@@ -3,15 +3,18 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { firmarCodigo, leerCodigo, nuevoCodigo } from "./codigo";
 
 const CLAVE = "clave-de-prueba-de-los-tests-con-mas-de-32-caracteres";
-let anterior: string | undefined;
+let anteriores: Record<string, string | undefined>;
 
 beforeEach(() => {
-  anterior = process.env.CLAVE_CIFRADO;
-  process.env.CLAVE_CIFRADO = CLAVE;
+  anteriores = { CLAVE_CODIGOS: process.env.CLAVE_CODIGOS, CLAVE_CIFRADO: process.env.CLAVE_CIFRADO };
+  process.env.CLAVE_CODIGOS = CLAVE;
+  process.env.CLAVE_CIFRADO = "otra-clave-la-de-cifrar-tokens-tambien-de-32-o-mas";
 });
 afterEach(() => {
-  if (anterior === undefined) delete process.env.CLAVE_CIFRADO;
-  else process.env.CLAVE_CIFRADO = anterior;
+  for (const [nombre, valor] of Object.entries(anteriores)) {
+    if (valor === undefined) delete process.env[nombre];
+    else process.env[nombre] = valor;
+  }
 });
 
 // Cambia un carácter hexadecimal por otro distinto.
@@ -63,15 +66,27 @@ describe("código de cada entrada", () => {
   it("un código firmado con otra clave no sirve", () => {
     const codigo = nuevoCodigo();
     const firmado = firmarCodigo(codigo);
-    process.env.CLAVE_CIFRADO = "otra-clave-distinta-de-la-anterior-tambien-larga";
+    process.env.CLAVE_CODIGOS = "otra-clave-distinta-de-la-anterior-tambien-larga";
     expect(leerCodigo(firmado)).toEqual({ ok: false, motivo: "firma" });
   });
 
-  it("la firma no es la de un HMAC con CLAVE_CIFRADO tal cual (usa una clave derivada)", async () => {
-    const { createHmac } = await import("node:crypto");
+  it("la firma es exactamente la acordada (si cambia, ningún QR ya vendido entra)", () => {
+    // HKDF-SHA256(CLAVE_CODIGOS, "siste-ma", "entradas/codigo/v1", 32) y
+    // HMAC-SHA256("entrada:" + código), los primeros 16 bytes. Calculado aparte.
+    process.env.CLAVE_CODIGOS = "clave-fija-de-los-tests-con-mas-de-32-caracteres-xyz";
+    expect(firmarCodigo("0".repeat(32))).toBe("E1-00000000000000000000000000000000-F85E179FFBFB1D60BB9139EBB58271DC");
+    expect(firmarCodigo("0123456789ABCDEF0123456789ABCDEF")).toBe(
+      "E1-0123456789ABCDEF0123456789ABCDEF-A6F1A8E403C0CD5B27A98899206E0BD3",
+    );
+  });
+
+  it("no depende de CLAVE_CIFRADO (cambiar la clave de los tokens no rompe los QR)", () => {
     const codigo = nuevoCodigo();
-    const ingenua = createHmac("sha256", CLAVE).update(`entrada:${codigo}`).digest("hex").slice(0, 32).toUpperCase();
-    expect(firmarCodigo(codigo).endsWith(ingenua)).toBe(false);
+    const firmado = firmarCodigo(codigo);
+    process.env.CLAVE_CIFRADO = "una-clave-de-cifrado-totalmente-distinta-123456";
+    expect(firmarCodigo(codigo)).toBe(firmado);
+    delete process.env.CLAVE_CIFRADO;
+    expect(leerCodigo(firmado)).toEqual({ ok: true, codigo });
   });
 
   it("rechaza formatos que no son (versiones desconocidas, largos, vacíos, basura)", () => {
@@ -109,10 +124,13 @@ describe("código de cada entrada", () => {
     expect(() => firmarCodigo(nuevoCodigo().toLowerCase())).toThrow();
   });
 
-  it("sin CLAVE_CIFRADO no firma ni lee (falla, no deja pasar)", () => {
+  it("sin CLAVE_CODIGOS (o corta) no firma ni lee: falla, nunca deja pasar", () => {
     const firmado = firmarCodigo(nuevoCodigo());
-    delete process.env.CLAVE_CIFRADO;
-    expect(() => firmarCodigo(nuevoCodigo())).toThrow(/CLAVE_CIFRADO/);
-    expect(() => leerCodigo(firmado)).toThrow(/CLAVE_CIFRADO/);
+    for (const mala of [undefined, "", "corta", "x".repeat(31), "cambiame-cambiame-cambiame-cambiame"]) {
+      if (mala === undefined) delete process.env.CLAVE_CODIGOS;
+      else process.env.CLAVE_CODIGOS = mala;
+      expect(() => firmarCodigo(nuevoCodigo()), String(mala)).toThrow(/CLAVE_CODIGOS/);
+      expect(() => leerCodigo(firmado), String(mala)).toThrow(/CLAVE_CODIGOS/);
+    }
   });
 });

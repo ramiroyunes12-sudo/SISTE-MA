@@ -10,4 +10,4 @@ paths:
 - El QR lleva solo el código aleatorio firmado, nunca DNI ni nombre.
 - Fuera de React (HTML del mail, PDF) escapar nombre y DNI; nunca `dangerouslySetInnerHTML` con datos de la gente.
 - Cada acción y ruta nueva: `requerirUsuario()` y el filtro de `src/lib/auth/alcance.ts` sobre el registro que toca (la puerta y la exportación solo ven su productora).
-- Las claves (HMAC, SMTP, Mercado Pago, cifrado) nunca con `NEXT_PUBLIC_`, nunca en el repo ni en el chat: solo en Vercel o en el `.env`.
+- Las claves (HMAC, SMTP, Mercado Pago, cifrado) nunca con `NEXT_PUBLIC_`, nunca en el repo ni en el chat (tampoco las que genera Claude): solo en Vercel o en el `.env`. Se generan en el panel, en Claves (`/admin/claves`).

@@ -66,7 +66,7 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
                 <span>
                   Entrada {i + 1} · {entrada.tipo}: {entrada.titular} · DNI {formatearDni(entrada.dni ?? "")}
                 </span>
-                <CodigoEntrada codigo={entrada.codigo} estado={entrada.estado} />
+                <CodigoEntrada id={entrada.id} codigo={entrada.codigo} estado={entrada.estado} />
               </li>
             ))}
           </ul>
@@ -196,16 +196,20 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
   );
 }
 
-// El código de la entrada (lo que va en el QR, paso 14). Solo de las válidas.
-function CodigoEntrada({ codigo, estado }: { codigo: string; estado: string }) {
+// El código de la entrada (lo que va en el QR, paso 14). Solo de las válidas o usadas.
+function CodigoEntrada({ id, codigo, estado }: { id: string; codigo: string; estado: string }) {
   if (estado === "ANULADA") return <span className="text-[13px] font-semibold text-error">Anulada</span>;
   if (estado !== "VALIDA" && estado !== "USADA") return null;
   let firmado: string;
   try {
     firmado = firmarCodigo(codigo);
   } catch (error) {
-    console.error("[firmarCodigo] No se pudo:", error instanceof Error ? error.message : "error desconocido");
-    return null;
+    console.error(`[firmarCodigo] Entrada ${id}:`, error instanceof Error ? error.message : "error desconocido");
+    return (
+      <span className="text-[13px] font-semibold text-alerta">
+        El código de esta entrada no está disponible ahora. Recargá en un rato.
+      </span>
+    );
   }
   return (
     <span className="text-[13px] text-tenue">

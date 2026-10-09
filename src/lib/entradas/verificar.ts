@@ -2,9 +2,11 @@
 // el escáner de la puerta, paso 17, con un UPDATE condicionado).
 //
 // Primero se revisa la firma (sin tocar la base); después se busca el código
-// y se mira que sea de este evento. De una entrada de otro evento no se dice
-// nada más.
+// entre las entradas que el usuario puede ver (las de su productora; el ADMIN,
+// todas) y se mira que sea de este evento. De una entrada de otro evento no se
+// dice nada más, y una de otra productora es como si no existiera.
 import type { PrismaClient } from "@/generated/prisma/client";
+import { type Alcance, filtroDeEventos } from "@/lib/auth/alcance";
 
 import { leerCodigo } from "./codigo";
 
@@ -14,12 +16,17 @@ export type Verificacion =
   | { resultado: "no_valida"; motivo: "formato" | "firma" | "no_existe" | "otro_evento" }
   | { resultado: "valida" | "usada" | "sin_pagar" | "anulada"; entrada: DatosEntrada };
 
-export async function verificarCodigo(db: PrismaClient, eventoId: string, texto: unknown): Promise<Verificacion> {
+export async function verificarCodigo(
+  db: PrismaClient,
+  eventoId: string,
+  alcance: Alcance,
+  texto: unknown,
+): Promise<Verificacion> {
   const leido = leerCodigo(texto);
   if (!leido.ok) return { resultado: "no_valida", motivo: leido.motivo };
 
-  const entrada = await db.entrada.findUnique({
-    where: { codigo: leido.codigo },
+  const entrada = await db.entrada.findFirst({
+    where: { codigo: leido.codigo, evento: filtroDeEventos(alcance) },
     select: {
       eventoId: true,
       estado: true,

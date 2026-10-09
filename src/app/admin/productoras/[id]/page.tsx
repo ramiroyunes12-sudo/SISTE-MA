@@ -5,6 +5,7 @@ import { requerirUsuario } from "@/lib/auth/actual";
 import { obtenerDb } from "@/lib/db";
 import { formatearFecha } from "@/lib/fechas";
 
+import { cuentaMpDe } from "@/lib/pagos/cuenta";
 import { bpsAPorcentaje } from "@/lib/pagos/montos";
 
 import {
@@ -74,6 +75,7 @@ export default async function PaginaProductora({ params }: PageProps<"/admin/pro
         recargo={bpsAPorcentaje(productora.recargoMpBps)}
         cuentaMp={productora.mpUsuarioId ? (productora.mpCuenta ?? productora.mpUsuarioId) : null}
         conectadaEl={productora.mpConectadaEn ? formatearFecha(productora.mpConectadaEn) : null}
+        cuentaIlegible={Boolean(productora.mpUsuarioId) && cuentaMpDe(productora) === null}
       />
 
       <section className="overflow-hidden rounded-2xl border border-borde bg-superficie">

@@ -96,8 +96,10 @@ function vigente(orden: OrdenParaCobrar, ahora: Date) {
   return orden.estado === "PENDIENTE" && orden.venceEn !== null && orden.venceEn > ahora;
 }
 
+// Con cuenta conectada y token legible (si cambió CLAVE_CIFRADO, no se ofrece
+// pagar hasta volver a conectarla: no se podría confirmar nada).
 function conectada(productora: OrdenParaCobrar["evento"]["productora"]) {
-  return Boolean(productora.mpUsuarioId && productora.mpTokenCifrado);
+  return cuentaMpDe(productora) !== null;
 }
 
 // El cargo por servicio de la orden: el que quedó fijo al crear el primer

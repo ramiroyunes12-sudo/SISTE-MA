@@ -2,7 +2,7 @@
 
 // "Verificar una entrada": se pega el código (el del QR) y dice si es válida y
 // de quién es. Solo mira: no la marca usada (eso lo hace el escáner, paso 17).
-import { type FormEvent, startTransition, useActionState } from "react";
+import { type FormEvent, startTransition, useActionState, useState } from "react";
 
 import { BotonPrincipal, ESTILO_CAMPO, MensajeError } from "@/components/formulario";
 
@@ -21,11 +21,17 @@ export function VerificarEntrada({
   accion: (anterior: EstadoVerificacion, datos: FormData) => Promise<EstadoVerificacion>;
 }) {
   const [estado, accion, verificando] = useActionState(verificar, {});
+  // El código que se mandó: si después se cambia el del campo, el resultado
+  // (que es del anterior) se esconde, para no confundir uno con otro.
+  const [enviado, setEnviado] = useState<string | null>(null);
+  const [cambiado, setCambiado] = useState(false);
 
   // Se manda "a mano" para que el código quede escrito después de verificar.
   function alEnviar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     const datos = new FormData(evento.currentTarget);
+    setEnviado(String(datos.get("codigo") ?? "").trim());
+    setCambiado(false);
     startTransition(() => accion(datos));
   }
 
@@ -52,6 +58,7 @@ export function VerificarEntrada({
           autoCapitalize="characters"
           spellCheck={false}
           placeholder="E1-…"
+          onChange={() => setCambiado(true)}
           className={`h-12 font-mono text-sm ${ESTILO_CAMPO}`}
         />
       </div>
@@ -59,13 +66,13 @@ export function VerificarEntrada({
         {verificando ? "Verificando…" : "Verificar"}
       </BotonPrincipal>
 
-      {!verificando && <MensajeError>{estado.error}</MensajeError>}
-      {!verificando && estado.verificada && <Resultado verificada={estado.verificada} />}
+      {!verificando && !cambiado && <MensajeError>{estado.error}</MensajeError>}
+      {!verificando && !cambiado && estado.verificada && <Resultado verificada={estado.verificada} codigo={enviado} />}
     </form>
   );
 }
 
-function Resultado({ verificada: v }: { verificada: EntradaVerificada }) {
+function Resultado({ verificada: v, codigo }: { verificada: EntradaVerificada; codigo: string | null }) {
   const titulo = { valida: "VÁLIDA", usada: "YA USADA", sin_pagar: "SIN PAGAR", anulada: "ANULADA", no_valida: "NO VÁLIDA" }[
     v.resultado
   ];
@@ -78,6 +85,11 @@ function Resultado({ verificada: v }: { verificada: EntradaVerificada }) {
   return (
     <div role="status" className={`flex flex-col gap-1.5 rounded-xl border-2 p-4 ${color}`}>
       <p className="font-display text-2xl font-bold">{titulo}</p>
+      {codigo && (
+        <p className="text-[13px] text-tenue">
+          Código que termina en <span className="font-mono">…{codigo.slice(-8).toUpperCase()}</span>
+        </p>
+      )}
       {v.resultado === "no_valida" ? (
         <p className="text-tinta">{v.motivo ? MOTIVOS[v.motivo] : ""}</p>
       ) : (

@@ -19,6 +19,7 @@ export function FormularioCobros({
   recargo,
   cuentaMp,
   conectadaEl,
+  cuentaIlegible,
 }: {
   guardar: Accion;
   conectar: Accion;
@@ -28,6 +29,7 @@ export function FormularioCobros({
   recargo: string;
   cuentaMp: string | null;
   conectadaEl: string | null;
+  cuentaIlegible: boolean; // conectada, pero el token no se puede descifrar (cambió CLAVE_CIFRADO)
 }) {
   const [estado, accion, guardando] = useActionState(guardar, {});
   const [estadoMp, accionMp, conectando] = useActionState(conectar, {});
@@ -117,6 +119,12 @@ export function FormularioCobros({
           </div>
         ) : (
           <p className="text-sm font-semibold text-error">Sin cuenta conectada: todavía no se puede cobrar.</p>
+        )}
+        {cuentaIlegible && (
+          <p role="alert" className="rounded-xl bg-error/10 px-4 py-3 text-sm font-semibold text-error">
+            Hay que volver a conectarla: cambió la clave del sistema (CLAVE_CIFRADO) y el Access Token guardado ya no se
+            puede leer. Hasta reconectarla no se ofrece ningún pago. Pegá el Access Token abajo y tocá Conectar.
+          </p>
         )}
         {!desconectando && <MensajeError>{estadoDesconectar.errores?.general}</MensajeError>}
         <form action={accionMp} className="flex flex-col gap-3">

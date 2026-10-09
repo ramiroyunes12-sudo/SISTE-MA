@@ -108,16 +108,22 @@ export async function desconectarMercadoPago(db: PrismaClient, productoraId: str
 
 export type CuentaMp = { productoraId: string; mpUsuarioId: string; token: string };
 
-// La cuenta conectada de una productora, con el token ya descifrado (null si no tiene).
+// La cuenta conectada de una productora, con el token ya descifrado (null si
+// no tiene). Si no se puede descifrar (cambió CLAVE_CIFRADO), también null: la
+// cuenta queda como no conectada hasta volver a pegar el token, y se anota
+// (sin el token) en vez de romper la página de la compra.
 export function cuentaMpDe(productora: {
   id: string;
   mpUsuarioId: string | null;
   mpTokenCifrado: string | null;
 }): CuentaMp | null {
   if (!productora.mpUsuarioId || !productora.mpTokenCifrado) return null;
-  return {
-    productoraId: productora.id,
-    mpUsuarioId: productora.mpUsuarioId,
-    token: descifrar(productora.mpTokenCifrado, `mp-token:${productora.id}`),
-  };
+  let token: string;
+  try {
+    token = descifrar(productora.mpTokenCifrado, `mp-token:${productora.id}`);
+  } catch {
+    console.error(`[cuentaMp] No se pudo descifrar el token de la productora ${productora.id}: hay que volver a conectar la cuenta.`);
+    return null;
+  }
+  return { productoraId: productora.id, mpUsuarioId: productora.mpUsuarioId, token };
 }

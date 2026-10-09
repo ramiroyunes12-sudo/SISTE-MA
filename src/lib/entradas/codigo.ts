@@ -14,21 +14,27 @@
 // número al azar de una entrada real. La puerta revisa la firma ANTES de ir a
 // la base, así un QR trucho ni siquiera llega a consultarla.
 //
-// La clave sale de CLAVE_CIFRADO con HKDF y su propia etiqueta (ver
-// claveDerivada): es distinta de la que cifra los tokens de Mercado Pago. Si
-// se cambia CLAVE_CIFRADO, todos los QR dejan de servir.
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-
-import { claveDerivada } from "@/lib/cifrado";
+// La clave es propia: CLAVE_CODIGOS (solo en Vercel o en el .env; no es la que
+// cifra los tokens de Mercado Pago, así cada una se puede cambiar sin tocar la
+// otra). Si se cambia CLAVE_CODIGOS, ningún QR ya emitido sirve más: para
+// cambiarla sin eso, la versión 2 leería CLAVE_CODIGOS_V2 y las E1 seguirían
+// valiendo mientras tanto.
+import { createHmac, hkdfSync, randomBytes, timingSafeEqual } from "node:crypto";
 
 const VERSION_ACTUAL = "1";
 const AL_AZAR = /^[0-9A-F]{32}$/;
 const FIRMADO = /^E(\d{1,3})-([0-9A-F]{32})-([0-9A-F]{32})$/;
 const LARGO_MAXIMO = 120; // lo que se acepta leer (el código firmado tiene 68)
 
-// La clave de cada versión (null si la versión no existe).
+// La clave de cada versión (null si la versión no existe). Sin la variable, o
+// si es corta o la de ejemplo, falla: nunca firma ni acepta con una clave floja.
 function claveDe(version: string) {
-  return version === "1" ? claveDerivada("entradas/codigo/v1") : null;
+  if (version !== "1") return null;
+  const raiz = process.env.CLAVE_CODIGOS;
+  if (!raiz || raiz.length < 32 || raiz.includes("cambiame")) {
+    throw new Error("Falta CLAVE_CODIGOS (al menos 32 caracteres al azar)");
+  }
+  return Buffer.from(hkdfSync("sha256", raiz, "siste-ma", "entradas/codigo/v1", 32));
 }
 
 function firma(codigo: string, clave: Buffer) {
@@ -51,7 +57,7 @@ export function firmarCodigo(codigo: string) {
 export type CodigoLeido = { ok: true; codigo: string } | { ok: false; motivo: "formato" | "firma" };
 
 // Lo que leyó la cámara (o se pegó a mano) → el código para buscar en la base,
-// solo si la firma es correcta. Sin CLAVE_CIFRADO, falla (nunca deja pasar).
+// solo si la firma es correcta. Sin CLAVE_CODIGOS, falla (nunca deja pasar).
 export function leerCodigo(texto: unknown): CodigoLeido {
   if (typeof texto !== "string" || texto.length > LARGO_MAXIMO) return { ok: false, motivo: "formato" };
   const partes = FIRMADO.exec(texto.trim().toUpperCase());
