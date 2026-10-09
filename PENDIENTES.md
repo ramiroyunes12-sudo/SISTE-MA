@@ -6,10 +6,8 @@ Lo que **no** está atado a un paso de `PASOS.md`: acciones manuales del dueño 
 
 | Qué | Por qué | Desde |
 |---|---|---|
-| Cargar `CLAVE_CODIGOS` en Vercel (panel → Claves → Vercel → Settings → Environment Variables, Production) y redeployar | Sin ella no se firman ni leen los códigos de las entradas. Guardarla también aparte: si se pierde, ningún QR emitido sirve | Paso 13 |
-| Cambiar `CLAVE_CIFRADO` por una nueva del panel → Claves, redeployar y reconectar la cuenta de Mercado Pago | La actual quedó escrita en un chat | Paso 13 |
+| Reconectar la cuenta de Mercado Pago (panel → Productoras → Cobros) | Se cambió `CLAVE_CIFRADO` (9/10): sin reconectar no se ofrece ningún pago | Paso 13 |
 | Probar el paso 13 en producción y avisar | Para marcarlo `[x]` | Paso 13 |
-| Borrar `MERCADOPAGO_ACCESS_TOKEN` de Vercel (opcional) | Ya no se usa: el token va cifrado en la base | Paso 11 |
 
 ## Temas sin paso asignado
 

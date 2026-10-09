@@ -26,12 +26,10 @@ Sistema de venta de entradas por lotes para varias **productoras** (se alquila p
 
 Cosas que hace Ramiro a mano (no se pueden hacer desde el chat). Lista completa en `PENDIENTES.md`.
 
-Revisado en Vercel el 9/10/2026 (solo nombres, nunca valores):
+Revisado en Vercel el 9/10/2026 (solo nombres, nunca valores): `CLAVE_CODIGOS` cargada, `CLAVE_CIFRADO` cambiada, `MERCADOPAGO_ACCESS_TOKEN` borrada y producción vuelta a publicar con las claves nuevas.
 
-1. **Falta `CLAVE_CODIGOS` en Vercel.** Generarla en el panel → Claves, cargarla (Production) y redeployar. Sin ella las entradas no muestran código.
-2. **`CLAVE_CIFRADO` sigue siendo la vieja** (quedó escrita en un chat). Cambiarla por una nueva del panel → Claves, redeployar y reconectar la cuenta de Mercado Pago de la productora.
-3. Probar el paso 13: en una compra paga se ve el código de cada entrada; panel → evento → "Verificar una entrada".
-4. Opcional: borrar `MERCADOPAGO_ACCESS_TOKEN` de Vercel (ya no se usa).
+1. **Reconectar la cuenta de Mercado Pago** de la productora (panel → Productoras → la productora → Cobros, pegar el Access Token de nuevo): con la `CLAVE_CIFRADO` nueva, la conexión anterior ya no sirve y no se ofrece ningún pago hasta reconectarla.
+2. **Probar el paso 13:** en una compra paga se ve el código de cada entrada; panel → evento → "Verificar una entrada".
 
 ## Cómo trabajamos
 
