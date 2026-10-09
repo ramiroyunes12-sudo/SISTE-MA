@@ -69,24 +69,27 @@ export function hayEnvioConfigurado() {
 }
 
 // El mail de una compra paga, armado desde la base (sin la llave del link).
-// null si no tiene a quién o qué mandar.
+// null si no tiene a quién o qué mandar. Si ya la pidieron de nuevo
+// ("Reenviar mis entradas", reenviar.ts), va como reenvío: todo mail
+// después del primer reenvío es un reenvío.
 export async function mailDeOrden(db: PrismaClient, ordenId: string, ahora = new Date()): Promise<Mensaje | null> {
   const compra = await buscarCompraPorId(db, ordenId, ahora);
   if (!compra || compra.estado !== "PAGADA" || !compra.email) return null;
   const entradas = entradasConQr(compra);
   if (entradas.length === 0) return null;
-  const { productora } = await db.evento.findUniqueOrThrow({
-    where: { id: compra.evento.id },
-    select: { productora: { select: { nombre: true } } },
+  const { reenviosCount, evento } = await db.orden.findUniqueOrThrow({
+    where: { id: compra.id },
+    select: { reenviosCount: true, evento: { select: { productora: { select: { nombre: true } } } } },
   });
   return armarMailEntradas({
     para: compra.email,
-    productora,
+    productora: evento.productora,
     ayuda: whatsappDeAyuda(),
     compra: compra.numero,
     totalEntradas: compra.entradas.length,
     evento: compra.evento,
     entradas,
+    reenvio: reenviosCount > 0,
   });
 }
 

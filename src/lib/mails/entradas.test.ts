@@ -90,6 +90,20 @@ describe("Mail con las entradas", () => {
     expect(mail.html).toContain("Acá están tus 2 entradas");
   });
 
+  it("un reenvío tiene otro asunto (si no, Gmail lo esconde en la conversación del primero) y lo dice arriba", async () => {
+    const mail = await armarMailEntradas(datos({ reenvio: true }));
+    expect(mail.asunto).toBe("Te reenviamos tus entradas para Fiesta (compra N° 12)");
+    for (const contenido of [mail.html, mail.texto]) {
+      expect(contenido).toContain("Te reenviamos tus 2 entradas (compra N° 12), como se pidió. Son las mismas de antes: los QR no cambian.");
+    }
+    const una = await armarMailEntradas(datos({ reenvio: true, totalEntradas: 1, entradas: [entrada(1)] }));
+    expect(una.texto).toContain("Te reenviamos tu entrada (compra N° 12), como se pidió. Es la misma de antes: el QR no cambia.");
+    // El primero, como siempre.
+    const primero = await armarMailEntradas(datos());
+    expect(primero.asunto).toBe("Tus entradas para Fiesta (compra N° 12)");
+    expect(primero.html).not.toContain("reenviamos");
+  });
+
   it("con una sola entrada: un solo PDF y sin 'Entrada 1 de 1'", async () => {
     const mail = await armarMailEntradas(datos({ totalEntradas: 1, entradas: [entrada(1)] }));
     expect(mail.adjuntos.map((a) => a.archivo)).toEqual(["qr-entrada-1.png", "entradas-compra-12.pdf"]);

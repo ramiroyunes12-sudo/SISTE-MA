@@ -122,22 +122,27 @@ describe.skipIf(!url)("Reenviar mis entradas", () => {
 
   // Manda el primer mail de la compra (como al pagarla).
   async function mandarElPrimero(ev: Ev, ahora = new Date()) {
-    const { cartero } = carteroDePrueba();
+    const { cartero, enviados } = carteroDePrueba();
     expect(await enviarMailsPendientes(db, cartero, { eventoId: ev.eventoId, ahora })).toEqual({ enviados: 1, fallidos: 0 });
+    return enviados[0];
   }
 
   // ─── Desde el link de la compra ───────────────────────────────────────────
 
-  it("reenvía una compra cuyo mail ya salió: sale una vez más, al email de la compra", async () => {
+  it("reenvía una compra cuyo mail ya salió: sale una vez más, al email de la compra y con otro asunto", async () => {
     const ev = await evento();
     const { id, llave } = await compra(ev);
-    await mandarElPrimero(ev);
+    const primero = await mandarElPrimero(ev);
+    expect(primero.asunto).toMatch(/^Tus entradas para Fiesta del reenvío \(compra N° \d+\)$/);
 
     expect(await reenviarDeCompra(db, llave)).toEqual({ ok: true, ordenId: id, email: "comprador@ejemplo.com" });
     const { cartero, enviados } = carteroDePrueba();
     expect(await enviarMailsPendientes(db, cartero, { eventoId: ev.eventoId })).toEqual({ enviados: 1, fallidos: 0 });
     expect(await enviarMailsPendientes(db, cartero, { eventoId: ev.eventoId })).toEqual({ enviados: 0, fallidos: 0 });
     expect(enviados.map((mensaje) => mensaje.para)).toEqual(["comprador@ejemplo.com"]);
+    // Otro asunto: si fuera el mismo, Gmail lo mete en la conversación del
+    // primero y parece que no llegó nada nuevo.
+    expect(enviados[0].asunto).toMatch(/^Te reenviamos tus entradas para Fiesta del reenvío \(compra N° \d+\)$/);
 
     const orden = await ordenDe(id);
     expect(orden.mailEnviadoEn).not.toBeNull();

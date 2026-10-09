@@ -75,8 +75,9 @@ export function FormularioMisEntradas({
             <path d="M5 12.5l4.5 4.5L19 7.5" />
           </svg>
           <span>
-            <strong>Listo.</strong> Si hay una compra paga para este evento con ese email y ese DNI, te mandamos las entradas a
-            ese email. Puede tardar unos minutos: si no lo ves, revisá en spam o promociones.
+            <strong>Listo.</strong> Si hay compras pagas para este evento con ese email y ese DNI, te las volvemos a mandar a ese
+            email: un mail por compra, que dice &quot;Te reenviamos tus entradas&quot;. Puede tardar unos minutos: si no lo ves,
+            revisá en spam o promociones.
           </span>
         </div>
       )}

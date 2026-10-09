@@ -7,6 +7,10 @@
 // Los QR van como imágenes adjuntas que el mail nombra por su cid: Gmail no
 // muestra SVG ni imágenes "data:". Todo se arma en el momento desde la base;
 // no se guarda nada.
+//
+// Un reenvío ("Reenviar mis entradas") lleva otro asunto: con el mismo, Gmail
+// lo mete en la conversación del primer mail de esa compra y parece que no
+// llegó nada nuevo.
 import type { WhatsappDeAyuda } from "@/lib/ayuda";
 import type { EntradaConQr } from "@/lib/entradas/imprimir";
 import { tipoYLote } from "@/lib/entradas/imprimir";
@@ -25,6 +29,7 @@ export type DatosMailEntradas = {
   totalEntradas: number; // todas las de la compra (también las anuladas): "Entrada 2 de 3"
   evento: { nombre: string; fecha: Date; lugar: string; direccion: string | null };
   entradas: EntradaConQr[]; // las que tienen QR
+  reenvio?: boolean; // lo pidieron de nuevo ("Reenviar mis entradas")
 };
 
 const TINTA = "#15171C";
@@ -51,7 +56,11 @@ export async function armarMailEntradas(datos: DatosMailEntradas): Promise<Mensa
   const fecha = formatearFechaLarga(evento.fecha);
   const una = datos.entradas.length === 1;
   const cantidad = una ? "tu entrada" : `tus ${datos.entradas.length} entradas`;
-  const aca = una ? "Acá está" : "Acá están";
+  // El primer renglón: "Acá están tus 2 entradas (compra N° 12)." o, en un
+  // reenvío, que son las mismas de antes.
+  const saludo = datos.reenvio
+    ? `Te reenviamos ${cantidad} (compra N° ${datos.compra}), como se pidió. ${una ? "Es la misma de antes: el QR no cambia." : "Son las mismas de antes: los QR no cambian."}`
+    : `${una ? "Acá está" : "Acá están"} ${cantidad} (compra N° ${datos.compra}).`;
   const variasEnLaCompra = datos.totalEntradas > 1;
   // Para terminar una oración con un nombre sin que quede ".." ("S.R.L.").
   const alFinal = (texto: string) => texto.replace(/[.\s]+$/, "");
@@ -119,7 +128,7 @@ export async function armarMailEntradas(datos: DatosMailEntradas): Promise<Mensa
 <title>${e(`Tus entradas para ${evento.nombre}`)}</title>
 </head>
 <body style="margin:0;padding:0;background:${FONDO};">
-<div style="display:none;mso-hide:all;max-height:0;overflow:hidden;">Compra N° ${datos.compra}: ${cantidad} con QR para ${e(alFinal(evento.nombre))}.</div>
+<div style="display:none;mso-hide:all;max-height:0;overflow:hidden;">Compra N° ${datos.compra}: ${datos.reenvio ? "te reenviamos " : ""}${cantidad} con QR para ${e(alFinal(evento.nombre))}.</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${FONDO};">
 <tr><td align="center" style="padding:16px 12px;">
 <!--[if mso]><table role="presentation" width="480" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
@@ -130,7 +139,7 @@ export async function armarMailEntradas(datos: DatosMailEntradas): Promise<Mensa
   <div style="font-size:15px;margin-top:2px;">${e(lugar)}</div>
 </td></tr>
 <tr><td style="padding:16px 4px;font-size:15px;line-height:1.5;">
-  ¡Hola! ${aca} ${cantidad} (compra N° ${datos.compra}). En la puerta mostrá el QR desde el celular o impreso, junto con el DNI.
+  ¡Hola! ${saludo} En la puerta mostrá el QR desde el celular o impreso, junto con el DNI.
 </td></tr>
 ${tarjetas}
 <tr><td style="background:#FFFFFF;border-radius:14px;padding:16px 20px;font-size:14px;line-height:1.6;">
@@ -162,7 +171,7 @@ ${tarjetas}
     fecha,
     lugar,
     "",
-    `¡Hola! ${aca} ${cantidad} (compra N° ${datos.compra}). ${una ? "El QR está en el PDF adjunto" : "El QR de cada una está en los PDF adjuntos"}: en la puerta mostralo desde el celular o impreso, junto con el DNI.`,
+    `¡Hola! ${saludo} ${una ? "El QR está en el PDF adjunto" : "El QR de cada una está en los PDF adjuntos"}: en la puerta mostralo desde el celular o impreso, junto con el DNI.`,
     "",
     ...lineas,
     "Importante: cada persona entra con su QR y su DNI. Cada QR sirve para entrar una sola vez (el primero que lo usa, entra). No lo publiques ni lo compartas con quien no va.",
@@ -175,8 +184,9 @@ ${tarjetas}
   return {
     para: datos.para,
     nombreRemitente: enUnRenglon(datos.productora.nombre, 80),
-    // Con el N° de compra: si no, Gmail junta en una conversación las de un mismo evento.
-    asunto: `Tus entradas para ${enUnRenglon(evento.nombre, 100)} (compra N° ${datos.compra})`,
+    // Con el N° de compra: si no, Gmail junta en una conversación las de un
+    // mismo evento. Y el reenvío, con otro asunto (ver arriba).
+    asunto: `${datos.reenvio ? "Te reenviamos tus entradas" : "Tus entradas"} para ${enUnRenglon(evento.nombre, 100)} (compra N° ${datos.compra})`,
     html,
     texto,
     adjuntos,
