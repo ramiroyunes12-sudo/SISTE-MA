@@ -2,6 +2,12 @@
 
 Una entrada por chat, la más nueva arriba. Corta: qué se hizo, qué quedó y cómo se probó. El detalle está en los commits y en `PASOS.md`.
 
+## 9/10/2026 — Paso 15: el mail con las entradas
+- Paso 14 marcado `[x]` (Ramiro probó los arreglos).
+- Decidido con Ramiro: Gmail (contraseña de aplicación), remitente la productora con respuestas a su mail de contacto, PDF con todas + uno por persona, tipo y lote en la entrada.
+- Borrador: `src/lib/mails/` (SMTP con `nodemailer`, contenido como el diseño, envío una sola vez con `UPDATE` condicionado y reintentos), `after()` donde se confirma un pago, panel "Mails con las entradas", mail de contacto en Productoras. Migración `20261009120000_mails`.
+- Quedó: revisión con agentes, cargar Gmail en Vercel y la prueba de Ramiro.
+
 ## 9/10/2026 — Paso 14: QR y PDF
 - QR por entrada en el link de la compra y PDF A6 (todas o una), armados en nuestro servidor con `qrcode` y `pdf-lib`, sin guardar nada.
 - Ramiro probó el borrador en producción: QR en la compra N° 2, VÁLIDA, PDF descargado y escaneado.

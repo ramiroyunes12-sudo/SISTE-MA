@@ -56,6 +56,7 @@ export async function editarProductoraAccion(
     const resultado = await editarProductora(obtenerDb(), productoraId, {
       nombre: datos.get("nombre"),
       activa: datos.get("activa") === "si",
+      emailContacto: datos.get("emailContacto") ?? undefined,
     });
     if (!resultado.ok) return { errores: resultado.errores };
     refresh();

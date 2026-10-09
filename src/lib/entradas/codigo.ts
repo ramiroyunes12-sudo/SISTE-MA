@@ -30,11 +30,14 @@ const LARGO_MAXIMO = 120; // lo que se acepta leer (el código firmado tiene 68)
 // si es corta o la de ejemplo, falla: nunca firma ni acepta con una clave floja.
 function claveDe(version: string) {
   if (version !== "1") return null;
+  if (!hayClaveDeCodigos()) throw new Error("Falta CLAVE_CODIGOS (al menos 32 caracteres al azar)");
+  return Buffer.from(hkdfSync("sha256", process.env.CLAVE_CODIGOS!, "siste-ma", "entradas/codigo/v1", 32));
+}
+
+// ¿Está CLAVE_CODIGOS? (Sin ella no se arma ningún QR: el mail espera.)
+export function hayClaveDeCodigos() {
   const raiz = process.env.CLAVE_CODIGOS;
-  if (!raiz || raiz.length < 32 || raiz.includes("cambiame")) {
-    throw new Error("Falta CLAVE_CODIGOS (al menos 32 caracteres al azar)");
-  }
-  return Buffer.from(hkdfSync("sha256", raiz, "siste-ma", "entradas/codigo/v1", 32));
+  return Boolean(raiz && raiz.length >= 32 && !raiz.includes("cambiame"));
 }
 
 function firma(codigo: string, clave: Buffer) {

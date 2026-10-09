@@ -66,18 +66,32 @@ export async function crearProductora(
   }
 }
 
+// El mail de contacto (a dónde llegan las respuestas al mail con las
+// entradas): vacío = ninguno (null); undefined si no vino.
+function validarEmailContacto(valor: unknown, errores: Errores) {
+  if (valor === undefined) return undefined;
+  const email = normalizarEmail(valor);
+  if (!email) return null;
+  if (!EMAIL.test(email) || email.length > 200) errores.emailContacto = "Poné un email válido (o dejalo vacío).";
+  return email;
+}
+
 export async function editarProductora(
   db: PrismaClient,
   productoraId: string,
-  entrada: { nombre?: unknown; activa?: unknown },
+  entrada: { nombre?: unknown; activa?: unknown; emailContacto?: unknown },
 ): Promise<{ ok: true } | { ok: false; errores: Errores }> {
   const errores: Errores = {};
   const nombre = validarNombreProductora(entrada.nombre, errores);
+  const emailContacto = validarEmailContacto(entrada.emailContacto, errores);
   if (Object.keys(errores).length) return { ok: false, errores };
   try {
     const activa = entrada.activa === true;
     const existe = await db.$transaction(async (tx) => {
-      const { count } = await tx.productora.updateMany({ where: { id: productoraId }, data: { nombre, activa } });
+      const { count } = await tx.productora.updateMany({
+        where: { id: productoraId },
+        data: { nombre, activa, ...(emailContacto !== undefined ? { emailContacto } : {}) },
+      });
       // Al desactivarla, se cierran las sesiones de toda su gente: quedan afuera
       // enseguida, y si después se reactiva, tienen que volver a ingresar.
       if (count === 1 && !activa) await tx.sesion.deleteMany({ where: { usuario: { productoraId } } });

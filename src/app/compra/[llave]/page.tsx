@@ -11,8 +11,10 @@ import type { ReactNode } from "react";
 
 import { obtenerDb } from "@/lib/db";
 import { formatearPesos } from "@/lib/dinero";
-import { type EntradaConQr, entradasConQr } from "@/lib/entradas/imprimir";
+import { type EntradaConQr, entradasConQr, tipoYLote } from "@/lib/entradas/imprimir";
 import { qrParaSvg } from "@/lib/entradas/qr";
+import { mandarMailsDespues } from "@/lib/mails/despues";
+import { estadoDelMail } from "@/lib/mails/pendientes";
 import { opcionesDePago, revisarPagoDeCompra } from "@/lib/pagos/cobros";
 import { apiMercadoPago } from "@/lib/pagos/mercadopago";
 import { formatearDni } from "@/lib/ventas/datos";
@@ -54,6 +56,9 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
   const mpNoSeCompleto = vueltaMp !== null && !["approved", "pending", "in_process"].includes(vueltaMp);
 
   if (compra.estado === "PAGADA") {
+    // Si el mail todavía no salió (o falló), se intenta después de responder.
+    const mail = await estadoDelMail(db, compra.id);
+    if (mail === "enviando") mandarMailsDespues({ ordenId: compra.id });
     return (
       <Marco titulo="Tu compra" evento={compra.evento.nombre} volver={volver}>
         <section role="status" className="flex flex-col gap-2 rounded-2xl border-2 border-ok bg-superficie p-5">
@@ -61,6 +66,25 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
           <p>
             Compra N° <strong>{compra.numero}</strong> · {compra.evento.nombre}
           </p>
+          {compra.email && (
+            <p className="[overflow-wrap:anywhere]">
+              {mail === "enviado" && (
+                <>
+                  Te mandamos las entradas a <strong>{compra.email}</strong>. Si no lo ves, revisá en spam o promociones.
+                </>
+              )}
+              {mail === "enviando" && (
+                <>
+                  Te estamos mandando las entradas a <strong>{compra.email}</strong> (puede tardar unos minutos).
+                </>
+              )}
+              {mail === "no_salio" && (
+                <>
+                  No pudimos mandarte el mail a <strong>{compra.email}</strong>. Tus entradas están igual acá abajo.
+                </>
+              )}
+            </p>
+          )}
           <p className="text-tenue [overflow-wrap:anywhere]">
             Guardá este link: es tu comprobante. Tus entradas están acá abajo, cada una con su QR: descargalas en PDF.
           </p>
@@ -150,7 +174,7 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
         <ul className="flex flex-col gap-0.5">
           {compra.entradas.map((entrada, i) => (
             <li key={entrada.id}>
-              Entrada {i + 1} · {entrada.tipo}: {entrada.titular} · DNI {formatearDni(entrada.dni ?? "")}
+              Entrada {i + 1} · {tipoYLote(entrada)}: {entrada.titular} · DNI {formatearDni(entrada.dni ?? "")}
             </li>
           ))}
         </ul>
@@ -228,7 +252,7 @@ function EntradasPagas({ llave, compra }: { llave: string; compra: Compra }) {
           return (
             <li key={entrada.id} className="flex flex-col gap-2 rounded-2xl border border-borde bg-superficie p-4">
               <h3 className="text-[15px] font-bold">
-                Entrada {i + 1} · {entrada.tipo}
+                Entrada {i + 1} · {tipoYLote(entrada)}
               </h3>
               <p className="text-[15px]">
                 {entrada.titular} · DNI {formatearDni(entrada.dni ?? "")}

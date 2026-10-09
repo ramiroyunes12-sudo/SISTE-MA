@@ -15,7 +15,7 @@ import { aTextoPdf, entraEnWinAnsi } from "./texto-pdf";
 
 export type EntradaParaPdf = {
   numero: number; // "Entrada 2 de 3"
-  tipo: string;
+  tipo: string; // con el lote: "General · Lote 2" (tipoYLote)
   titular: string;
   dni: string;
   codigoFirmado: string; // lo que va en el QR
@@ -118,7 +118,10 @@ function paginaDeEntrada(pdf: PDFDocument, fuentes: Fuentes, datos: DatosPdf, en
 
   pagina.drawLine({ start: { x: BORDE, y: y - 6 }, end: { x: ANCHO - BORDE, y: y - 6 }, thickness: 0.6, color: TENUE });
   y -= 8;
-  y = escribir(pagina, aMayusculas(entrada.tipo), y, { fuente: fuentes.negrita, tamano: 13, maximo: 1 });
+  // Tipo y lote en un renglón (si no entra, más chico; recién ahí se corta).
+  const tipo = aMayusculas(entrada.tipo);
+  const tamanoTipo = fuentes.negrita.widthOfTextAtSize(tipo, 13) <= ANCHO - 2 * BORDE ? 13 : 10;
+  y = escribir(pagina, tipo, y, { fuente: fuentes.negrita, tamano: tamanoTipo, maximo: 1 });
   y = escribir(pagina, `Entrada ${entrada.numero} de ${datos.totalEntradas} · Compra N° ${datos.compra}`, y, {
     fuente: fuentes.normal,
     tamano: 8.5,

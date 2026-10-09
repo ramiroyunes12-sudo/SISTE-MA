@@ -1,12 +1,14 @@
 // Sección "Pagos" del evento: lo cobrado, las compras esperando la plata (con
 // "Confirmar pago" para los casos raros), los pagos que hay que devolver y
-// los que Mercado Pago revirtió (devolución o contracargo).
+// los que Mercado Pago revirtió (devolución o contracargo). Abajo, los mails
+// con las entradas.
 import { obtenerDb } from "@/lib/db";
 import { formatearPesos } from "@/lib/dinero";
 import { formatearFecha } from "@/lib/fechas";
 
 import { buscarPagosAccion, confirmarPagoAccion } from "../acciones";
 import { BotonBuscarPagos, BotonConfirmarPago } from "../pagos";
+import { MailsDelEvento } from "./mails-del-evento";
 
 const ESTADO = { PENDIENTE: "Esperando el pago", VENCIDA: "Venció la reserva", CANCELADA: "La canceló" } as const;
 const METODO = { TRANSFERENCIA: "Transferencia", MERCADOPAGO: "Mercado Pago", MANUAL: "A mano" } as const;
@@ -187,6 +189,8 @@ export async function PagosDelEvento({ eventoId, pagada }: { eventoId: string; p
           </ul>
         </div>
       )}
+
+      <MailsDelEvento eventoId={eventoId} />
     </section>
   );
 }

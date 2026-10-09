@@ -2,7 +2,7 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import { buscarCompra } from "@/lib/ventas/ordenes";
 
-import { entradasConQr } from "./imprimir";
+import { entradasConQr, tipoYLote } from "./imprimir";
 import { armarPdfEntradas } from "./pdf";
 
 // El ?entrada=N del link: null si no vino (todas), el número (1 a 999) o
@@ -28,7 +28,7 @@ export async function pdfDeCompra(db: PrismaClient, llave: string, numero: numbe
     evento: compra.evento,
     compra: compra.numero,
     totalEntradas: compra.entradas.length,
-    entradas: entradas.map((entrada) => ({ ...entrada, usada: entrada.estado === "USADA" })),
+    entradas: entradas.map((entrada) => ({ ...entrada, tipo: tipoYLote(entrada), usada: entrada.estado === "USADA" })),
   });
   const archivo = numero === null ? `entradas-compra-${compra.numero}.pdf` : `entrada-${numero}-compra-${compra.numero}.pdf`;
   return { ok: true, pdf, archivo };

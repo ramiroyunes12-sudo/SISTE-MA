@@ -6,7 +6,9 @@ Lo que **no** está atado a un paso de `PASOS.md`: acciones manuales del dueño 
 
 | Qué | Por qué | Desde |
 |---|---|---|
-| Probar los arreglos del paso 14 en producción | Para marcar el paso 14 como hecho (qué probar: `PASOS.md`, paso 14) | 9/10/2026 |
+| Crear la cuenta de Gmail de la plataforma, activarle la verificación en 2 pasos y sacar una contraseña de aplicación (myaccount.google.com/apppasswords). En Vercel → siste-ma → Settings → Environment Variables (Production): `SMTP_HOST` = `smtp.gmail.com`, `SMTP_PUERTO` = `465`, `SMTP_USUARIO` = la cuenta, `SMTP_CLAVE` = la contraseña de aplicación. Mejor antes del merge del paso 15; si es después, Deployments → ⋯ → Redeploy | Sin eso no sale ningún mail (paso 15) | 9/10/2026 |
+| Cargar el "Mail de contacto" de cada productora (Productoras → la productora → Datos) | A dónde llegan las respuestas al mail con las entradas | 9/10/2026 |
+| Probar el paso 15 en producción | Qué probar: `PASOS.md`, paso 15 | 9/10/2026 |
 
 ## Temas sin paso asignado
 

@@ -8,6 +8,9 @@ import { alcanceDe, filtroDeEventos } from "@/lib/auth/alcance";
 import { obtenerDb } from "@/lib/db";
 import { verificarCodigo } from "@/lib/entradas/verificar";
 import { formatearFecha } from "@/lib/fechas";
+import { carteroSmtp } from "@/lib/mails/cartero";
+import { mandarMailsDespues } from "@/lib/mails/despues";
+import { reintentarMailsDelEvento } from "@/lib/mails/pendientes";
 import { confirmarPagoManual, revisarCobros } from "@/lib/pagos/cobros";
 import { apiMercadoPago } from "@/lib/pagos/mercadopago";
 import { type Errores, validarEvento } from "@/lib/eventos/editor";
@@ -95,6 +98,8 @@ export async function confirmarPagoAccion(eventoId: string, ordenId: string): Pr
       id === eventoId && Boolean(await obtenerDb().evento.findFirst({ where: { id, ...filtro }, select: { id: true } })),
     );
     if (!resultado.ok) return { error: resultado.error };
+    // El mail con las entradas sale después de responder.
+    mandarMailsDespues({ ordenId });
     numero = (await obtenerDb().orden.findUniqueOrThrow({ where: { id: ordenId }, select: { numero: true } })).numero;
   } catch (error) {
     unstable_rethrow(error);
@@ -115,6 +120,7 @@ export async function buscarPagosAccion(eventoId: string): Promise<EstadoPagoMan
   if (!evento) return { error: "Ese evento ya no existe." };
   try {
     const { revisado, confirmadas } = await revisarCobros(obtenerDb(), evento.productoraId, apiMercadoPago);
+    if (confirmadas > 0) mandarMailsDespues();
     refresh();
     if (!revisado) return { listo: "Recién se revisó (o no hay cuenta de Mercado Pago conectada). Probá en unos segundos." };
     return { listo: confirmadas ? `Se confirmaron ${confirmadas} compras.` : "No entró ningún pago nuevo." };
@@ -122,6 +128,33 @@ export async function buscarPagosAccion(eventoId: string): Promise<EstadoPagoMan
     unstable_rethrow(error);
     console.error("[buscarPagos] Falló:", error instanceof Error ? error.message : error);
     return { error: "No pudimos hablar con Mercado Pago. Probá de nuevo en un rato." };
+  }
+}
+
+// "Reintentar" los mails con las entradas que no salieron (ver
+// src/lib/mails/pendientes.ts). Los manda ahora, así se ve cómo fue.
+export async function reintentarMailsAccion(eventoId: string): Promise<EstadoPagoManual> {
+  const usuario = await requerirUsuario(["ADMIN", "ORGANIZADOR"]);
+  if (!UUID.test(String(eventoId))) return { error: "Datos no válidos. Recargá la página." };
+  const evento = await obtenerDb().evento.findFirst({
+    where: { id: eventoId, ...filtroDeEventos(alcanceDe(usuario)) },
+    select: { id: true },
+  });
+  if (!evento) return { error: "Ese evento ya no existe." };
+  try {
+    const { enviados, fallidos, sinConfigurar } = await reintentarMailsDelEvento(obtenerDb(), evento.id, carteroSmtp());
+    refresh();
+    if (sinConfigurar) return { error: "Los mails no salen: falta configurar el servidor de mail (ver abajo)." };
+    if (enviados === 0 && fallidos === 0) return { listo: "No había mails para mandar (o se están mandando ahora)." };
+    const partes = [
+      enviados && `${enviados === 1 ? "Salió 1 mail" : `Salieron ${enviados} mails`}`,
+      fallidos && `${fallidos === 1 ? "1 volvió a fallar" : `${fallidos} volvieron a fallar`}`,
+    ].filter(Boolean);
+    return fallidos ? { error: `${partes.join(". ")}.` } : { listo: `${partes.join(". ")}.` };
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("[reintentarMails] Falló:", error instanceof Error ? error.message : "error desconocido");
+    return { error: "No pudimos mandar los mails: falló la conexión con el sistema. Probá de nuevo." };
   }
 }
 
