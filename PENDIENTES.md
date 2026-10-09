@@ -6,7 +6,7 @@ Lo que **no** está atado a un paso de `PASOS.md`: acciones manuales del dueño 
 
 | Qué | Por qué | Desde |
 |---|---|---|
-| — | Nada pendiente por ahora | |
+| Probar los arreglos del paso 14 en producción | Para marcar el paso 14 como hecho (qué probar: `PASOS.md`, paso 14) | 9/10/2026 |
 
 ## Temas sin paso asignado
 

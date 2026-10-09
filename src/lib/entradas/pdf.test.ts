@@ -6,7 +6,8 @@ import jsQR from "jsqr";
 import { PDFArray, PDFDocument, type PDFRawStream } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 
-import { aTextoPdf, armarPdfEntradas, type DatosPdf } from "./pdf";
+import { armarPdfEntradas, type DatosPdf } from "./pdf";
+import { aTextoPdf } from "./texto-pdf";
 
 const CODIGO = "E1-0123456789ABCDEF0123456789ABCDEF-FEDCBA9876543210FEDCBA9876543210";
 
@@ -67,11 +68,16 @@ describe("texto para el PDF", () => {
 
   it("lo que no entra en la fuente: sin acento si se puede, si no ?", () => {
     expect(aTextoPdf("Łukasz Dvořák Erdős")).toBe("?ukasz Dvorák Erdos");
-    expect(aTextoPdf("Иван 🎉 李")).toBe("???? ? ?");
+    expect(aTextoPdf("Иван 李")).toBe("???? ?");
   });
 
   it("junta espacios y saltos de línea", () => {
     expect(aTextoPdf("  Fiesta\n\tde   noche ")).toBe("Fiesta de noche");
+  });
+
+  it("saca los emojis y las banderas (no se pueden imprimir), pero no © ni ®", () => {
+    expect(aTextoPdf("Noche ❤️ Retro 🇦🇷 🎃👻 Fest")).toBe("Noche Retro Fest");
+    expect(aTextoPdf("Fiesta 👨‍👩‍👧 1️⃣ © ®")).toBe("Fiesta 1 © ®");
   });
 
   it("saca caracteres invisibles (de control y guion opcional)", () => {
@@ -97,6 +103,16 @@ describe("PDF de las entradas", () => {
     expect(segunda.qr).toBe(otro);
     expect(segunda.textos).toEqual(expect.arrayContaining(["Ana O’Connor", "DNI 4.555.666", "VIP"]));
     expect(segunda.textos.join(" ")).not.toContain("30.111.222");
+  });
+
+  it("el nombre largo sale completo (en dos renglones), sin cortar", async () => {
+    const base = datos();
+    const largo = "María de los Ángeles Florencia Rodríguez Etcheverry";
+    const pdf = await armarPdfEntradas({ ...base, entradas: [{ ...base.entradas[0], titular: largo, usada: true }] });
+    const { textos, qr } = await leerPagina(pdf, 0);
+    expect(textos.join(" ")).toContain(largo);
+    expect(textos.join(" ")).not.toContain("…");
+    expect(qr).toBe(CODIGO);
   });
 
   it("una entrada usada lo dice", async () => {

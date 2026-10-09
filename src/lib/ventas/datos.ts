@@ -5,6 +5,7 @@
 //
 // Los campos del formulario se llaman nombre-0, dni-0, nombre-1… y email,
 // email2, telefono; los errores usan esas mismas claves.
+import { aTextoPdf } from "@/lib/entradas/texto-pdf";
 
 export type DatosEntrada = { nombre: string; dni: string };
 export type DatosCompra = { email: string; telefono: string | null; entradas: DatosEntrada[] };
@@ -12,13 +13,14 @@ export type ErroresDatos = Record<string, string>;
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Letras (con tildes y ñ), espacios, apóstrofo, guion y punto.
-// Solo letras latinas (con acentos), como en el DNI: las demás no se pueden
-// imprimir en la entrada.
+// Solo letras latinas (con acentos), como en el DNI. Además, que se puedan
+// imprimir en la entrada sin que salga "?" (ř sale r, pero Ł o ẞ no tienen cómo).
 const NOMBRE = /^[\p{Script=Latin}][\p{Script=Latin}'’.\- ]*$/u;
 
-// "  juan   pérez " → "juan pérez"
+// "  juan   pérez " → "juan pérez". Las tildes en dos partes (texto copiado de
+// una Mac) se juntan, y los apóstrofos raros (´ ‘ ` ʼ) pasan a ’.
 export function normalizarNombre(texto: string) {
-  return texto.trim().replace(/\s+/g, " ");
+  return texto.normalize("NFC").trim().replace(/\s+/g, " ").replace(/[´‘`ʼ]/g, "’");
 }
 
 // "40.123.456" → "40123456"
@@ -35,7 +37,7 @@ export function errorDeNombre(texto: string): string | undefined {
   const nombre = normalizarNombre(texto);
   if (!nombre) return "Poné nombre y apellido.";
   if (nombre.length > 80) return "Es muy largo (hasta 80 letras).";
-  if (!NOMBRE.test(nombre)) return "Solo letras, como figura en el DNI.";
+  if (!NOMBRE.test(nombre) || aTextoPdf(nombre).includes("?")) return "Solo letras, como figura en el DNI.";
   if (nombre.split(" ").length < 2) return "Poné nombre y apellido.";
   return undefined;
 }

@@ -5,7 +5,8 @@ Una entrada por chat, la más nueva arriba. Corta: qué se hizo, qué quedó y c
 ## 9/10/2026 — Paso 14: QR y PDF
 - QR por entrada en el link de la compra y PDF A6 (todas o una), armados en nuestro servidor con `qrcode` y `pdf-lib`, sin guardar nada.
 - Ramiro probó el borrador en producción: QR en la compra N° 2, VÁLIDA, PDF descargado y escaneado.
-- Revisión con 4 agentes: nada grave; arreglos en el mismo chat (234 tests, 0 salteados, build).
+- Revisión con 4 agentes: nada grave; arreglos en el mismo chat.
+- Segunda revisión ("¿está listo?", 9 agentes con verificación): nada roto ni inseguro; arreglados nombre largo en el PDF, aviso de no compartir el link, nombres imprimibles, emojis, test de la ruta. 241 tests (0 salteados) y build.
 - Quedó: la prueba de Ramiro de los arreglos.
 
 ## 9/10/2026 — Sistema de contexto entre chats

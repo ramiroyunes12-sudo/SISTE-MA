@@ -11,6 +11,7 @@ import { formatearFechaLarga } from "@/lib/fechas";
 import { formatearDni } from "@/lib/ventas/datos";
 
 import { MARGEN_QR, matrizQr, tramosQr } from "./qr";
+import { aTextoPdf, entraEnWinAnsi } from "./texto-pdf";
 
 export type EntradaParaPdf = {
   numero: number; // "Entrada 2 de 3"
@@ -31,34 +32,9 @@ export type DatosPdf = {
 const ANCHO = 297.64; // A6, en puntos
 const ALTO = 419.53;
 const BORDE = 22;
-const LADO_QR = 196;
+const LADO_QR = 184;
 const TINTA = rgb(0.1, 0.1, 0.12);
 const TENUE = rgb(0.38, 0.38, 0.42);
-
-// Las fuentes estándar del PDF solo tienen las letras de Europa occidental
-// (WinAnsi). Lo demás se pasa a la letra sin acento si se puede (ő → o) y si
-// no, a "?": un nombre raro nunca rompe el PDF.
-const EXTRAS_WINANSI = "€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ";
-function entraEnWinAnsi(letra: string) {
-  const codigo = letra.codePointAt(0)!;
-  return (codigo >= 0x20 && codigo <= 0x7e) || (codigo >= 0xa0 && codigo <= 0xff) || EXTRAS_WINANSI.includes(letra);
-}
-
-export function aTextoPdf(texto: string) {
-  let resultado = "";
-  // Primero los espacios raros (tab, salto de línea) a espacio; después, fuera
-  // lo invisible: caracteres de control y el guion opcional.
-  const limpio = texto.normalize("NFC").replace(/\s+/g, " ").replace(/[\p{Cc}\u00AD]/gu, "");
-  for (const letra of limpio) {
-    if (entraEnWinAnsi(letra)) {
-      resultado += letra;
-      continue;
-    }
-    const sinAcento = letra.normalize("NFD").replace(/\p{M}/gu, "");
-    resultado += sinAcento && [...sinAcento].every(entraEnWinAnsi) ? sinAcento : "?";
-  }
-  return resultado.trim().replace(/ {2,}/g, " ");
-}
 
 // En mayúsculas, salvo las letras cuya mayúscula no está en la fuente (µ → Μ griega).
 function aMayusculas(texto: string) {
@@ -153,7 +129,7 @@ function paginaDeEntrada(pdf: PDFDocument, fuentes: Fuentes, datos: DatosPdf, en
   dibujarQr(pagina, entrada.codigoFirmado, (ANCHO - LADO_QR) / 2, yQr);
   y = escribir(pagina, entrada.codigoFirmado, yQr + 2, { fuente: fuentes.mono, tamano: 5.6, color: TENUE, centrado: true });
 
-  y = escribir(pagina, entrada.titular, y - 2, { fuente: fuentes.negrita, tamano: 11.5, maximo: 1, centrado: true });
+  y = escribir(pagina, entrada.titular, y - 2, { fuente: fuentes.negrita, tamano: 11.5, maximo: 2, centrado: true });
   y = escribir(pagina, `DNI ${formatearDni(entrada.dni)}`, y, { fuente: fuentes.normal, tamano: 10, centrado: true });
   if (entrada.usada) escribir(pagina, "YA USADA", y, { fuente: fuentes.negrita, tamano: 9, color: TENUE, centrado: true });
 

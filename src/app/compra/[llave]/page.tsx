@@ -215,6 +215,13 @@ function EntradasPagas({ llave, compra }: { llave: string; compra: Compra }) {
           {conQr.length === 1 ? "Descargar la entrada (PDF)" : `Descargar las ${conQr.length} entradas (PDF)`}
         </a>
       )}
+      {conQr.length > 0 && (
+        <p className="rounded-xl bg-alerta/10 px-4 py-3 text-[14px]">
+          <strong>No compartas este link:</strong> con él cualquiera ve y puede usar tus entradas. Para pasarle su entrada a
+          alguien, mandale el archivo PDF. En la puerta mostrá el QR junto con tu DNI; cada QR sirve para entrar una sola
+          vez.
+        </p>
+      )}
       <ul className="flex flex-col gap-4">
         {compra.entradas.map((entrada, i) => {
           const qr = porId.get(entrada.id);
