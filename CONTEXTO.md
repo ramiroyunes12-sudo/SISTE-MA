@@ -21,7 +21,7 @@ Sistema de venta de entradas por lotes para varias **productoras** (se alquila p
 - **Hechos y probados:** pasos 1 a 15 (base, login, productoras, evento y lotes, página pública, reparto entre lotes, datos del checkout, reserva, cobro por transferencia y Mercado Pago con plata real el 8/10/2026, código firmado de cada entrada, QR y PDF, y el mail con las entradas, probados el 9/10/2026).
 - El panel todavía **no lista las compras pagas ni sus entradas** (llega en el paso 20): solo muestra cuántas, lo cobrado y los mails que no salieron. El código de cada entrada se ve en el link secreto de la compra y en el mail.
 - Los mails salen por Gmail (`sistemaentradas@gmail.com`, contraseña de aplicación). Ramiro no quiere pagar un servicio de mails: se queda Gmail aunque algunos caigan en spam.
-- **Próximo: paso 16** ("Compra confirmada" y "Reenviar mis entradas").
+- **Paso 16** ("Compra confirmada" y "Reenviar mis entradas"): **borrador listo** (9/10/2026). Falta la revisión con agentes, sus arreglos y la prueba de Ramiro.
 
 ## Acciones del dueño pendientes
 
@@ -62,8 +62,8 @@ Detalle en `.claude/rules/` (se cargan solas al tocar esos archivos) y permisos 
 
 | Carpeta | Qué hay |
 |---|---|
-| `src/app/e/[slug]` | Página pública del evento y "Continuar" (reserva) |
-| `src/app/compra/[llave]` | La compra: datos, reloj, pago, QR de las entradas y `pdf/` (descarga) |
+| `src/app/e/[slug]` | Página pública del evento, "Continuar" (reserva) y `mis-entradas` ("Reenviar mis entradas" con email y DNI) |
+| `src/app/compra/[llave]` | La compra: datos, reloj, pago, "Compra confirmada" con el QR de las entradas, "Reenviar el mail" y `pdf/` (descarga) |
 | `src/app/admin/` | Panel: `eventos` (lotes, pagos, verificar entrada), `productoras` (gente, cobros), `claves` |
 | `src/app/validar` | Puerta (escáner en el paso 17) |
 | `src/app/api/` | `mercadopago/aviso` (aviso de pagos), `mails/pendientes` (tarea diaria de Vercel), `salud` (estado de la base) |
@@ -72,11 +72,11 @@ Detalle en `.claude/rules/` (se cargan solas al tocar esos archivos) y permisos 
 | `src/lib/ventas` | Reparto por lote, reservas, órdenes, turno del evento, simulación |
 | `src/lib/pagos` | Cobros, confirmar, montos únicos, cuenta de Mercado Pago |
 | `src/lib/entradas` | Código firmado (`codigo.ts`), verificar, QR (`qr.ts`, también el PNG del mail), entradas con QR (`imprimir.ts`), PDF (`pdf.ts`, `texto-pdf.ts`, `descarga.ts`) |
-| `src/lib/mails` | Mail con las entradas: SMTP (`cartero.ts`), contenido (`entradas.ts`), envío una sola vez y reintentos (`pendientes.ts`), `after()` (`despues.ts`). El WhatsApp para consultas: `src/lib/ayuda.ts` |
+| `src/lib/mails` | Mail con las entradas: SMTP (`cartero.ts`), contenido (`entradas.ts`), envío una sola vez y reintentos (`pendientes.ts`), reenviar con límite (`reenviar.ts`), `after()` (`despues.ts`). El WhatsApp para consultas: `src/lib/ayuda.ts` |
 | `prisma/` | `schema.prisma`, migraciones, datos de prueba |
 | `scripts/` | `migrar.mjs` (deploy), `usuario.ts` (crear ADMIN / resetear contraseña) |
 
 ## Traspaso (último chat)
 
-- **9/10/2026:** pasos 14 y 15 marcados `[x]`. Paso 15: mail con QR de cada entrada + PDF (todas y una por persona), remitente la productora, sin respuestas (WhatsApp de Ramiro en el mail, el PDF y la página), panel "Mails con las entradas", tarea diaria. Probado en producción después de acomodar la contraseña de Gmail; los primeros cayeron en spam. Decidido: seguir con Gmail, sin Resend.
-- **Para el próximo chat:** arrancar el paso 16 (leer sus notas en `PASOS.md`: `mailDeOrden` sirve para "Reenviar", y la pantalla "Compra confirmada" del diseño).
+- **9/10/2026:** paso 16, borrador. Decidido con Ramiro: "Reenviar mis entradas" en cada evento (`/e/<evento>/mis-entradas`, email + DNI, misma respuesta siempre); el link propio por entrada queda para más adelante (`PENDIENTES.md`). Hecho: `src/lib/mails/reenviar.ts` (3 por compra cada 24 h, `UPDATE` condicionado, reusa el envío del paso 15), "Compra confirmada" como el diseño con "Reenviar el mail", link en la página del evento. Sin migración.
+- **Para el próximo chat:** etapa 3 del paso 16: revisión con agentes en paralelo (seguridad y datos personales del formulario público; límite y carreras del reenvío; cómo se ve en el celu), verificar cada hallazgo, arreglar y commit `Paso 16: arreglos de la revisión con agentes`.

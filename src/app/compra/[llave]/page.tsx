@@ -2,7 +2,8 @@
 // reservó). Mientras la reserva está vigente: reloj, resumen, los datos de
 // cada entrada y, con los datos completos, elegir cómo pagar (transferencia
 // o Mercado Pago). Si venció o se canceló, lo dice y lleva de vuelta al
-// evento; si ya está paga, lo confirma.
+// evento; si ya está paga, "Compra confirmada": las entradas con su QR y
+// "Reenviar el mail".
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -15,15 +16,23 @@ import { formatearPesos } from "@/lib/dinero";
 import { type EntradaConQr, entradasConQr, tipoYLote } from "@/lib/entradas/imprimir";
 import { qrParaSvg } from "@/lib/entradas/qr";
 import { mandarMailsDespues } from "@/lib/mails/despues";
-import { estadoDelMail } from "@/lib/mails/pendientes";
+import { estadoDelMail, hayEnvioConfigurado } from "@/lib/mails/pendientes";
 import { opcionesDePago, revisarPagoDeCompra } from "@/lib/pagos/cobros";
 import { apiMercadoPago } from "@/lib/pagos/mercadopago";
 import { formatearDni } from "@/lib/ventas/datos";
 import { buscarCompra, type Compra, liberarVencidas } from "@/lib/ventas/ordenes";
 
-import { cancelarAccion, guardarDatosAccion, mercadoPagoAccion, revisarPagoAccion, transferenciaAccion } from "./acciones";
+import {
+  cancelarAccion,
+  guardarDatosAccion,
+  mercadoPagoAccion,
+  reenviarMailAccion,
+  revisarPagoAccion,
+  transferenciaAccion,
+} from "./acciones";
 import { FormularioDatos } from "./formulario-datos";
 import { BotonCambiarEntradas, DatosTransferencia, ElegirPago, EsperarPago } from "./pago";
+import { ReenviarMail } from "./reenviar";
 import { Reloj } from "./reloj";
 
 export const metadata: Metadata = {
@@ -66,24 +75,29 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
     // Si el mail todavía no salió (o falló), se intenta después de responder.
     const mail = await estadoDelMail(db, compra.id);
     if (mail === "enviando") mandarMailsDespues({ ordenId: compra.id });
-    // (Sin el envío configurado, o si es de antes de los mails: no se dice nada.)
+    const cuantas = compra.entradas.filter((entrada) => entrada.estado === "VALIDA" || entrada.estado === "USADA").length;
+    const lasEntradas = cuantas === 1 ? "tu entrada" : cuantas > 1 ? `tus ${cuantas} entradas` : "tus entradas";
+    // (Sin el envío configurado, o si es de antes de los mails: no se dice nada del mail.)
     return (
-      <Marco ayuda={ayuda} titulo="Tu compra" evento={compra.evento.nombre} volver={volver}>
-        <section role="status" className="flex flex-col gap-2 rounded-2xl border-2 border-ok bg-superficie p-5">
-          <h2 className="font-display text-2xl font-bold text-ok-oscuro">¡Pago confirmado!</h2>
-          <p>
-            Compra N° <strong>{compra.numero}</strong> · {compra.evento.nombre}
-          </p>
+      <Marco ayuda={ayuda} titulo="Compra confirmada" evento={compra.evento.nombre} volver={volver}>
+        <section role="status" className="flex flex-col items-center gap-3 px-2 pt-6 pb-2 text-center">
+          <span className="flex size-20 items-center justify-center rounded-full bg-ok">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M5 12.5l4.5 4.5L19 7.5" />
+            </svg>
+          </span>
+          <h2 className="font-display text-[28px] font-extrabold leading-tight">¡Compra confirmada!</h2>
           {compra.email && mail !== "nada" && (
-            <p className="[overflow-wrap:anywhere]">
+            <p className="leading-normal [overflow-wrap:anywhere]">
               {mail === "enviado" && (
                 <>
-                  Te mandamos las entradas a <strong>{compra.email}</strong>. Si no lo ves, revisá en spam o promociones.
+                  Te mandamos <strong>{lasEntradas}</strong> a <strong>{compra.email}</strong>
                 </>
               )}
               {mail === "enviando" && (
                 <>
-                  Te estamos mandando las entradas a <strong>{compra.email}</strong> (puede tardar unos minutos).
+                  Te estamos mandando <strong>{lasEntradas}</strong> a <strong>{compra.email}</strong> (puede tardar unos
+                  minutos)
                 </>
               )}
               {mail === "no_salio" && (
@@ -93,11 +107,15 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
               )}
             </p>
           )}
-          <p className="text-tenue [overflow-wrap:anywhere]">
-            Guardá este link: es tu comprobante. Tus entradas están acá abajo, cada una con su QR: descargalas en PDF.
+          <p className="text-sm text-tenue">
+            Compra N° {compra.numero} · {compra.evento.nombre}
           </p>
         </section>
+        <p className="text-center text-[15px] text-tenue [overflow-wrap:anywhere]">
+          Guardá este link: es tu comprobante. Tus entradas están acá abajo, cada una con su QR: descargalas en PDF.
+        </p>
         <EntradasPagas llave={llave} compra={compra} />
+        {compra.email && hayEnvioConfigurado() && <ReenviarMail reenviar={reenviarMailAccion.bind(null, llave)} />}
         <div className="h-6" />
       </Marco>
     );

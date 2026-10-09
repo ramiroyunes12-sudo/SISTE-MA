@@ -183,8 +183,14 @@ Cuando se confirma el pago, a quien compró le llega **"Tus entradas para …"**
 - **Remitente:** el nombre de la productora, desde la cuenta de mail de la plataforma (conviene que se llame, por ejemplo, `noresponder.entradas@gmail.com`). El mail dice que no se responda: para cualquier problema, el **WhatsApp de la plataforma** (`WHATSAPP_AYUDA`), que también va al pie de cada PDF y abajo de la página de la compra. Al tocarlo se abre WhatsApp con "Hola, tengo una consulta por la compra N° …" ya escrito.
 - **Cuándo sale:** nunca dentro de la confirmación del pago. Después de responder (con `after()` de Next), piden mandar los que faltan el aviso de Mercado Pago, la pantalla que espera el pago, el panel y el link de la compra paga; y una vez por día, a las 12:00, una tarea programada de Vercel (`/api/mails/pendientes`, protegida con `CRON_SECRET`). Cada mail se "toma" con un cambio condicionado en la base: aunque se pida varias veces a la vez, sale una sola vez.
 - **Si falla:** queda anotado el motivo (sin datos de la persona) y se reintenta cada vez más espaciado (5 minutos, 15 minutos, 1 hora, 4 horas), hasta 5 intentos, la próxima vez que algo pida mandar. Si es el límite diario de Gmail, no cuenta como intento y espera una hora. En el panel, **Evento → Pagos → Mails con las entradas**: cuántos salieron, cuáles no y por qué, y **Reintentar ahora**.
-- El link de la compra paga dice si el mail ya salió ("Te mandamos las entradas a …"). Si el envío no está configurado, no promete nada.
+- El link de la compra paga ("¡Compra confirmada!") dice si el mail ya salió ("Te mandamos tus 2 entradas a …"). Si el envío no está configurado, no promete nada.
 - Las compras que ya estaban pagas antes de que existieran los mails no se mandan solas: aparecen en el panel como que no salieron, y con "Reintentar ahora" salen.
+
+### Reenviar las entradas
+
+- En el link de la compra paga, abajo: **Reenviar el mail** (el link es el permiso).
+- Quien perdió el mail y el link: en la página del evento, **Reenviar mis entradas** (`/e/<evento>/mis-entradas`), con el email y el DNI de alguna de las entradas. La respuesta es siempre la misma: no dice si hay una compra con esos datos.
+- Siempre al email de la compra y como mucho **3 veces por día por compra** (`src/lib/mails/reenviar.ts`). Sale por el mismo camino que el primer mail: una sola vez y, si falla, se reintenta y aparece en el panel.
 
 | Variable | Qué es |
 |---|---|

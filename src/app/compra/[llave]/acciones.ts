@@ -5,6 +5,7 @@ import { redirect, unstable_rethrow } from "next/navigation";
 import { obtenerDb } from "@/lib/db";
 import { esperoDemasiado } from "@/lib/errores-db";
 import { mandarMailsDespues } from "@/lib/mails/despues";
+import { MAX_REENVIOS_POR_DIA, reenviarDeCompra } from "@/lib/mails/reenviar";
 import { elegirMercadoPago, elegirTransferencia, type EstadoDeCompra, revisarPagoDeCompra } from "@/lib/pagos/cobros";
 import { apiMercadoPago } from "@/lib/pagos/mercadopago";
 import { urlPublica } from "@/lib/url";
@@ -13,6 +14,7 @@ import { buscarCompra, cancelarReserva, guardarDatosCompra } from "@/lib/ventas/
 
 export type EstadoDatos = { errores?: ErroresDatos; general?: string };
 export type EstadoPago = { error?: string };
+export type EstadoReenvio = { tipo?: "ok" | "aviso" | "error"; mensaje?: string };
 
 const ERROR_CONEXION = "No pudimos conectar con el sistema. Probá de nuevo.";
 
@@ -91,4 +93,37 @@ export async function cancelarAccion(llave: string): Promise<void> {
     console.error("[cancelarReserva] Falló:", error);
   }
   redirect(destino);
+}
+
+// "Reenviar el mail" de la compra paga: la llave del link es el permiso. Sale
+// al email de la compra, después de responder (src/lib/mails/reenviar.ts).
+export async function reenviarMailAccion(llave: string): Promise<EstadoReenvio> {
+  try {
+    const resultado = await reenviarDeCompra(obtenerDb(), String(llave));
+    if (resultado.ok) {
+      mandarMailsDespues({ ordenId: resultado.ordenId });
+      return {
+        tipo: "ok",
+        mensaje: `Listo: te lo mandamos de nuevo a ${resultado.email}. Puede tardar unos minutos; si no lo ves, revisá en spam o promociones.`,
+      };
+    }
+    switch (resultado.motivo) {
+      case "ya_sale":
+        mandarMailsDespues({ ordenId: resultado.ordenId });
+        return { tipo: "aviso", mensaje: "Ya te lo estamos mandando: puede tardar unos minutos. Si no lo ves, revisá en spam o promociones." };
+      case "limite":
+        return {
+          tipo: "aviso",
+          mensaje: `Ya te lo reenviamos ${MAX_REENVIOS_POR_DIA} veces hoy: probá mañana. Tus entradas están igual en esta página.`,
+        };
+      case "sin_configurar":
+        return { tipo: "error", mensaje: "Ahora no podemos mandar mails. Tus entradas están en esta página: descargalas en PDF." };
+      default:
+        return { tipo: "error", mensaje: "No encontramos tu compra paga." };
+    }
+  } catch (error) {
+    // Solo qué falló: nada de la compra en los logs.
+    console.error("[reenviarMail] Falló:", error instanceof Error ? error.message : "error desconocido");
+    return { tipo: "error", mensaje: ERROR_CONEXION };
+  }
 }
