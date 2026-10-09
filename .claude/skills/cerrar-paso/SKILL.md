@@ -15,8 +15,9 @@ Hacerlo en cada etapa, no solo al final: si el chat se corta, lo hecho tiene que
    - "Traspaso (último chat)": reemplazar por 2-4 líneas: qué se hizo, qué quedó a medias o bloqueado, y la primera tarea del próximo chat.
    - Que siga por debajo de ~150 líneas: lo que es historia va a `BITACORA.md` o `PASOS.md`.
 6. **`BITACORA.md`**: una entrada arriba (fecha, paso, qué se hizo, qué quedó). Si el chat ya tiene entrada, actualizarla.
-7. **Commit y push.** Mensaje en español: `Paso N (borrador para revisar): ...`, `Paso N: arreglos de la revisión con agentes`, o `Paso N: ...`. Push a la rama del chat. Si no es la rama principal (`claude/ticket-sales-system-2qfswg`), preguntarle al dueño si se lleva a la principal (eso publica en producción y aplica migraciones).
+7. **Commit y push.** Mensaje en español: `Paso N (borrador para revisar): ...`, `Paso N: arreglos de la revisión con agentes`, o `Paso N: ...`. Push a la rama del chat. Después abrir (o reusar, si ya hay uno abierto) un pull request de esa rama hacia la principal (`claude/ticket-sales-system-2qfswg`). El merge lo hace el dueño: publica en producción y aplica migraciones.
 8. **Mensaje final al dueño**, corto:
+   - **el link directo al pull request** (`https://github.com/ramiroyunes12-sudo/SISTE-MA/pull/N`) y que toque "Merge pull request" → "Confirm merge"; después del merge, recargar las páginas del panel que tenga abiertas;
    - qué probar y dónde (links a https://siste-ma.vercel.app/...);
    - qué tiene que hacer a mano (de `PENDIENTES.md`);
    - la frase para arrancar el próximo chat, por ejemplo: `/empezar-paso 14`.

@@ -34,7 +34,7 @@ Ninguna por ahora (9/10/2026: claves cargadas en Vercel y cuenta de Mercado Pago
 - **Etapas de un paso:** (1) si hay decisiones abiertas, preguntarle al dueño con opciones y una recomendación → (2) borrador: commit `Paso N (borrador para revisar): ...` → (3) revisión con agentes en paralelo, verificar cada hallazgo → (4) commit `Paso N: arreglos de la revisión con agentes` → (5) el dueño lo prueba en producción → `[x]` en `PASOS.md`.
 - **Antes de cada commit:** skill `verificar` (test que falla primero en lo delicado; typecheck, lint y tests con Postgres local, 0 salteados).
 - **Idioma:** todo en español rioplatense y simple (código, commits, docs, mensajes). Ramiro no necesita jerga: decir qué probar y dónde hacer clic.
-- **Ramas:** si el chat trabaja en otra rama, al terminar hay que llevar los cambios a la rama principal (PR o merge), siempre preguntándole antes al dueño, porque eso publica en producción.
+- **Ramas:** el chat no publica solo. Al cerrar cada etapa abre un pull request de su rama hacia la principal y le da a Ramiro **el link directo al PR** para que toque "Merge pull request" → "Confirm merge" (pedido por él el 9/10/2026). Si ya hay un PR abierto de la rama, se reusa y se le vuelve a pasar el link.
 
 ## Reglas que no se negocian
 
