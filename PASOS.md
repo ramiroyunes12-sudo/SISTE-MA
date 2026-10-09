@@ -74,8 +74,13 @@ Cada paso termina con algo para probar. Se marca `[x]` cuando está revisado.
   - Seguridad: `CLAVE_CIFRADO` se había creado desde el chat (su valor quedó en la conversación): se cambió por una nueva generada en el panel (Claves), sin pasar por el chat (9/10).
   - Probado en producción (9/10/2026): el código de una entrada de la compra N° 2 dio VÁLIDA con titular, DNI y compra correctos.
   - Para el paso 20: hoy el panel no lista las compras pagas ni sus entradas (solo cuántas y lo cobrado); el código se ve solo en el link de la compra. La página de prueba que mostraba los movimientos de Mercado Pago (`/admin/mercadopago-prueba`) se sacó en el paso 11.
-- [ ] **14. QR y PDF**
+- [ ] **14. QR y PDF** — en borrador (9/10/2026), falta la revisión con agentes. Para probarlo: abrir el link de una compra paga (por ejemplo la N° 2): cada entrada muestra su QR y su código; "Descargar las N entradas (PDF)" baja un PDF con una página por entrada y "Descargar solo esta (PDF)" baja una sola. Escanear un QR con la cámara del celu tiene que mostrar el código `E1-…`; pegado en panel → evento → "Verificar una entrada" da VÁLIDA.
   - Notas: QR y PDF se generan en nuestro servidor (sin APIs externas: llevan nombre y DNI). El QR lleva solo el código firmado. No guardar los PDF: se rearman desde la base.
+  - Decidido (9/10): un PDF con todas las entradas y, además, cada una suelta (para pasársela a quien va). En la entrada (pantalla y PDF) van nombre y DNI completo.
+  - Librerías: `qrcode` (arma la matriz del QR) y `pdf-lib` (el PDF), las dos corren en nuestro servidor. El QR sale en modo alfanumérico, versión 4 (33×33), corrección M; en pantalla es un SVG negro sobre blanco y en el PDF va dibujado con rectángulos (vectorial). PDF tamaño A6, fuentes estándar (letras fuera del castellano/Europa occidental pasan a sin acento o "?", nunca rompen el PDF).
+  - Ruta `/compra/<llave>/pdf` (y `?entrada=N`): la llave del link es el permiso, como la página de la compra. Solo compras PAGADAS y entradas válidas o usadas (las anuladas no). Sin `CLAVE_CODIGOS` responde "no disponible" (503) y no arma nada. Sin caché (`private, no-store`).
+  - Tests: el QR se lee con un lector real (jsQR) y da exactamente el código firmado; el PDF impreso a imagen también se leyó bien.
+  - Para el paso 15: el mail puede adjuntar el mismo PDF (`pdfDeCompra` en `src/lib/entradas/imprimir.ts`) o el QR como imagen CID.
 - [ ] **15. Enviar el mail** — Gmail SMTP.
   - Con varias productoras, el límite de Gmail (~500 por día) puede quedar corto: evaluar Resend con dominio propio.
   - Notas: en Vercel no sirven las colas en memoria: marcar en la base qué mail falta (en la misma transacción que confirma el pago) y mandarlo después con `after()`; reintentar los pendientes. En Gmail el QR va como adjunto (CID) o en el PDF, no como imagen `data:`.

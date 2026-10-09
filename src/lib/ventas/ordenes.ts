@@ -210,7 +210,7 @@ export type Compra = {
   totalCentavos: number;
   email: string | null;
   telefono: string | null;
-  evento: { id: string; slug: string; nombre: string };
+  evento: { id: string; slug: string; nombre: string; fecha: Date; lugar: string; direccion: string | null };
   entradas: EntradaDeCompra[]; // siempre en el mismo orden: Entrada 1, 2, 3…
 };
 
@@ -227,7 +227,7 @@ async function ordenPorLlave(db: PrismaClient | Tx, llave: string) {
       totalCentavos: true,
       email: true,
       telefono: true,
-      evento: { select: { id: true, slug: true, nombre: true } },
+      evento: { select: { id: true, slug: true, nombre: true, fecha: true, lugar: true, direccion: true } },
       entradas: {
         select: {
           id: true,

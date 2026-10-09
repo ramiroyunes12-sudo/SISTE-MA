@@ -11,7 +11,8 @@ import type { ReactNode } from "react";
 
 import { obtenerDb } from "@/lib/db";
 import { formatearPesos } from "@/lib/dinero";
-import { firmarCodigo } from "@/lib/entradas/codigo";
+import { type EntradaConQr, entradasConQr } from "@/lib/entradas/imprimir";
+import { qrParaSvg } from "@/lib/entradas/qr";
 import { opcionesDePago, revisarPagoDeCompra } from "@/lib/pagos/cobros";
 import { apiMercadoPago } from "@/lib/pagos/mercadopago";
 import { formatearDni } from "@/lib/ventas/datos";
@@ -55,25 +56,17 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
   if (compra.estado === "PAGADA") {
     return (
       <Marco titulo="Tu compra" evento={compra.evento.nombre} volver={volver}>
-        <section role="status" className="flex flex-col gap-3 rounded-2xl border-2 border-ok bg-superficie p-5">
+        <section role="status" className="flex flex-col gap-2 rounded-2xl border-2 border-ok bg-superficie p-5">
           <h2 className="font-display text-2xl font-bold text-ok-oscuro">¡Pago confirmado!</h2>
           <p>
             Compra N° <strong>{compra.numero}</strong> · {compra.evento.nombre}
           </p>
-          <ul className="flex flex-col gap-2 text-[15px]">
-            {compra.entradas.map((entrada, i) => (
-              <li key={entrada.id} className="flex flex-col gap-0.5">
-                <span>
-                  Entrada {i + 1} · {entrada.tipo}: {entrada.titular} · DNI {formatearDni(entrada.dni ?? "")}
-                </span>
-                <CodigoEntrada id={entrada.id} codigo={entrada.codigo} estado={entrada.estado} />
-              </li>
-            ))}
-          </ul>
           <p className="text-tenue [overflow-wrap:anywhere]">
             Guardá este link: es tu comprobante. Las entradas, cada una con su QR, te llegan a <strong>{compra.email}</strong>.
           </p>
         </section>
+        <EntradasPagas llave={llave} compra={compra} />
+        <div className="h-6" />
       </Marco>
     );
   }
@@ -196,25 +189,83 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
   );
 }
 
-// El código de la entrada (lo que va en el QR, paso 14). Solo de las válidas o usadas.
-function CodigoEntrada({ id, codigo, estado }: { id: string; codigo: string; estado: string }) {
-  if (estado === "ANULADA") return <span className="text-[13px] font-semibold text-error">Anulada</span>;
-  if (estado !== "VALIDA" && estado !== "USADA") return null;
-  let firmado: string;
+// Cada entrada de la compra paga: su QR (solo el código firmado) y los PDF
+// para descargar. Las anuladas lo dicen, sin QR.
+function EntradasPagas({ llave, compra }: { llave: string; compra: Compra }) {
+  let conQr: EntradaConQr[];
   try {
-    firmado = firmarCodigo(codigo);
+    conQr = entradasConQr(compra);
   } catch (error) {
-    console.error(`[firmarCodigo] Entrada ${id}:`, error instanceof Error ? error.message : "error desconocido");
+    console.error(`[entradasConQr] Compra ${compra.id}:`, error instanceof Error ? error.message : "error desconocido");
     return (
-      <span className="text-[13px] font-semibold text-alerta">
-        El código de esta entrada no está disponible ahora. Recargá en un rato.
-      </span>
+      <p role="alert" className="rounded-xl bg-alerta/10 px-4 py-3 font-semibold">
+        Tus entradas no están disponibles ahora. Recargá en un rato.
+      </p>
     );
   }
+  const porId = new Map(conQr.map((entrada) => [entrada.id, entrada]));
+  const pdf = `/compra/${llave}/pdf`;
   return (
-    <span className="text-[13px] text-tenue">
-      Código: <code className="break-all font-mono text-tinta">{firmado}</code>
-    </span>
+    <>
+      {conQr.length > 0 && (
+        <a
+          href={pdf}
+          download
+          className="flex h-12 items-center justify-center rounded-xl bg-acento px-5 font-bold text-white no-underline hover:bg-acento-hover"
+        >
+          {conQr.length === 1 ? "Descargar la entrada (PDF)" : `Descargar las ${conQr.length} entradas (PDF)`}
+        </a>
+      )}
+      <ul className="flex flex-col gap-4">
+        {compra.entradas.map((entrada, i) => {
+          const qr = porId.get(entrada.id);
+          return (
+            <li key={entrada.id} className="flex flex-col gap-2 rounded-2xl border border-borde bg-superficie p-4">
+              <h3 className="text-[15px] font-bold">
+                Entrada {i + 1} · {entrada.tipo}
+              </h3>
+              <p className="text-[15px]">
+                {entrada.titular} · DNI {formatearDni(entrada.dni ?? "")}
+              </p>
+              {qr ? (
+                <>
+                  <QrEntrada texto={qr.codigoFirmado} numero={i + 1} />
+                  {qr.estado === "USADA" && <p className="text-center text-[13px] font-semibold text-tenue">Ya se usó para entrar.</p>}
+                  <p className="text-center text-[12px] text-tenue">
+                    Código: <code className="break-all font-mono text-tinta">{qr.codigoFirmado}</code>
+                  </p>
+                  {conQr.length > 1 && (
+                    <a href={`${pdf}?entrada=${i + 1}`} download className="text-center text-sm font-semibold text-acento hover:text-acento-hover">
+                      Descargar solo esta (PDF)
+                    </a>
+                  )}
+                </>
+              ) : (
+                <p className="text-[13px] font-semibold text-error">{entrada.estado === "ANULADA" ? "Anulada" : "Sin QR"}</p>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
+}
+
+// El QR, dibujado acá en el servidor. Siempre negro sobre blanco (también en
+// modo oscuro): así lo leen los escáneres.
+function QrEntrada({ texto, numero }: { texto: string; numero: number }) {
+  const { lado, camino } = qrParaSvg(texto);
+  return (
+    <svg
+      role="img"
+      aria-label={`QR de la entrada ${numero}`}
+      viewBox={`0 0 ${lado} ${lado}`}
+      shapeRendering="crispEdges"
+      className="mx-auto aspect-square w-full max-w-60 rounded-lg"
+    >
+      <rect width={lado} height={lado} fill="#fff" />
+      <path d={camino} fill="#000" />
+    </svg>
   );
 }
 

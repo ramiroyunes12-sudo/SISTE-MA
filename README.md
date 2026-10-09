@@ -164,7 +164,15 @@ En la base (`entradas.codigo`) se guarda solo la parte al azar: con una copia de
 
 Las claves secretas (`CLAVE_CODIGOS`, `CLAVE_CIFRADO`) se generan en el panel, **Claves** (solo ADMIN): se arman en el navegador, no pasan por el servidor ni por ningún chat.
 
-En el panel, **Evento → Verificar una entrada**: se pega un código y dice si es VÁLIDA (y de quién es), YA USADA, SIN PAGAR, ANULADA o NO VÁLIDA. Solo mira: no la marca usada. En una compra paga, el link de la compra muestra el código de cada entrada (en el paso 14, el QR).
+En el panel, **Evento → Verificar una entrada**: se pega un código y dice si es VÁLIDA (y de quién es), YA USADA, SIN PAGAR, ANULADA o NO VÁLIDA. Solo mira: no la marca usada.
+
+## Entradas: QR y PDF
+
+En una compra paga, el link de la compra (`/compra/<llave>`) muestra cada entrada con su **QR** y el código escrito abajo (por si no se puede escanear). El QR lleva solo el código firmado, nunca nombre ni DNI (`src/lib/entradas/qr.ts`).
+
+- **Descargar las N entradas (PDF)**: un PDF con una página (A6) por entrada: evento, fecha, lugar, tipo, nombre, DNI y QR. **Descargar solo esta**: la de una persona, para pasársela.
+- Los PDF se arman en el momento en nuestro servidor (`src/lib/entradas/pdf.ts`, con `pdf-lib`) y no se guardan: se vuelven a armar desde la base cuando hace falta. La ruta es `/compra/<llave>/pdf` (`?entrada=N` para una sola); como la página, la llave del link es el permiso.
+- Solo salen las entradas válidas o usadas de compras pagas; las anuladas dicen "Anulada", sin QR.
 
 ## Publicación (Vercel)
 
