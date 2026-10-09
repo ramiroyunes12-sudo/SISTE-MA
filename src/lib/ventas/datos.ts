@@ -12,7 +12,9 @@ export type ErroresDatos = Record<string, string>;
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Letras (con tildes y ñ), espacios, apóstrofo, guion y punto.
-const NOMBRE = /^[\p{L}][\p{L}'’.\- ]*$/u;
+// Solo letras latinas (con acentos), como en el DNI: las demás no se pueden
+// imprimir en la entrada.
+const NOMBRE = /^[\p{Script=Latin}][\p{Script=Latin}'’.\- ]*$/u;
 
 // "  juan   pérez " → "juan pérez"
 export function normalizarNombre(texto: string) {

@@ -21,6 +21,11 @@
   --font-display: var(--font-archivo);
 }
 
+:root {
+  /* Siempre claro: que el modo oscuro forzado del celu no invierta los QR. */
+  color-scheme: only light;
+}
+
 body {
   background: var(--color-fondo);
   color: var(--color-tinta);

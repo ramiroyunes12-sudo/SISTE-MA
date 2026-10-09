@@ -1,10 +1,8 @@
 // Las entradas de una compra listas para mostrar o imprimir: cuáles tienen QR
-// y el PDF para descargar desde el link de la compra.
-import type { PrismaClient } from "@/generated/prisma/client";
-import { buscarCompra, type Compra } from "@/lib/ventas/ordenes";
+// y con qué código. (Sin pdf-lib: lo usa también la página de la compra.)
+import type { Compra } from "@/lib/ventas/ordenes";
 
 import { firmarCodigo } from "./codigo";
-import { armarPdfEntradas } from "./pdf";
 
 export type EntradaConQr = {
   id: string;
@@ -35,25 +33,4 @@ export function entradasConQr(compra: Compra): EntradaConQr[] {
     });
   }
   return lista;
-}
-
-export type PdfDeCompra =
-  | { ok: true; pdf: Uint8Array; archivo: string }
-  | { ok: false; motivo: "no_encontrada" | "sin_entradas" };
-
-// El PDF de la compra del link: todas sus entradas con QR o solo la número
-// `numero`. Se arma en el momento; no se guarda en ningún lado.
-export async function pdfDeCompra(db: PrismaClient, llave: string, numero: number | null): Promise<PdfDeCompra> {
-  const compra = await buscarCompra(db, llave);
-  if (!compra) return { ok: false, motivo: "no_encontrada" };
-  const entradas = entradasConQr(compra).filter((entrada) => numero === null || entrada.numero === numero);
-  if (entradas.length === 0) return { ok: false, motivo: "sin_entradas" };
-  const pdf = await armarPdfEntradas({
-    evento: compra.evento,
-    compra: compra.numero,
-    totalEntradas: compra.entradas.length,
-    entradas,
-  });
-  const archivo = numero === null ? `entradas-compra-${compra.numero}.pdf` : `entrada-${numero}-compra-${compra.numero}.pdf`;
-  return { ok: true, pdf, archivo };
 }

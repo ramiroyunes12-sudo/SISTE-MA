@@ -5,19 +5,19 @@
 import type { NextRequest } from "next/server";
 
 import { obtenerDb } from "@/lib/db";
-import { pdfDeCompra } from "@/lib/entradas/imprimir";
+import { leerNumeroDeEntrada, pdfDeCompra } from "@/lib/entradas/descarga";
 
 const SIN_GUARDAR = {
   "Cache-Control": "private, no-store",
   "Referrer-Policy": "no-referrer",
   "X-Robots-Tag": "noindex, nofollow",
+  "X-Content-Type-Options": "nosniff",
 };
 
 export async function GET(request: NextRequest, ctx: RouteContext<"/compra/[llave]/pdf">) {
   const { llave } = await ctx.params;
-  const pedida = request.nextUrl.searchParams.get("entrada");
-  const numero = pedida === null ? null : /^[1-9]\d{0,2}$/.test(pedida) ? Number(pedida) : NaN;
-  if (Number.isNaN(numero)) return texto("No encontramos esa entrada.", 404);
+  const numero = leerNumeroDeEntrada(request.nextUrl.searchParams.get("entrada"));
+  if (numero === "invalido") return texto("No encontramos esa entrada.", 404);
 
   let resultado: Awaited<ReturnType<typeof pdfDeCompra>>;
   try {
@@ -33,7 +33,10 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/compra/[llav
     headers: {
       ...SIN_GUARDAR,
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${resultado.archivo}"`,
+      // inline: se abre en el visor del celu (en iPhone y en el navegador de
+      // WhatsApp o Instagram "attachment" a veces no hace nada); desde ahí se
+      // guarda o se comparte. El nombre es solo con números, sin datos de nadie.
+      "Content-Disposition": `inline; filename="${resultado.archivo}"`,
     },
   });
 }

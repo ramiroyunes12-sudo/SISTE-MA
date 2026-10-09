@@ -76,6 +76,10 @@ describe("datos del checkout", () => {
     expect(errorDeNombre("Juan 23")).toBe("Solo letras, como figura en el DNI.");
     expect(errorDeNombre("<script> alert")).toBe("Solo letras, como figura en el DNI.");
     expect(errorDeNombre("Ñandú Güemes")).toBeUndefined();
+    // Solo letras latinas, como en el DNI (las demás no se pueden imprimir en la entrada).
+    expect(errorDeNombre("Иван Петров")).toBe("Solo letras, como figura en el DNI.");
+    expect(errorDeNombre("Juan 李")).toBe("Solo letras, como figura en el DNI.");
+    expect(errorDeNombre("Zoë Dvořák")).toBeUndefined();
     expect(errorDeNombre(`Juan ${"a".repeat(80)}`)).toBe("Es muy largo (hasta 80 letras).");
     for (const malo of ["0000000", "123456789", "40 123 45a", "-"]) expect(errorDeDni(malo), malo).toBeDefined();
     for (const bueno of ["40123456", "40.123.456", "5.123.456", "123456"]) expect(errorDeDni(bueno), bueno).toBeUndefined();
