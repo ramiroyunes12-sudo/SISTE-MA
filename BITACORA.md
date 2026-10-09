@@ -7,7 +7,8 @@ Una entrada por chat, la más nueva arriba. Corta: qué se hizo, qué quedó y c
 - Decidido con Ramiro: Gmail (contraseña de aplicación), remitente la productora, PDF con todas + uno por persona, tipo y lote en la entrada. Después: el mail no recibe respuestas; para problemas, su WhatsApp (`WHATSAPP_AYUDA`) en el mail, el PDF y la página (se sacó el "mail de contacto" de la productora).
 - Borrador: `src/lib/mails/` (SMTP con `nodemailer`, contenido como el diseño, envío una sola vez con `UPDATE` condicionado y reintentos), `after()` donde se confirma un pago, panel "Mails con las entradas". Migración `20261009120000_mails`.
 - Revisión con 3 agentes (seguridad, envío único, cómo se ve): nada grave; arreglados mails que nadie pedía o quedaban sin intentar, hora vieja al tomar (mail doble), reintentos espaciados y límite de Gmail, tarea diaria de Vercel (`CRON_SECRET`), lote en el PDF, Outlook, asunto con N° de compra, textos. 277 tests (0 salteados) y build.
-- Quedó: cargar Gmail, `WHATSAPP_AYUDA` y `CRON_SECRET` en Vercel y la prueba de Ramiro.
+- Prueba en producción: Gmail rechazó el ingreso; el panel ahora muestra el código de Gmail para saber por qué (PR aparte).
+- Quedó: que Gmail acepte la cuenta y la prueba de Ramiro.
 
 ## 9/10/2026 — Paso 14: QR y PDF
 - QR por entrada en el link de la compra y PDF A6 (todas o una), armados en nuestro servidor con `qrcode` y `pdf-lib`, sin guardar nada.

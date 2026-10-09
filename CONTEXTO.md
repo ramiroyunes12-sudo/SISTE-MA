@@ -79,4 +79,5 @@ Detalle en `.claude/rules/` (se cargan solas al tocar esos archivos) y permisos 
 ## Traspaso (último chat)
 
 - **9/10/2026:** paso 14 marcado `[x]`. Paso 15 terminado en código: mail con QR de cada entrada + PDF (todas y una por persona), remitente la productora, sin respuestas (WhatsApp de Ramiro en el mail, el PDF y la página), tipo y lote en la entrada, panel "Mails con las entradas", tarea diaria. Revisión con 3 agentes y sus arreglos (ver `PASOS.md`). 277 tests (0 salteados) y build.
+- Primera prueba en producción: Gmail rechazó el ingreso (ver `PASOS.md`, paso 15); se sumó el código de Gmail al motivo del panel.
 - **Para el próximo chat:** si Ramiro confirma que le llegó el mail y lo probó, marcar el 15 `[x]` y arrancar el paso 16 (leer sus notas: `mailDeOrden` sirve para "Reenviar").
