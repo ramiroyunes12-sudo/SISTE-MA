@@ -18,20 +18,15 @@ Sistema de venta de entradas por lotes para varias **productoras** (se alquila p
 
 ## Estado actual
 
-- **Hechos y probados:** pasos 1 a 12 (base, login, productoras, evento y lotes, página pública, reparto entre lotes, datos del checkout, reserva, cobro por transferencia y Mercado Pago, probado con plata real el 8/10/2026).
-- **Paso 13 (código firmado de cada entrada): programado y revisado con agentes, falta la prueba del dueño** (ver "Acciones del dueño"). Se marca `[x]` en `PASOS.md` cuando él confirme.
+- **Hechos y probados:** pasos 1 a 13 (base, login, productoras, evento y lotes, página pública, reparto entre lotes, datos del checkout, reserva, cobro por transferencia y Mercado Pago con plata real el 8/10/2026, código firmado de cada entrada probado el 9/10/2026).
+- El panel todavía **no lista las compras pagas ni sus entradas** (llega en el paso 20): solo muestra cuántas y lo cobrado. El código de cada entrada se ve en el link secreto de la compra.
 - **Próximo paso: 14 — QR y PDF.** Notas ya decididas en `PASOS.md` (generar en nuestro servidor, el QR lleva solo el código firmado, los PDF no se guardan: se rearman desde la base).
 
 ## Acciones del dueño pendientes
 
 Cosas que hace Ramiro a mano (no se pueden hacer desde el chat). Lista completa en `PENDIENTES.md`.
 
-Revisado en Vercel el 9/10/2026 (solo nombres, nunca valores):
-
-1. **Falta `CLAVE_CODIGOS` en Vercel.** Generarla en el panel → Claves, cargarla (Production) y redeployar. Sin ella las entradas no muestran código.
-2. **`CLAVE_CIFRADO` sigue siendo la vieja** (quedó escrita en un chat). Cambiarla por una nueva del panel → Claves, redeployar y reconectar la cuenta de Mercado Pago de la productora.
-3. Probar el paso 13: en una compra paga se ve el código de cada entrada; panel → evento → "Verificar una entrada".
-4. Opcional: borrar `MERCADOPAGO_ACCESS_TOKEN` de Vercel (ya no se usa).
+Ninguna por ahora (9/10/2026: claves cargadas en Vercel y cuenta de Mercado Pago reconectada).
 
 ## Cómo trabajamos
 
@@ -39,7 +34,7 @@ Revisado en Vercel el 9/10/2026 (solo nombres, nunca valores):
 - **Etapas de un paso:** (1) si hay decisiones abiertas, preguntarle al dueño con opciones y una recomendación → (2) borrador: commit `Paso N (borrador para revisar): ...` → (3) revisión con agentes en paralelo, verificar cada hallazgo → (4) commit `Paso N: arreglos de la revisión con agentes` → (5) el dueño lo prueba en producción → `[x]` en `PASOS.md`.
 - **Antes de cada commit:** skill `verificar` (test que falla primero en lo delicado; typecheck, lint y tests con Postgres local, 0 salteados).
 - **Idioma:** todo en español rioplatense y simple (código, commits, docs, mensajes). Ramiro no necesita jerga: decir qué probar y dónde hacer clic.
-- **Ramas:** si el chat trabaja en otra rama, al terminar hay que llevar los cambios a la rama principal (PR o merge), siempre preguntándole antes al dueño, porque eso publica en producción.
+- **Ramas:** el chat no publica solo. Al cerrar cada etapa abre un pull request de su rama hacia la principal y le da a Ramiro **el link directo al PR** para que toque "Merge pull request" → "Confirm merge" (pedido por él el 9/10/2026). Si ya hay un PR abierto de la rama, se reusa y se le vuelve a pasar el link.
 
 ## Reglas que no se negocian
 
@@ -82,4 +77,5 @@ Detalle en `.claude/rules/` (se cargan solas al tocar esos archivos) y permisos 
 ## Traspaso (último chat)
 
 - **9/10/2026:** se armó este sistema de contexto (`CONTEXTO.md`, `PENDIENTES.md`, `BITACORA.md`, skills `empezar-paso` y `cerrar-paso`). Sin cambios de código.
-- **Para el próximo chat:** si Ramiro confirma la prueba del paso 13, marcarlo `[x]` y arrancar el paso 14 (QR y PDF). Si no, resolver lo que haya encontrado primero.
+- **9/10/2026 (después):** Ramiro probó el paso 13 (VÁLIDA) → marcado `[x]`. Preguntó por una lista de ventas: va en el paso 20.
+- **Para el próximo chat:** arrancar el paso 14 (QR y PDF).
