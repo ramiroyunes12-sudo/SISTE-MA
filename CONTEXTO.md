@@ -18,8 +18,8 @@ Sistema de venta de entradas por lotes para varias **productoras** (se alquila p
 
 ## Estado actual
 
-- **Hechos y probados:** pasos 1 a 12 (base, login, productoras, evento y lotes, página pública, reparto entre lotes, datos del checkout, reserva, cobro por transferencia y Mercado Pago, probado con plata real el 8/10/2026).
-- **Paso 13 (código firmado de cada entrada): programado y revisado con agentes, falta la prueba del dueño** (ver "Acciones del dueño"). Se marca `[x]` en `PASOS.md` cuando él confirme.
+- **Hechos y probados:** pasos 1 a 13 (base, login, productoras, evento y lotes, página pública, reparto entre lotes, datos del checkout, reserva, cobro por transferencia y Mercado Pago con plata real el 8/10/2026, código firmado de cada entrada probado el 9/10/2026).
+- El panel todavía **no lista las compras pagas ni sus entradas** (llega en el paso 20): solo muestra cuántas y lo cobrado. El código de cada entrada se ve en el link secreto de la compra.
 - **Próximo paso: 14 — QR y PDF.** Notas ya decididas en `PASOS.md` (generar en nuestro servidor, el QR lleva solo el código firmado, los PDF no se guardan: se rearman desde la base).
 
 ## Acciones del dueño pendientes
@@ -29,7 +29,6 @@ Cosas que hace Ramiro a mano (no se pueden hacer desde el chat). Lista completa 
 Revisado en Vercel el 9/10/2026 (solo nombres, nunca valores): `CLAVE_CODIGOS` cargada, `CLAVE_CIFRADO` cambiada, `MERCADOPAGO_ACCESS_TOKEN` borrada y producción vuelta a publicar con las claves nuevas.
 
 1. **Reconectar la cuenta de Mercado Pago** de la productora (panel → Productoras → la productora → Cobros, pegar el Access Token de nuevo): con la `CLAVE_CIFRADO` nueva, la conexión anterior ya no sirve y no se ofrece ningún pago hasta reconectarla.
-2. **Probar el paso 13:** en una compra paga se ve el código de cada entrada; panel → evento → "Verificar una entrada".
 
 ## Cómo trabajamos
 
@@ -80,4 +79,5 @@ Detalle en `.claude/rules/` (se cargan solas al tocar esos archivos) y permisos 
 ## Traspaso (último chat)
 
 - **9/10/2026:** se armó este sistema de contexto (`CONTEXTO.md`, `PENDIENTES.md`, `BITACORA.md`, skills `empezar-paso` y `cerrar-paso`). Sin cambios de código.
-- **Para el próximo chat:** si Ramiro confirma la prueba del paso 13, marcarlo `[x]` y arrancar el paso 14 (QR y PDF). Si no, resolver lo que haya encontrado primero.
+- **9/10/2026 (después):** Ramiro probó el paso 13 (VÁLIDA) → marcado `[x]`. Preguntó por una lista de ventas: va en el paso 20.
+- **Para el próximo chat:** arrancar el paso 14 (QR y PDF). Confirmar antes que la cuenta de Mercado Pago esté reconectada.

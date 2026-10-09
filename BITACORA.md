@@ -4,7 +4,8 @@ Una entrada por chat, la más nueva arriba. Corta: qué se hizo, qué quedó y c
 
 ## 9/10/2026 — Sistema de contexto entre chats
 - Se crearon `CONTEXTO.md` (se carga solo en cada chat), `PENDIENTES.md`, esta bitácora y las skills `empezar-paso` y `cerrar-paso`.
-- Ramiro cargó `CLAVE_CODIGOS`, cambió `CLAVE_CIFRADO` y borró `MERCADOPAGO_ACCESS_TOKEN` en Vercel; producción republicada. Falta reconectar Mercado Pago y probar el paso 13.
+- Ramiro cargó `CLAVE_CODIGOS`, cambió `CLAVE_CIFRADO` y borró `MERCADOPAGO_ACCESS_TOKEN` en Vercel; producción republicada. Falta reconectar Mercado Pago.
+- Paso 13 probado por Ramiro en producción (VÁLIDA) y marcado `[x]`.
 - Sin cambios de código.
 
 ## 8-9/10/2026 — Paso 13: código firmado de cada entrada
