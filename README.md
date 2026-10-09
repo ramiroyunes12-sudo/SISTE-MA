@@ -196,7 +196,7 @@ Cuando se confirma el pago, a quien compró le llega **"Tus entradas para …"**
 | `WHATSAPP_AYUDA` | El WhatsApp para consultas, como se quiere mostrar y con código de país: `+54 9 379 412-3456`. Sin él, no se muestra |
 | `CRON_SECRET` | La clave con la que Vercel llama a la tarea diaria (16+ caracteres al azar; generala en el panel → Claves). Sin ella, la tarea diaria no hace nada |
 
-Sin estas variables (o sin `CLAVE_CODIGOS`) no sale ningún mail y el panel lo avisa; cuando se cargan, los que faltan salen solos. Gmail manda hasta unos 500 por día: para más, se puede pasar a Resend u otro servicio cambiando solo las variables. Gmail guarda en "Enviados" una copia de cada mail (con los QR): usá una cuenta solo para esto y vaciá "Enviados" después de cada evento.
+Sin estas variables (o sin `CLAVE_CODIGOS`) no sale ningún mail y el panel lo avisa; cuando se cargan, los que faltan salen solos. Gmail manda hasta unos 500 por día (para más, se podría pasar a otro servicio cambiando solo las variables; por ahora se queda Gmail). Con una cuenta nueva, algunos mails pueden caer en spam. Gmail guarda en "Enviados" una copia de cada mail (con los QR): usá una cuenta solo para esto y vaciá "Enviados" después de cada evento.
 
 ## Publicación (Vercel)
 
