@@ -184,11 +184,11 @@ describe.skipIf(!url)("cobrar por transferencia o Mercado Pago", { timeout: 120_
 
     // Sin la plata todavía: sigue pendiente.
     await db.productora.update({ where: { id: productoraId }, data: { mpRevisadoEn: null } });
-    expect(await revisarPagoDeCompra(db, reserva.llave, mp.api)).toEqual({ estado: "PENDIENTE", aDevolver: false });
+    expect(await revisarPagoDeCompra(db, reserva.llave, mp.api)).toEqual({ estado: "PENDIENTE", aDevolver: false, confirmoAlgo: false });
 
     const pago = mp.entra(monto);
     await db.productora.update({ where: { id: productoraId }, data: { mpRevisadoEn: null } });
-    expect(await revisarPagoDeCompra(db, reserva.llave, mp.api)).toEqual({ estado: "PAGADA", aDevolver: false });
+    expect(await revisarPagoDeCompra(db, reserva.llave, mp.api)).toEqual({ estado: "PAGADA", aDevolver: false, confirmoAlgo: true });
     const pagada = await orden(reserva.ordenId);
     expect(pagada.metodoPago).toBe("TRANSFERENCIA");
     expect(pagada.entradas.every((entrada) => entrada.estado === "VALIDA")).toBe(true);
@@ -199,6 +199,18 @@ describe.skipIf(!url)("cobrar por transferencia o Mercado Pago", { timeout: 120_
     expect(await procesarPagoMp(db, cuenta, pago)).toBe("ya_registrado");
     expect(await lote(evento.lotes[0])).toEqual({ vendidas: 2, reservadas: 0 });
     expect(await db.pago.count({ where: { ordenId: reserva.ordenId } })).toBe(1);
+  });
+
+  it("si la revisión de una compra confirma la de otra persona, lo avisa (para mandarle el mail)", async () => {
+    const evento = await crearEvento([10]);
+    const una = await reservar(evento, 1);
+    const otra = await reservar(evento, 1);
+    await elegirTransferencia(db, una.llave);
+    await elegirTransferencia(db, otra.llave);
+    mp.entra(await montoDe(otra.ordenId));
+    await db.productora.update({ where: { id: productoraId }, data: { mpRevisadoEn: null } });
+    expect(await revisarPagoDeCompra(db, una.llave, mp.api)).toEqual({ estado: "PENDIENTE", aDevolver: false, confirmoAlgo: true });
+    expect((await orden(otra.ordenId)).estado).toBe("PAGADA");
   });
 
   it("muchas órdenes del mismo total eligen transferencia a la vez: todos los montos distintos", async () => {
@@ -534,7 +546,7 @@ describe.skipIf(!url)("cobrar por transferencia o Mercado Pago", { timeout: 120_
     await liberarVencidas(db, evento.id, new Date(Date.now() + (MINUTOS_RESERVA + 1) * MINUTO));
     await reservar(evento, 1);
     await procesarPagoMp(db, cuenta, mp.entra(await montoDe(tarde.ordenId)));
-    expect(await revisarPagoDeCompra(db, tarde.llave, mp.api)).toEqual({ estado: "VENCIDA", aDevolver: true });
+    expect(await revisarPagoDeCompra(db, tarde.llave, mp.api)).toMatchObject({ estado: "VENCIDA", aDevolver: true });
     expect((await opcionesDePago(db, tarde.llave))!.aDevolverCentavos).toBe(await montoDe(tarde.ordenId));
   });
 });

@@ -44,7 +44,7 @@ describe("Mail con las entradas", () => {
     expect(mail.para).toBe("comprador@ejemplo.com");
     expect(mail.nombreRemitente).toBe("La Productora");
     expect(mail.responderA).toBe("hola@productora.com");
-    expect(mail.asunto).toBe("Tus entradas para Fiesta");
+    expect(mail.asunto).toBe("Tus entradas para Fiesta (compra N° 12)");
 
     const imagenes = mail.adjuntos.filter((a) => a.tipo === "image/png");
     expect(imagenes.map((a) => a.cid)).toEqual(["qr-entrada-1@entradas", "qr-entrada-2@entradas"]);
@@ -63,6 +63,10 @@ describe("Mail con las entradas", () => {
       expect(texto).toContain("compra N° 12");
     }
     expect(mail.html).toContain("ENTRADA 2 DE 2");
+    // Cada entrada dice cuál es su PDF (para mandárselo a esa persona).
+    expect(mail.html).toContain("Su PDF: entrada-2-compra-12.pdf");
+    expect(mail.texto).toContain("Su PDF: entrada-2-compra-12.pdf");
+    expect(mail.texto).toContain("Respondé este mail");
     expect(mail.html).toContain("Acá están tus 2 entradas");
     expect(mail.html).toContain("Respondé este mail");
   });
@@ -72,6 +76,8 @@ describe("Mail con las entradas", () => {
     expect(mail.adjuntos.map((a) => a.archivo)).toEqual(["qr-entrada-1.png", "entradas-compra-12.pdf"]);
     expect(mail.html).toContain("TU ENTRADA");
     expect(mail.texto).toContain("Acá está tu entrada");
+    expect(mail.texto).toContain("El QR está en el PDF adjunto");
+    expect(mail.html).not.toContain("Su PDF");
     expect(mail.html).not.toContain("DE 1");
   });
 
@@ -108,7 +114,21 @@ describe("Mail con las entradas", () => {
     expect(mail.html).toContain("Ana &lt;b&gt;O&#39;Connor&lt;/b&gt;");
     expect(mail.html).toContain("Club &amp; Bar");
     expect(mail.asunto).not.toMatch(/[\r\n]/);
+    expect(mail.asunto).toMatch(/\(compra N° 12\)$/);
     expect(mail.nombreRemitente).toBe("Prod Bcc: otro@ejemplo.com");
+  });
+
+  it("un nombre que termina en punto no deja '..' al final de una oración", async () => {
+    const mail = await armarMailEntradas(datos({ productora: { nombre: "Noche S.R.L.", emailContacto: "hola@noche.com" } }));
+    expect(mail.html).toContain("le llega a Noche S.R.L.");
+    expect(mail.html).not.toContain("S.R.L..");
+    expect(mail.texto).not.toContain("S.R.L..");
+  });
+
+  it("Outlook de escritorio: el texto de vista previa va oculto y el ancho, fijo", async () => {
+    const mail = await armarMailEntradas(datos());
+    expect(mail.html).toMatch(/display:none;mso-hide:all;/);
+    expect(mail.html).toContain('<!--[if mso]><table role="presentation" width="480"');
   });
 
   it("sin entradas no arma nada", async () => {

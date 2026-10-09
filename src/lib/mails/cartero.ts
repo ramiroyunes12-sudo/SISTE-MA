@@ -59,14 +59,16 @@ export function carteroSmtp(env: Record<string, string | undefined> = process.en
     secure: config.puerto === 465, // 465: TLS desde el principio; 587: lo pide con STARTTLS
     requireTLS: config.puerto !== 465,
     auth: { user: config.usuario, pass: config.clave },
-    // Que un servidor colgado no deje el envío esperando para siempre.
+    // Que un servidor colgado no deje el envío esperando para siempre (y
+    // además, un plazo total: PLAZO_ENVIO_MS).
+    dnsTimeout: 10_000,
     connectionTimeout: 10_000,
     greetingTimeout: 10_000,
     socketTimeout: 20_000,
   });
   return {
     async enviar(mensaje) {
-      await transporte.sendMail({
+      const envio = transporte.sendMail({
         from: { name: enUnRenglon(mensaje.nombreRemitente, 80), address: config.desde },
         to: mensaje.para,
         ...(mensaje.responderA ? { replyTo: mensaje.responderA } : {}),
@@ -80,8 +82,30 @@ export function carteroSmtp(env: Record<string, string | undefined> = process.en
           ...(adjunto.cid ? { cid: adjunto.cid, contentDisposition: "inline" as const } : {}),
         })),
       });
+      await conPlazo(envio, PLAZO_ENVIO_MS);
     },
   };
+}
+
+// Lo más que se espera a que salga un mail. (pendientes.ts cuenta con esto:
+// DURACION_MAXIMA_ENVIO_MS tiene que ser mayor.)
+export const PLAZO_ENVIO_MS = 45_000;
+
+function conPlazo<T>(promesa: Promise<T>, ms: number): Promise<T> {
+  let reloj: ReturnType<typeof setTimeout> | undefined;
+  const vencido = new Promise<never>((_, rechazar) => {
+    reloj = setTimeout(() => rechazar(Object.assign(new Error("El envío tardó demasiado"), { code: "ETIMEDOUT" })), ms);
+  });
+  // Si vence el plazo, lo que pase después con el envío ya no importa.
+  promesa.catch(() => {});
+  return Promise.race([promesa, vencido]).finally(() => clearTimeout(reloj));
+}
+
+// El servidor dice que se llegó al límite de mails por día de la cuenta
+// (Gmail: 5.4.5). No es culpa del mail: no cuenta como intento.
+export function esLimiteDiario(error: unknown) {
+  const respuesta = typeof error === "object" && error !== null ? (error as { response?: unknown }).response : undefined;
+  return typeof respuesta === "string" && /\b5\.4\.5\b/.test(respuesta);
 }
 
 // Por qué no salió un mail, en palabras simples y sin datos de la persona (el
@@ -89,9 +113,8 @@ export function carteroSmtp(env: Record<string, string | undefined> = process.en
 export function describirErrorDeMail(error: unknown): string {
   const e = (typeof error === "object" && error !== null ? error : {}) as { code?: unknown; responseCode?: unknown; response?: unknown };
   const codigo = typeof e.code === "string" ? e.code : "";
-  const respuesta = typeof e.response === "string" ? e.response : "";
   if (codigo === "EAUTH") return "El servidor de mail rechazó el usuario o la contraseña (SMTP_USUARIO y SMTP_CLAVE).";
-  if (/\b5\.4\.5\b/.test(respuesta)) return "Se llegó al límite de mails por día de la cuenta. Se reintenta más tarde.";
+  if (esLimiteDiario(error)) return "Se llegó al límite de mails por día de la cuenta: se vuelve a intentar cada una hora.";
   if (["ECONNECTION", "ETIMEDOUT", "ESOCKET", "EDNS", "ECONNREFUSED", "ECONNRESET", "ETLS"].includes(codigo)) {
     return "No se pudo conectar con el servidor de mail.";
   }

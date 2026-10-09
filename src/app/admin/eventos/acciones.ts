@@ -126,6 +126,8 @@ export async function buscarPagosAccion(eventoId: string): Promise<EstadoPagoMan
     return { listo: confirmadas ? `Se confirmaron ${confirmadas} compras.` : "No entró ningún pago nuevo." };
   } catch (error) {
     unstable_rethrow(error);
+    // Puede haber confirmado alguna antes de fallar.
+    mandarMailsDespues();
     console.error("[buscarPagos] Falló:", error instanceof Error ? error.message : error);
     return { error: "No pudimos hablar con Mercado Pago. Probá de nuevo en un rato." };
   }

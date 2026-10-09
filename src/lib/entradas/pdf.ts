@@ -15,7 +15,8 @@ import { aTextoPdf, entraEnWinAnsi } from "./texto-pdf";
 
 export type EntradaParaPdf = {
   numero: number; // "Entrada 2 de 3"
-  tipo: string; // con el lote: "General · Lote 2" (tipoYLote)
+  tipo: string;
+  lote?: string; // "Lote 2" (va al lado del tipo; vacío en una cortesía)
   titular: string;
   dni: string;
   codigoFirmado: string; // lo que va en el QR
@@ -106,6 +107,19 @@ function dibujarQr(pagina: PDFPage, texto: string, x: number, y: number) {
   }
 }
 
+// "GENERAL · LOTE 2" en un renglón: si no entra, más chico; si tampoco, se
+// acorta el tipo (el lote queda entero).
+function renglonTipoYLote(fuente: PDFFont, tipo: string, lote: string) {
+  const ancho = ANCHO - 2 * BORDE;
+  const sufijo = lote ? ` · ${lote}` : "";
+  for (const tamano of [13, 10]) {
+    if (fuente.widthOfTextAtSize(`${tipo}${sufijo}`, tamano) <= ancho) return { texto: `${tipo}${sufijo}`, tamano };
+  }
+  let corto = tipo;
+  while (corto.length > 1 && fuente.widthOfTextAtSize(`${corto}…${sufijo}`, 10) > ancho) corto = corto.slice(0, -1);
+  return { texto: `${corto.trimEnd()}…${sufijo}`, tamano: 10 };
+}
+
 function paginaDeEntrada(pdf: PDFDocument, fuentes: Fuentes, datos: DatosPdf, entrada: EntradaParaPdf) {
   const pagina = pdf.addPage([ANCHO, ALTO]);
   const { evento } = datos;
@@ -118,10 +132,8 @@ function paginaDeEntrada(pdf: PDFDocument, fuentes: Fuentes, datos: DatosPdf, en
 
   pagina.drawLine({ start: { x: BORDE, y: y - 6 }, end: { x: ANCHO - BORDE, y: y - 6 }, thickness: 0.6, color: TENUE });
   y -= 8;
-  // Tipo y lote en un renglón (si no entra, más chico; recién ahí se corta).
-  const tipo = aMayusculas(entrada.tipo);
-  const tamanoTipo = fuentes.negrita.widthOfTextAtSize(tipo, 13) <= ANCHO - 2 * BORDE ? 13 : 10;
-  y = escribir(pagina, tipo, y, { fuente: fuentes.negrita, tamano: tamanoTipo, maximo: 1 });
+  const tipo = renglonTipoYLote(fuentes.negrita, aMayusculas(entrada.tipo), entrada.lote ? aMayusculas(entrada.lote) : "");
+  y = escribir(pagina, tipo.texto, y, { fuente: fuentes.negrita, tamano: tipo.tamano, maximo: 1 });
   y = escribir(pagina, `Entrada ${entrada.numero} de ${datos.totalEntradas} · Compra N° ${datos.compra}`, y, {
     fuente: fuentes.normal,
     tamano: 8.5,

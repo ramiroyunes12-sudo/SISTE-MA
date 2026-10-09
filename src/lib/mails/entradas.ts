@@ -45,16 +45,21 @@ export async function armarMailEntradas(datos: DatosMailEntradas): Promise<Mensa
   const { evento } = datos;
   const lugar = evento.direccion ? `${evento.lugar} · ${evento.direccion}` : evento.lugar;
   const fecha = formatearFechaLarga(evento.fecha);
-  const cantidad = datos.entradas.length === 1 ? "tu entrada" : `tus ${datos.entradas.length} entradas`;
-  const aca = datos.entradas.length === 1 ? "Acá está" : "Acá están";
+  const una = datos.entradas.length === 1;
+  const cantidad = una ? "tu entrada" : `tus ${datos.entradas.length} entradas`;
+  const aca = una ? "Acá está" : "Acá están";
   const variasEnLaCompra = datos.totalEntradas > 1;
+  // Para terminar una oración con un nombre sin que quede ".." ("S.R.L.").
+  const alFinal = (texto: string) => texto.replace(/[.\s]+$/, "");
+  const archivoTodas = `entradas-compra-${datos.compra}.pdf`;
+  const archivoDe = (entrada: EntradaConQr) => `entrada-${entrada.numero}-compra-${datos.compra}.pdf`;
 
   // ─── Adjuntos ───
   const datosPdf = (entradas: EntradaConQr[]): DatosPdf => ({
     evento,
     compra: datos.compra,
     totalEntradas: datos.totalEntradas,
-    entradas: entradas.map((entrada) => ({ ...entrada, tipo: tipoYLote(entrada), usada: entrada.estado === "USADA" })),
+    entradas: entradas.map((entrada) => ({ ...entrada, usada: entrada.estado === "USADA" })),
   });
   const pdf = (archivo: string, contenido: Uint8Array): Adjunto => ({ archivo, contenido, tipo: "application/pdf" });
   const adjuntos: Adjunto[] = datos.entradas.map((entrada) => ({
@@ -63,11 +68,9 @@ export async function armarMailEntradas(datos: DatosMailEntradas): Promise<Mensa
     tipo: "image/png",
     cid: cid(entrada.numero),
   }));
-  adjuntos.push(pdf(`entradas-compra-${datos.compra}.pdf`, await armarPdfEntradas(datosPdf(datos.entradas))));
-  if (datos.entradas.length > 1) {
-    for (const entrada of datos.entradas) {
-      adjuntos.push(pdf(`entrada-${entrada.numero}-compra-${datos.compra}.pdf`, await armarPdfEntradas(datosPdf([entrada]))));
-    }
+  adjuntos.push(pdf(archivoTodas, await armarPdfEntradas(datosPdf(datos.entradas))));
+  if (!una) {
+    for (const entrada of datos.entradas) adjuntos.push(pdf(archivoDe(entrada), await armarPdfEntradas(datosPdf([entrada]))));
   }
 
   // ─── HTML ───
@@ -76,23 +79,23 @@ export async function armarMailEntradas(datos: DatosMailEntradas): Promise<Mensa
     .map((entrada) => {
       const titulo = variasEnLaCompra ? `ENTRADA ${entrada.numero} DE ${datos.totalEntradas}` : "TU ENTRADA";
       return `
-<tr><td style="background:#FFFFFF;border-radius:14px;padding:20px;text-align:center;">
+<tr><td align="center" style="background:#FFFFFF;border-radius:14px;padding:20px;text-align:center;">
   <div style="font-size:13px;font-weight:700;color:${TENUE};letter-spacing:0.04em;">${titulo}</div>
   <img src="cid:${cid(entrada.numero)}" width="220" height="220" alt="QR de la entrada ${entrada.numero}" style="display:block;width:220px;height:220px;margin:12px auto;border:0;background:#FFFFFF;">
   <div style="font-size:18px;font-weight:700;color:${TINTA};">${e(entrada.titular)}</div>
   <div style="font-size:14px;color:${TENUE};margin-top:2px;">DNI ${e(formatearDni(entrada.dni))} · ${e(tipoYLote(entrada))}</div>
   ${entrada.estado === "USADA" ? `<div style="font-size:13px;font-weight:700;color:${TENUE};margin-top:6px;">YA USADA</div>` : ""}
   <div style="font-size:11px;color:${TENUE};margin-top:8px;font-family:'Courier New',monospace;word-break:break-all;">Código: ${e(entrada.codigoFirmado)}</div>
+  ${una ? "" : `<div style="font-size:12px;color:${TENUE};margin-top:6px;">Su PDF: ${archivoDe(entrada)}</div>`}
 </td></tr>
 <tr><td style="height:12px;line-height:12px;font-size:0;">&nbsp;</td></tr>`;
     })
     .join("");
-  const pdfs =
-    datos.entradas.length > 1
-      ? "También van adjuntas en PDF: uno con todas y uno por persona, para mandarle a cada uno la suya."
-      : "También va adjunta en PDF.";
+  const pdfs = una
+    ? "También va adjunta en PDF."
+    : "También van adjuntas en PDF: un archivo con todas y uno por persona, para mandarle a cada uno la suya.";
   const responder = datos.productora.emailContacto
-    ? `<br>¿Dudas? Respondé este mail y le llega a ${e(datos.productora.nombre)}.`
+    ? ` ¿Dudas? Respondé este mail y le llega a ${e(alFinal(datos.productora.nombre))}.`
     : "";
 
   const html = `<!doctype html>
@@ -105,9 +108,10 @@ export async function armarMailEntradas(datos: DatosMailEntradas): Promise<Mensa
 <title>${e(`Tus entradas para ${evento.nombre}`)}</title>
 </head>
 <body style="margin:0;padding:0;background:${FONDO};">
-<div style="display:none;max-height:0;overflow:hidden;">Compra N° ${datos.compra}: ${cantidad} con QR para ${e(evento.nombre)}.</div>
+<div style="display:none;mso-hide:all;max-height:0;overflow:hidden;">Compra N° ${datos.compra}: ${cantidad} con QR para ${e(alFinal(evento.nombre))}.</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${FONDO};">
 <tr><td align="center" style="padding:16px 12px;">
+<!--[if mso]><table role="presentation" width="480" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;font-family:Arial,Helvetica,sans-serif;color:${TINTA};">
 <tr><td style="background:${TINTA};color:#FFFFFF;border-radius:14px;padding:20px;">
   <div style="font-size:22px;font-weight:800;line-height:1.25;">${e(evento.nombre)}</div>
@@ -115,20 +119,21 @@ export async function armarMailEntradas(datos: DatosMailEntradas): Promise<Mensa
   <div style="font-size:15px;margin-top:2px;">${e(lugar)}</div>
 </td></tr>
 <tr><td style="padding:16px 4px;font-size:15px;line-height:1.5;">
-  ¡Hola! ${aca} ${cantidad} (compra N° ${datos.compra}). Mostrá el QR en la puerta desde el celular o impreso, junto con tu DNI.
+  ¡Hola! ${aca} ${cantidad} (compra N° ${datos.compra}). En la puerta mostrá el QR desde el celular o impreso, junto con el DNI.
 </td></tr>
 ${tarjetas}
 <tr><td style="background:#FFFFFF;border-radius:14px;padding:16px 20px;font-size:14px;line-height:1.6;">
   <div style="font-weight:700;font-size:15px;">Importante</div>
+  • Cada persona entra con su QR y su DNI.<br>
   • Cada QR sirve para entrar una sola vez: el primero que lo usa, entra.<br>
   • No lo publiques ni lo compartas con quien no va.<br>
-  • Llevá tu DNI: puede pedirse en la puerta.<br>
   • ${pdfs}
 </td></tr>
 <tr><td style="padding:16px 4px;font-size:12px;line-height:1.5;color:${TENUE};">
   Te llega este mail porque compraste entradas para ${e(evento.nombre)} de ${e(datos.productora.nombre)} con esta dirección.${responder}
 </td></tr>
 </table>
+<!--[if mso]></td></tr></table><![endif]-->
 </td></tr>
 </table>
 </body>
@@ -138,6 +143,7 @@ ${tarjetas}
   const lineas = datos.entradas.flatMap((entrada) => [
     `${variasEnLaCompra ? `Entrada ${entrada.numero} de ${datos.totalEntradas}` : "Tu entrada"}: ${entrada.titular} · DNI ${formatearDni(entrada.dni)} · ${tipoYLote(entrada)}${entrada.estado === "USADA" ? " · YA USADA" : ""}`,
     `Código: ${entrada.codigoFirmado}`,
+    ...(una ? [] : [`Su PDF: ${archivoDe(entrada)}`]),
     "",
   ]);
   const texto = [
@@ -145,19 +151,21 @@ ${tarjetas}
     fecha,
     lugar,
     "",
-    `¡Hola! ${aca} ${cantidad} (compra N° ${datos.compra}). El QR de cada una está en el PDF adjunto: mostralo en la puerta desde el celular o impreso, junto con tu DNI.`,
+    `¡Hola! ${aca} ${cantidad} (compra N° ${datos.compra}). ${una ? "El QR está en el PDF adjunto" : "El QR de cada una está en los PDF adjuntos"}: en la puerta mostralo desde el celular o impreso, junto con el DNI.`,
     "",
     ...lineas,
-    "Importante: cada QR sirve para entrar una sola vez (el primero que lo usa, entra). No lo publiques ni lo compartas con quien no va.",
+    "Importante: cada persona entra con su QR y su DNI. Cada QR sirve para entrar una sola vez (el primero que lo usa, entra). No lo publiques ni lo compartas con quien no va.",
+    una ? `Adjunto: ${archivoTodas}.` : `Adjuntos: ${archivoTodas} (todas) y uno por persona.`,
     "",
-    `Te llega este mail porque compraste entradas para ${evento.nombre} de ${datos.productora.nombre} con esta dirección.`,
+    `Te llega este mail porque compraste entradas para ${evento.nombre} de ${datos.productora.nombre} con esta dirección.${datos.productora.emailContacto ? ` ¿Dudas? Respondé este mail y le llega a ${alFinal(datos.productora.nombre)}.` : ""}`,
   ].join("\n");
 
   return {
     para: datos.para,
     nombreRemitente: enUnRenglon(datos.productora.nombre, 80),
     ...(datos.productora.emailContacto ? { responderA: datos.productora.emailContacto } : {}),
-    asunto: enUnRenglon(`Tus entradas para ${evento.nombre}`, 150),
+    // Con el N° de compra: si no, Gmail junta en una conversación las de un mismo evento.
+    asunto: `Tus entradas para ${enUnRenglon(evento.nombre, 100)} (compra N° ${datos.compra})`,
     html,
     texto,
     adjuntos,

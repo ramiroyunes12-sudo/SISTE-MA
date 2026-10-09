@@ -13,7 +13,9 @@ import type { Cartero, Mensaje } from "./cartero";
 import {
   DURACION_MAXIMA_ENVIO_MS,
   enviarMailsPendientes,
-  ESPERA_ENTRE_INTENTOS_MS,
+  ESPERA_LIMITE_DIARIO_MS,
+  ESPERAS_MS,
+  estadoDelMail,
   estadoDeLosMails,
   MAX_INTENTOS,
   reintentarMailsDelEvento,
@@ -21,6 +23,7 @@ import {
 
 const url = process.env.TEST_DATABASE_URL;
 const MINUTO = 60_000;
+const HORA = 60 * MINUTO;
 
 // Un cartero de mentira: anota lo que manda. `fallar`: tira ese error;
 // `demora`: tarda en "mandarlo" (para probar dos envíos a la vez).
@@ -103,7 +106,10 @@ describe.skipIf(!url)("Mail con las entradas", () => {
   }
 
   const mailDe = (id: string) =>
-    db.orden.findUniqueOrThrow({ where: { id }, select: { mailEnviadoEn: true, mailIntentos: true, mailError: true, mailIntentoEn: true } });
+    db.orden.findUniqueOrThrow({
+      where: { id },
+      select: { mailEnviadoEn: true, mailIntentos: true, mailError: true, mailIntentoEn: true, mailReintentarDesde: true },
+    });
 
   it("manda el mail de una compra paga una sola vez, con los QR y los PDF", async () => {
     const ev = await evento("contacto@productora.com");
@@ -117,7 +123,7 @@ describe.skipIf(!url)("Mail con las entradas", () => {
     const [mensaje] = enviados;
     expect(mensaje.para).toBe("comprador@ejemplo.com");
     expect(mensaje.responderA).toBe("contacto@productora.com");
-    expect(mensaje.asunto).toBe("Tus entradas para Fiesta <del> mail");
+    expect(mensaje.asunto).toMatch(/^Tus entradas para Fiesta <del> mail \(compra N° \d+\)$/);
     // 2 QR dentro del mail + el PDF con todas + uno por persona.
     expect(mensaje.adjuntos.map((a) => a.archivo)).toEqual([
       "qr-entrada-1.png",
@@ -168,7 +174,7 @@ describe.skipIf(!url)("Mail con las entradas", () => {
     const andando = carteroDePrueba();
     const despues = (ms: number) => ({ eventoId: ev.eventoId, ahora: new Date(ahora.getTime() + ms) });
     expect(await enviarMailsPendientes(db, andando.cartero, despues(MINUTO))).toEqual({ enviados: 0, fallidos: 0 });
-    expect(await enviarMailsPendientes(db, andando.cartero, despues(ESPERA_ENTRE_INTENTOS_MS))).toEqual({ enviados: 1, fallidos: 0 });
+    expect(await enviarMailsPendientes(db, andando.cartero, despues(ESPERAS_MS[0] + 1000))).toEqual({ enviados: 1, fallidos: 0 });
     guardado = await mailDe(id);
     expect(guardado.mailEnviadoEn).not.toBeNull();
     expect(guardado.mailIntentos).toBe(2);
@@ -189,24 +195,81 @@ describe.skipIf(!url)("Mail con las entradas", () => {
     const id = await compra(ev);
     const ahora = Date.now();
     const fallando = carteroDePrueba({ fallar: Object.assign(new Error("x"), { code: "ECONNECTION" }) });
+    // Cada vuelta, pasada la espera más larga.
     for (let i = 0; i < MAX_INTENTOS + 1; i++) {
-      await enviarMailsPendientes(db, fallando.cartero, {
-        eventoId: ev.eventoId,
-        ahora: new Date(ahora + i * ESPERA_ENTRE_INTENTOS_MS),
-      });
+      await enviarMailsPendientes(db, fallando.cartero, { eventoId: ev.eventoId, ahora: new Date(ahora + i * 5 * HORA) });
     }
     let guardado = await mailDe(id);
     expect(guardado.mailIntentos).toBe(MAX_INTENTOS);
     expect(guardado.mailError).toBe("No se pudo conectar con el servidor de mail.");
 
     const andando = carteroDePrueba();
-    const tarde = new Date(ahora + 10 * ESPERA_ENTRE_INTENTOS_MS);
+    const tarde = new Date(ahora + 50 * HORA);
     expect(await enviarMailsPendientes(db, andando.cartero, { eventoId: ev.eventoId, ahora: tarde })).toEqual({ enviados: 0, fallidos: 0 });
 
     expect(await reintentarMailsDelEvento(db, ev.eventoId, andando.cartero, tarde)).toEqual({ enviados: 1, fallidos: 0 });
     guardado = await mailDe(id);
     expect(guardado.mailEnviadoEn).not.toBeNull();
     expect(andando.enviados).toHaveLength(1);
+  });
+
+  it("cada intento que falla espera más que el anterior", async () => {
+    const ev = await evento();
+    const id = await compra(ev);
+    const fallando = carteroDePrueba({ fallar: Object.assign(new Error("x"), { code: "ECONNECTION" }) });
+    let ahora = Date.now();
+    for (const espera of ESPERAS_MS) {
+      await enviarMailsPendientes(db, fallando.cartero, { eventoId: ev.eventoId, ahora: new Date(ahora) });
+      const { mailReintentarDesde } = await mailDe(id);
+      expect(mailReintentarDesde!.getTime() - ahora).toBeGreaterThanOrEqual(espera);
+      expect(mailReintentarDesde!.getTime() - ahora).toBeLessThan(espera + 10_000);
+      // Un minuto antes de la espera, no lo intenta.
+      expect(await enviarMailsPendientes(db, fallando.cartero, { eventoId: ev.eventoId, ahora: new Date(ahora + espera - MINUTO) })).toEqual({
+        enviados: 0,
+        fallidos: 0,
+      });
+      ahora = mailReintentarDesde!.getTime();
+    }
+    expect((await mailDe(id)).mailIntentos).toBe(ESPERAS_MS.length);
+  });
+
+  it("el límite diario de la cuenta no gasta intentos: espera una hora", async () => {
+    const ev = await evento();
+    const id = await compra(ev);
+    const ahora = Date.now();
+    const limite = Object.assign(new Error("x"), { responseCode: 550, response: "550-5.4.5 Daily user sending limit exceeded." });
+    const fallando = carteroDePrueba({ fallar: limite });
+    for (let i = 0; i < MAX_INTENTOS + 2; i++) {
+      expect(
+        await enviarMailsPendientes(db, fallando.cartero, { eventoId: ev.eventoId, ahora: new Date(ahora + i * ESPERA_LIMITE_DIARIO_MS + i * 1000) }),
+      ).toEqual({ enviados: 0, fallidos: 1 });
+    }
+    const guardado = await mailDe(id);
+    expect(guardado.mailIntentos).toBe(0);
+    expect(guardado.mailError).toMatch(/límite de mails por día/);
+    const andando = carteroDePrueba();
+    const despues = new Date(guardado.mailReintentarDesde!.getTime() + 1000);
+    expect(await enviarMailsPendientes(db, andando.cartero, { eventoId: ev.eventoId, ahora: despues })).toEqual({ enviados: 1, fallidos: 0 });
+  });
+
+  it("en una ráfaga de pagos no queda ningún mail sin intentar", async () => {
+    const ev = await evento();
+    const ids: string[] = [];
+    for (let i = 0; i < 25; i++) ids.push(await compra(ev, "PAGADA", ["VALIDA"]));
+    const { cartero, enviados } = carteroDePrueba({ demora: 20 });
+    await Promise.all(ids.map(() => enviarMailsPendientes(db, cartero, { eventoId: ev.eventoId })));
+    expect(enviados).toHaveLength(25);
+    for (const id of ids) expect((await mailDe(id)).mailIntentos).toBe(1);
+  });
+
+  it("cada compra se toma con la hora en que de verdad empieza su envío (no la de la vuelta)", async () => {
+    const ev = await evento();
+    const ids = [await compra(ev, "PAGADA", ["VALIDA"]), await compra(ev, "PAGADA", ["VALIDA"]), await compra(ev, "PAGADA", ["VALIDA"])];
+    const ahora = new Date();
+    const { cartero } = carteroDePrueba({ demora: 300 });
+    await enviarMailsPendientes(db, cartero, { eventoId: ev.eventoId, ahora });
+    const tomadas = await Promise.all(ids.map(async (id) => (await mailDe(id)).mailIntentoEn!.getTime() - ahora.getTime()));
+    expect(Math.max(...tomadas)).toBeGreaterThanOrEqual(550);
   });
 
   it('"Reintentar" no toca un envío que está en curso', async () => {
@@ -264,16 +327,49 @@ describe.skipIf(!url)("Mail con las entradas", () => {
     expect(guardado.mailError).toBe("No tiene entradas para mandar.");
   });
 
+  it("la página de la compra paga dice si el mail salió (y nada si no está configurado o es de antes)", async () => {
+    const ev = await evento();
+    const id = await compra(ev);
+    const vieja = await compra(ev);
+    // Como las que marcó la migración: 5 intentos sin ningún intento de verdad.
+    await db.orden.update({ where: { id: vieja }, data: { mailIntentos: MAX_INTENTOS, mailError: "Se pagó antes." } });
+    const smtp = { SMTP_HOST: "smtp.ejemplo.com", SMTP_USUARIO: "plataforma@ejemplo.com", SMTP_CLAVE: "clave" };
+    const anteriores = Object.fromEntries(Object.keys(smtp).map((k) => [k, process.env[k]]));
+    try {
+      expect(await estadoDelMail(db, id)).toBe("nada"); // sin servidor de mail
+      Object.assign(process.env, smtp);
+      expect(await estadoDelMail(db, id)).toBe("enviando");
+      expect(await estadoDelMail(db, vieja)).toBe("nada");
+      await enviarMailsPendientes(db, carteroDePrueba({ fallar: Object.assign(new Error("x"), { code: "EAUTH" }) }).cartero, { ordenId: id });
+      await db.orden.update({ where: { id }, data: { mailIntentos: MAX_INTENTOS } });
+      expect(await estadoDelMail(db, id)).toBe("no_salio");
+      await reintentarMailsDelEvento(db, ev.eventoId, carteroDePrueba().cartero, new Date(Date.now() + DURACION_MAXIMA_ENVIO_MS));
+      expect(await estadoDelMail(db, id)).toBe("enviado");
+    } finally {
+      for (const [k, v] of Object.entries(anteriores)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    }
+  });
+
   it("el panel ve cuántos salieron y cuáles no", async () => {
     const ev = await evento();
     const bien = await compra(ev);
     const mal = await compra(ev);
     await enviarMailsPendientes(db, carteroDePrueba().cartero, { ordenId: bien });
     await enviarMailsPendientes(db, carteroDePrueba({ fallar: Object.assign(new Error("x"), { code: "EAUTH" }) }).cartero, { ordenId: mal });
-    const estado = await estadoDeLosMails(db, ev.eventoId);
+    const estado = await estadoDeLosMails(db, ev.eventoId, new Date(Date.now() + DURACION_MAXIMA_ENVIO_MS + 1000));
     expect(estado.enviados).toBe(1);
+    expect(estado.cuantosSinEnviar).toBe(1);
     expect(estado.sinEnviar).toEqual([
-      expect.objectContaining({ id: mal, intentos: 1, error: expect.stringMatching(/usuario o la contraseña/), reintentaSolo: true }),
+      expect.objectContaining({
+        id: mal,
+        intentos: 1,
+        error: expect.stringMatching(/usuario o la contraseña/),
+        enCurso: false,
+        reintentaSolo: true,
+      }),
     ]);
   });
 });

@@ -39,10 +39,13 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
   const db = obtenerDb();
 
   // Volvió de Mercado Pago con el número del pago: se mira ese pago primero.
+  // Si confirmó alguna compra (esta u otra), los mails salen después de responder.
   if (typeof pagoId === "string") {
-    await revisarPagoDeCompra(db, llave, apiMercadoPago, pagoId).catch((error: unknown) =>
-      console.warn("[revisarPagoDeCompra] No se pudo:", error),
-    );
+    const revision = await revisarPagoDeCompra(db, llave, apiMercadoPago, pagoId).catch((error: unknown) => {
+      console.warn("[revisarPagoDeCompra] No se pudo:", error);
+      return null;
+    });
+    if (revision?.confirmoAlgo) mandarMailsDespues();
   }
 
   const ahora = new Date();
@@ -59,6 +62,7 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
     // Si el mail todavía no salió (o falló), se intenta después de responder.
     const mail = await estadoDelMail(db, compra.id);
     if (mail === "enviando") mandarMailsDespues({ ordenId: compra.id });
+    // (Sin el envío configurado, o si es de antes de los mails: no se dice nada.)
     return (
       <Marco titulo="Tu compra" evento={compra.evento.nombre} volver={volver}>
         <section role="status" className="flex flex-col gap-2 rounded-2xl border-2 border-ok bg-superficie p-5">
@@ -66,7 +70,7 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
           <p>
             Compra N° <strong>{compra.numero}</strong> · {compra.evento.nombre}
           </p>
-          {compra.email && (
+          {compra.email && mail !== "nada" && (
             <p className="[overflow-wrap:anywhere]">
               {mail === "enviado" && (
                 <>

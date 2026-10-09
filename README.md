@@ -181,9 +181,9 @@ En una compra paga, el link de la compra (`/compra/<llave>`) muestra cada entrad
 Cuando se confirma el pago, a quien compró le llega **"Tus entradas para …"** (`src/lib/mails/`): el evento, el QR de cada entrada con su nombre, DNI, tipo y lote, y adjuntos el PDF con todas y, con 2 o más, uno por persona (para mandarle a cada uno la suya). No lleva el link de la compra (en la base solo queda su huella).
 
 - **Remitente:** el nombre de la productora, desde la cuenta de mail de la plataforma. Si alguien responde, le llega al **Mail de contacto** de la productora (Productoras → la productora → Datos); si está vacío, a la cuenta de la plataforma.
-- **Cuándo sale:** nunca dentro de la confirmación del pago. Después de responder (con `after()` de Next), quien confirmó pide mandar los que faltan: el aviso de Mercado Pago, la pantalla que espera el pago y el panel. Cada mail se "toma" con un cambio condicionado en la base: aunque se pida dos veces a la vez, sale una sola vez.
-- **Si falla:** queda anotado el motivo (sin datos de la persona) y se reintenta pasados 5 minutos, hasta 5 intentos, cuando hay otra compra, cuando se abre el link de la compra o el panel del evento. En el panel, **Evento → Pagos → Mails con las entradas**: cuántos salieron, cuáles no y por qué, y **Reintentar ahora**.
-- El link de la compra paga dice si el mail ya salió ("Te mandamos las entradas a …").
+- **Cuándo sale:** nunca dentro de la confirmación del pago. Después de responder (con `after()` de Next), piden mandar los que faltan el aviso de Mercado Pago, la pantalla que espera el pago, el panel y el link de la compra paga; y una vez por día, a las 12:00, una tarea programada de Vercel (`/api/mails/pendientes`, protegida con `CRON_SECRET`). Cada mail se "toma" con un cambio condicionado en la base: aunque se pida varias veces a la vez, sale una sola vez.
+- **Si falla:** queda anotado el motivo (sin datos de la persona) y se reintenta cada vez más espaciado (5 minutos, 15 minutos, 1 hora, 4 horas), hasta 5 intentos, la próxima vez que algo pida mandar. Si es el límite diario de Gmail, no cuenta como intento y espera una hora. En el panel, **Evento → Pagos → Mails con las entradas**: cuántos salieron, cuáles no y por qué, y **Reintentar ahora**.
+- El link de la compra paga dice si el mail ya salió ("Te mandamos las entradas a …"). Si el envío no está configurado, no promete nada.
 - Las compras que ya estaban pagas antes de que existieran los mails no se mandan solas: aparecen en el panel como que no salieron, y con "Reintentar ahora" salen.
 
 | Variable | Qué es |
@@ -193,8 +193,9 @@ Cuando se confirma el pago, a quien compró le llega **"Tus entradas para …"**
 | `SMTP_USUARIO` | La cuenta (con Gmail, la dirección de la cuenta de la plataforma) |
 | `SMTP_CLAVE` | Con Gmail, una **contraseña de aplicación** de esa cuenta (necesita la verificación en 2 pasos): myaccount.google.com/apppasswords |
 | `MAIL_DESDE` | Opcional. La dirección del remitente si no es la cuenta (por ejemplo, con Resend, una de tu dominio) |
+| `CRON_SECRET` | La clave con la que Vercel llama a la tarea diaria (16+ caracteres al azar; generala en el panel → Claves). Sin ella, la tarea diaria no hace nada |
 
-Sin estas variables (o sin `CLAVE_CODIGOS`) no sale ningún mail y el panel lo avisa; cuando se cargan, los que faltan salen solos. Gmail manda hasta unos 500 por día: para más, se puede pasar a Resend u otro servicio cambiando solo las variables.
+Sin estas variables (o sin `CLAVE_CODIGOS`) no sale ningún mail y el panel lo avisa; cuando se cargan, los que faltan salen solos. Gmail manda hasta unos 500 por día: para más, se puede pasar a Resend u otro servicio cambiando solo las variables. Gmail guarda en "Enviados" una copia de cada mail (con los QR): usá una cuenta solo para esto y vaciá "Enviados" después de cada evento.
 
 ## Publicación (Vercel)
 

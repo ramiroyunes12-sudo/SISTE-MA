@@ -128,6 +128,28 @@ describe("PDF de las entradas", () => {
     expect((await leerPagina(pdf, 0)).textos).toContain("PISTA µ Ñ");
   });
 
+  it("el tipo va con su lote; si es muy largo se acorta el tipo, no el lote", async () => {
+    const pdf = await armarPdfEntradas(
+      datos({
+        totalEntradas: 2,
+        entradas: [
+          { numero: 1, tipo: "General", lote: "Lote 2", titular: "Ana", dni: "30111222", codigoFirmado: CODIGO },
+          {
+            numero: 2,
+            tipo: "Campo VIP con acceso preferencial y barra libre toda la noche",
+            lote: "Preventa 1",
+            titular: "Ana",
+            dni: "30111222",
+            codigoFirmado: CODIGO,
+          },
+        ],
+      }),
+    );
+    expect((await leerPagina(pdf, 0)).textos).toContain("GENERAL · LOTE 2");
+    const largo = (await leerPagina(pdf, 1)).textos.find((texto) => texto.endsWith("· PREVENTA 1"));
+    expect(largo).toMatch(/^CAMPO VIP .+… · PREVENTA 1$/);
+  });
+
   it("no se rompe con nombres raros ni textos muy largos", async () => {
     const largo = "Supercalifragilisticoespialidoso".repeat(6);
     const pdf = await armarPdfEntradas(

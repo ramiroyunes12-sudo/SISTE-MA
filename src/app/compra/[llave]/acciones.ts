@@ -64,11 +64,12 @@ export async function mercadoPagoAccion(llave: string): Promise<EstadoPago> {
 // La pantalla pregunta cada tanto si ya entró la plata.
 export async function revisarPagoAccion(llave: string): Promise<EstadoDeCompra | null> {
   try {
-    const estado = await revisarPagoDeCompra(obtenerDb(), String(llave), apiMercadoPago);
-    // Se confirmó (esta u otras: la revisión mira todos los pagos de la
-    // productora): los mails salen después de responder.
-    if (estado?.estado === "PAGADA") mandarMailsDespues();
-    return estado;
+    const revision = await revisarPagoDeCompra(obtenerDb(), String(llave), apiMercadoPago);
+    if (!revision) return null;
+    // Si se confirmó esta u otra compra (la revisión mira todos los pagos de
+    // la productora), los mails salen después de responder.
+    if (revision.confirmoAlgo || revision.estado === "PAGADA") mandarMailsDespues();
+    return { estado: revision.estado, aDevolver: revision.aDevolver };
   } catch (error) {
     console.error("[revisarPago] Falló:", error);
     return null;
