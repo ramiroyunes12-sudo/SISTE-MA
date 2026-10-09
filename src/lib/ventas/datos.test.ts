@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { errorDeDni, errorDeNombre, errorDeTelefono, formatearDni, validarDatosCompra } from "./datos";
+import { errorDeDni, errorDeNombre, errorDeTelefono, formatearDni, normalizarNombre, validarDatosCompra } from "./datos";
 import { pedidoATexto, pedidoDesdeTexto, validarPedido } from "./pedido";
 
 const GENERAL = "00000000-0000-4000-8000-000000000001";
@@ -80,11 +80,26 @@ describe("datos del checkout", () => {
     expect(errorDeNombre("Иван Петров")).toBe("Solo letras, como figura en el DNI.");
     expect(errorDeNombre("Juan 李")).toBe("Solo letras, como figura en el DNI.");
     expect(errorDeNombre("Zoë Dvořák")).toBeUndefined();
+    // Letras latinas que la entrada impresa no tiene (saldrían "?"): tampoco.
+    for (const nombre of ["Łukasz Kowalski", "Ｊｕａｎ Ｐｅｒｅｚ", "ﬁona Pérez", "Zoë ẞtraße"]) {
+      expect(errorDeNombre(nombre), nombre).toBe("Solo letras, como figura en el DNI.");
+    }
     expect(errorDeNombre(`Juan ${"a".repeat(80)}`)).toBe("Es muy largo (hasta 80 letras).");
     for (const malo of ["0000000", "123456789", "40 123 45a", "-"]) expect(errorDeDni(malo), malo).toBeDefined();
     for (const bueno of ["40123456", "40.123.456", "5.123.456", "123456"]) expect(errorDeDni(bueno), bueno).toBeUndefined();
     expect(errorDeTelefono("379 4123456")).toBeUndefined();
     expect(errorDeTelefono("llamame")).toBeDefined();
+  });
+
+  it("nombres con tilde en dos partes (copiados de una Mac) o con otros apóstrofos", () => {
+    const nfd = "José Pérez".normalize("NFD");
+    expect(errorDeNombre(nfd)).toBeUndefined();
+    expect(normalizarNombre(nfd)).toBe("José Pérez");
+    for (const nombre of ["Ana D´Angelo", "Ana D‘Angelo", "Ana D`Angelo", "Ana DʼAngelo", "Ana D'Angelo"]) {
+      expect(errorDeNombre(nombre), nombre).toBeUndefined();
+    }
+    expect(normalizarNombre("Ana D´Angelo")).toBe("Ana D’Angelo");
+    expect(normalizarNombre("Ana D'Angelo")).toBe("Ana D'Angelo");
   });
 
   it("muestra el DNI con puntos", () => {

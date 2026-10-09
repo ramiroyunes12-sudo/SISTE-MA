@@ -9,5 +9,5 @@ paths:
 - Nunca en `localStorage` ni `sessionStorage`.
 - El QR lleva solo el código aleatorio firmado, nunca DNI ni nombre.
 - Fuera de React (HTML del mail, PDF) escapar nombre y DNI; nunca `dangerouslySetInnerHTML` con datos de la gente.
-- Cada acción y ruta nueva: `requerirUsuario()` y el filtro de `src/lib/auth/alcance.ts` sobre el registro que toca (la puerta y la exportación solo ven su productora).
+- Cada acción y ruta nueva: `requerirUsuario()` y el filtro de `src/lib/auth/alcance.ts` sobre el registro que toca (la puerta y la exportación solo ven su productora). Excepción: lo que es sin usuario a propósito: la página del evento (`/e/<slug>`), la compra con su link secreto (`/compra/<llave>` y su `pdf`: la llave es el permiso) y el aviso de Mercado Pago (no se cree lo que llega: le pregunta el pago a Mercado Pago).
 - Las claves (HMAC, SMTP, Mercado Pago, cifrado) nunca con `NEXT_PUBLIC_`, nunca en el repo ni en el chat (tampoco las que genera Claude): solo en Vercel o en el `.env`. Se generan en el panel, en Claves (`/admin/claves`).

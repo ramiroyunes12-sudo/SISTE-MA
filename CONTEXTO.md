@@ -4,7 +4,7 @@
 
 ## Qué es
 
-Sistema de venta de entradas por lotes para varias **productoras** (se alquila por evento): página pública del evento, compra con reserva de 15 min, cobro por transferencia o Mercado Pago, entrada con código firmado (después QR + PDF por mail) y validación en la puerta. El dueño de la plataforma es Ramiro (ADMIN).
+Sistema de venta de entradas por lotes para varias **productoras** (se alquila por evento): página pública del evento, compra con reserva de 15 min, cobro por transferencia o Mercado Pago, entrada con código firmado, QR y PDF (después, por mail) y validación en la puerta. El dueño de la plataforma es Ramiro (ADMIN).
 
 ## Dónde está todo
 
@@ -20,13 +20,13 @@ Sistema de venta de entradas por lotes para varias **productoras** (se alquila p
 
 - **Hechos y probados:** pasos 1 a 13 (base, login, productoras, evento y lotes, página pública, reparto entre lotes, datos del checkout, reserva, cobro por transferencia y Mercado Pago con plata real el 8/10/2026, código firmado de cada entrada probado el 9/10/2026).
 - El panel todavía **no lista las compras pagas ni sus entradas** (llega en el paso 20): solo muestra cuántas y lo cobrado. El código de cada entrada se ve en el link secreto de la compra.
-- **Paso 14 (QR y PDF): revisado y arreglado.** El borrador ya lo probó Ramiro en producción (QR, VÁLIDA, PDF). Falta: que Ramiro pruebe los arreglos y marcarlo `[x]`. Después: paso 15 (mail).
+- **Paso 14 (QR y PDF): código terminado** (dos revisiones con agentes y sus arreglos). El borrador ya lo probó Ramiro en producción (QR, VÁLIDA, PDF). Falta: que Ramiro pruebe los arreglos y marcarlo `[x]`. Después: paso 15 (mail).
 
 ## Acciones del dueño pendientes
 
 Cosas que hace Ramiro a mano (no se pueden hacer desde el chat). Lista completa en `PENDIENTES.md`.
 
-Ninguna por ahora (9/10/2026: claves cargadas en Vercel y cuenta de Mercado Pago reconectada).
+1. Probar los arreglos del paso 14 en producción (qué probar: `PASOS.md`, paso 14).
 
 ## Cómo trabajamos
 
@@ -70,11 +70,11 @@ Detalle en `.claude/rules/` (se cargan solas al tocar esos archivos) y permisos 
 | `src/lib/eventos` | Guardar evento, lotes, vista pública |
 | `src/lib/ventas` | Reparto por lote, reservas, órdenes, turno del evento, simulación |
 | `src/lib/pagos` | Cobros, confirmar, montos únicos, cuenta de Mercado Pago |
-| `src/lib/entradas` | Código firmado (`codigo.ts`), verificar, QR (`qr.ts`), entradas con QR (`imprimir.ts`), PDF (`pdf.ts`, `descarga.ts`) |
+| `src/lib/entradas` | Código firmado (`codigo.ts`), verificar, QR (`qr.ts`), entradas con QR (`imprimir.ts`), PDF (`pdf.ts`, `texto-pdf.ts`, `descarga.ts`) |
 | `prisma/` | `schema.prisma`, migraciones, datos de prueba |
 | `scripts/` | `migrar.mjs` (deploy), `usuario.ts` (crear ADMIN / resetear contraseña) |
 
 ## Traspaso (último chat)
 
-- **9/10/2026:** paso 14: borrador (QR + PDF), probado por Ramiro en producción; revisión con 4 agentes (nada grave) y arreglos (texto del mail, descarga `inline`, "YA USADA", nombres solo latinos, tests del QR del PDF).
-- **Para el próximo chat:** si Ramiro confirma la prueba de los arreglos, marcar el paso 14 `[x]` y arrancar el paso 15 (mail).
+- **9/10/2026:** paso 14 completo en código: QR + PDF, probado el borrador por Ramiro, dos revisiones con agentes y sus arreglos (nombre largo completo en el PDF, aviso de no compartir el link, nombres imprimibles, test de la ruta). Notas para los pasos 15, 16, 19, 20 y 21 en `PASOS.md`.
+- **Para el próximo chat:** si Ramiro confirma la prueba de los arreglos, marcar el paso 14 `[x]` y arrancar el paso 15 (mail): leer primero su nota "Del paso 14" (el mail no tiene la llave del link).

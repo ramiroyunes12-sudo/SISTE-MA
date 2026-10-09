@@ -126,7 +126,7 @@ La página pública es `/e/<dirección>` (por ejemplo, https://siste-ma.vercel.a
 
 ## Ventas: lotes y reservas
 
-El motor de la venta está en `src/lib/ventas/` (la pantalla de compra llega en los pasos 9 a 12):
+El motor de la venta está en `src/lib/ventas/`:
 
 - **Reparto** (`pedido.ts`): se vende primero el lote de menor número con lugar; si en ese no entra todo el pedido, el resto va al siguiente, a su precio. Ej.: piden 4 y al Lote 1 le quedan 2 → 2 del Lote 1 y 2 del Lote 2. Las reservas sin pagar ocupan lugar; si vencen, el lote anterior vuelve a estar en venta. Los mensajes de error nunca dicen cuántas quedan.
 - **Reservar, liberar y confirmar** (`reservas.ts`): siempre dentro de una transacción. Primero se toma el **turno del evento** (`turno.ts`, un bloqueo de PostgreSQL con fila justa): las compras y las ediciones de un mismo evento pasan de a una, en orden de llegada. Además la base no deja que vendidas + reservadas pasen el cupo.
@@ -168,12 +168,12 @@ En el panel, **Evento → Verificar una entrada**: se pega un código y dice si 
 
 ## Entradas: QR y PDF
 
-En una compra paga, el link de la compra (`/compra/<llave>`) muestra cada entrada con su **QR** y el código escrito abajo (por si no se puede escanear). El QR lleva solo el código firmado, nunca nombre ni DNI (`src/lib/entradas/qr.ts`). La página es siempre clara, para que el modo oscuro del celu no invierta el QR.
+En una compra paga, el link de la compra (`/compra/<llave>`) muestra cada entrada con su **QR** y el código escrito abajo (por si no se puede escanear). El QR lleva solo el código firmado, nunca nombre ni DNI (`src/lib/entradas/qr.ts`). La página es siempre clara, para que el modo oscuro del celu no invierta el QR, y avisa que el link no se comparte: abre todas las entradas de la compra.
 
-- **Descargar las N entradas (PDF)**: un PDF con una página (A6) por entrada: evento, fecha, lugar, tipo, nombre, DNI y QR (y "YA USADA" si ya entró). **Descargar solo esta**: la de una persona, para pasársela (aparece con 2 entradas o más). Se abre en el visor del celu; desde ahí se guarda o se comparte.
+- **Descargar las N entradas (PDF)**: un PDF con una página (A6) por entrada: evento, fecha, lugar, tipo, nombre, DNI y QR (y "YA USADA" si ya entró). **Descargar solo esta**: la de una persona, para mandarle el archivo (aparece con 2 entradas o más). Se abre en el visor del celu; desde ahí se guarda o se comparte.
 - Los PDF se arman en el momento en nuestro servidor (`src/lib/entradas/pdf.ts`, con `pdf-lib`) y no se guardan: se vuelven a armar desde la base cuando hace falta. La ruta es `/compra/<llave>/pdf` (`?entrada=N` para una sola, `src/lib/entradas/descarga.ts`); como la página, la llave del link es el permiso.
 - Solo salen las entradas válidas o usadas de compras pagas; las anuladas lo dicen, sin QR.
-- Los nombres de cada entrada se aceptan solo con letras latinas (con acentos), como en el DNI, para poder imprimirlos.
+- Los nombres de cada entrada se aceptan solo con letras latinas que se puedan imprimir, como en el DNI (`src/lib/entradas/texto-pdf.ts`).
 
 ## Publicación (Vercel)
 
