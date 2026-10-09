@@ -26,9 +26,7 @@ Sistema de venta de entradas por lotes para varias **productoras** (se alquila p
 
 Cosas que hace Ramiro a mano (no se pueden hacer desde el chat). Lista completa en `PENDIENTES.md`.
 
-Revisado en Vercel el 9/10/2026 (solo nombres, nunca valores): `CLAVE_CODIGOS` cargada, `CLAVE_CIFRADO` cambiada, `MERCADOPAGO_ACCESS_TOKEN` borrada y producción vuelta a publicar con las claves nuevas.
-
-1. **Reconectar la cuenta de Mercado Pago** de la productora (panel → Productoras → la productora → Cobros, pegar el Access Token de nuevo): con la `CLAVE_CIFRADO` nueva, la conexión anterior ya no sirve y no se ofrece ningún pago hasta reconectarla.
+Ninguna por ahora (9/10/2026: claves cargadas en Vercel y cuenta de Mercado Pago reconectada).
 
 ## Cómo trabajamos
 
@@ -80,4 +78,4 @@ Detalle en `.claude/rules/` (se cargan solas al tocar esos archivos) y permisos 
 
 - **9/10/2026:** se armó este sistema de contexto (`CONTEXTO.md`, `PENDIENTES.md`, `BITACORA.md`, skills `empezar-paso` y `cerrar-paso`). Sin cambios de código.
 - **9/10/2026 (después):** Ramiro probó el paso 13 (VÁLIDA) → marcado `[x]`. Preguntó por una lista de ventas: va en el paso 20.
-- **Para el próximo chat:** arrancar el paso 14 (QR y PDF). Confirmar antes que la cuenta de Mercado Pago esté reconectada.
+- **Para el próximo chat:** arrancar el paso 14 (QR y PDF).

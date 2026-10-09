@@ -6,7 +6,7 @@ Lo que **no** está atado a un paso de `PASOS.md`: acciones manuales del dueño 
 
 | Qué | Por qué | Desde |
 |---|---|---|
-| Reconectar la cuenta de Mercado Pago (panel → Productoras → Cobros) | Se cambió `CLAVE_CIFRADO` (9/10): sin reconectar no se ofrece ningún pago | Paso 13 |
+| — | Nada pendiente por ahora | |
 
 ## Temas sin paso asignado
 
