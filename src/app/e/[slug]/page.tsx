@@ -1,6 +1,7 @@
 // Página pública del evento: /e/<slug>. Flyer, datos y, de cada tipo de
 // entrada, solo el lote en venta (ver src/lib/eventos/publico.ts).
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -75,6 +76,13 @@ export default async function PaginaEvento({ params }: PageProps<"/e/[slug]">) {
               accion={reservarAccion.bind(null, evento.slug)}
             />
           )}
+
+          <p className="text-sm text-tenue">
+            ¿Ya compraste y no encontrás tus entradas?{" "}
+            <Link href={`/e/${evento.slug}/mis-entradas`} className="font-semibold text-acento hover:text-acento-hover">
+              Reenviar mis entradas
+            </Link>
+          </p>
 
           {evento.descripcion && (
             <section className="flex flex-col gap-2 pb-6">

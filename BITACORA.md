@@ -2,6 +2,12 @@
 
 Una entrada por chat, la más nueva arriba. Corta: qué se hizo, qué quedó y cómo se probó. El detalle está en los commits y en `PASOS.md`.
 
+## 9/10/2026 — Paso 16: "Compra confirmada" y "Reenviar mis entradas" (borrador)
+- Decidido con Ramiro: reenviar desde cada evento (email + DNI); link propio por entrada, más adelante.
+- `src/lib/mails/reenviar.ts`: reenviar = dejar la orden "falta el mail" con un `UPDATE` condicionado (3 por compra cada 24 h, nunca sobre un mail en curso); lo manda el envío del paso 15. Desde el link de la compra ("Reenviar el mail") y desde `/e/<evento>/mis-entradas` (misma respuesta siempre). "Compra confirmada" como el diseño.
+- 291 tests (0 salteados), 11 nuevos contra la base; cada condición del reenvío probada sacándola. Capturas en tamaño celu con la app local.
+- Quedó: revisión con agentes, arreglos y la prueba de Ramiro.
+
 ## 9/10/2026 — Paso 15: el mail con las entradas (probado)
 - Paso 14 marcado `[x]` (Ramiro probó los arreglos).
 - Decidido con Ramiro: Gmail (contraseña de aplicación), remitente la productora, PDF con todas + uno por persona, tipo y lote en la entrada. Después: el mail no recibe respuestas; para problemas, su WhatsApp (`WHATSAPP_AYUDA`) en el mail, el PDF y la página (se sacó el "mail de contacto" de la productora).
