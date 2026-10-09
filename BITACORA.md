@@ -2,6 +2,11 @@
 
 Una entrada por chat, la más nueva arriba. Corta: qué se hizo, qué quedó y cómo se probó. El detalle está en los commits y en `PASOS.md`.
 
+## 9/10/2026 — Paso 14: QR y PDF (borrador)
+- QR por entrada en el link de la compra y PDF A6 (todas o una), armados en nuestro servidor con `qrcode` y `pdf-lib`, sin guardar nada.
+- Probado local: QR de la pantalla y del PDF leídos con jsQR; typecheck, lint, 228 tests (0 salteados) y build.
+- Quedó: revisión con agentes y la prueba de Ramiro.
+
 ## 9/10/2026 — Sistema de contexto entre chats
 - Se crearon `CONTEXTO.md` (se carga solo en cada chat), `PENDIENTES.md`, esta bitácora y las skills `empezar-paso` y `cerrar-paso`.
 - Ramiro cargó `CLAVE_CODIGOS`, cambió `CLAVE_CIFRADO` y borró `MERCADOPAGO_ACCESS_TOKEN` en Vercel; producción republicada. Ramiro reconectó Mercado Pago.

@@ -20,7 +20,7 @@ Sistema de venta de entradas por lotes para varias **productoras** (se alquila p
 
 - **Hechos y probados:** pasos 1 a 13 (base, login, productoras, evento y lotes, página pública, reparto entre lotes, datos del checkout, reserva, cobro por transferencia y Mercado Pago con plata real el 8/10/2026, código firmado de cada entrada probado el 9/10/2026).
 - El panel todavía **no lista las compras pagas ni sus entradas** (llega en el paso 20): solo muestra cuántas y lo cobrado. El código de cada entrada se ve en el link secreto de la compra.
-- **Próximo paso: 14 — QR y PDF.** Notas ya decididas en `PASOS.md` (generar en nuestro servidor, el QR lleva solo el código firmado, los PDF no se guardan: se rearman desde la base).
+- **Paso 14 (QR y PDF): borrador hecho** (QR en el link de la compra, PDF con todas y cada una suelta). Falta: revisión con agentes, arreglos y la prueba de Ramiro. Después: paso 15 (mail).
 
 ## Acciones del dueño pendientes
 
@@ -62,7 +62,7 @@ Detalle en `.claude/rules/` (se cargan solas al tocar esos archivos) y permisos 
 | Carpeta | Qué hay |
 |---|---|
 | `src/app/e/[slug]` | Página pública del evento y "Continuar" (reserva) |
-| `src/app/compra/[llave]` | La compra: datos, reloj, pago, códigos de las entradas |
+| `src/app/compra/[llave]` | La compra: datos, reloj, pago, QR de las entradas y `pdf/` (descarga) |
 | `src/app/admin/` | Panel: `eventos` (lotes, pagos, verificar entrada), `productoras` (gente, cobros), `claves` |
 | `src/app/validar` | Puerta (escáner en el paso 17) |
 | `src/app/api/` | `mercadopago/aviso` (aviso de pagos), `salud` (estado de la base) |
@@ -70,12 +70,11 @@ Detalle en `.claude/rules/` (se cargan solas al tocar esos archivos) y permisos 
 | `src/lib/eventos` | Guardar evento, lotes, vista pública |
 | `src/lib/ventas` | Reparto por lote, reservas, órdenes, turno del evento, simulación |
 | `src/lib/pagos` | Cobros, confirmar, montos únicos, cuenta de Mercado Pago |
-| `src/lib/entradas` | Código firmado (`codigo.ts`) y verificar |
+| `src/lib/entradas` | Código firmado (`codigo.ts`), verificar, QR (`qr.ts`), PDF (`pdf.ts`, `imprimir.ts`) |
 | `prisma/` | `schema.prisma`, migraciones, datos de prueba |
 | `scripts/` | `migrar.mjs` (deploy), `usuario.ts` (crear ADMIN / resetear contraseña) |
 
 ## Traspaso (último chat)
 
-- **9/10/2026:** se armó este sistema de contexto (`CONTEXTO.md`, `PENDIENTES.md`, `BITACORA.md`, skills `empezar-paso` y `cerrar-paso`). Sin cambios de código.
-- **9/10/2026 (después):** Ramiro probó el paso 13 (VÁLIDA) → marcado `[x]`. Preguntó por una lista de ventas: va en el paso 20.
-- **Para el próximo chat:** arrancar el paso 14 (QR y PDF).
+- **9/10/2026:** paso 14 en borrador: QR de cada entrada en el link de la compra y PDF (todas o una), con tests (el QR se lee con un lector real). Decidido por Ramiro: PDF con todas + cada una suelta; nombre y DNI completo.
+- **Para el próximo chat:** revisión del paso 14 con agentes en paralelo (seguridad de la ruta `/compra/<llave>/pdf`, datos personales, PDF con textos raros, la página en el celu), arreglos y commit `Paso 14: arreglos de la revisión con agentes`.
