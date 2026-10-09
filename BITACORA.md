@@ -7,7 +7,7 @@ Una entrada por chat, la más nueva arriba. Corta: qué se hizo, qué quedó y c
 - Ramiro probó el borrador en producción: QR en la compra N° 2, VÁLIDA, PDF descargado y escaneado.
 - Revisión con 4 agentes: nada grave; arreglos en el mismo chat.
 - Segunda revisión ("¿está listo?", 9 agentes con verificación): nada roto ni inseguro; arreglados nombre largo en el PDF, aviso de no compartir el link, nombres imprimibles, emojis, test de la ruta. 241 tests (0 salteados) y build.
-- Quedó: la prueba de Ramiro de los arreglos.
+- Ramiro probó los arreglos en producción: "anda todo bien" → paso 14 `[x]`.
 
 ## 9/10/2026 — Sistema de contexto entre chats
 - Se crearon `CONTEXTO.md` (se carga solo en cada chat), `PENDIENTES.md`, esta bitácora y las skills `empezar-paso` y `cerrar-paso`.

@@ -18,15 +18,15 @@ Sistema de venta de entradas por lotes para varias **productoras** (se alquila p
 
 ## Estado actual
 
-- **Hechos y probados:** pasos 1 a 13 (base, login, productoras, evento y lotes, página pública, reparto entre lotes, datos del checkout, reserva, cobro por transferencia y Mercado Pago con plata real el 8/10/2026, código firmado de cada entrada probado el 9/10/2026).
-- El panel todavía **no lista las compras pagas ni sus entradas** (llega en el paso 20): solo muestra cuántas y lo cobrado. El código de cada entrada se ve en el link secreto de la compra.
-- **Paso 14 (QR y PDF): código terminado** (dos revisiones con agentes y sus arreglos). El borrador ya lo probó Ramiro en producción (QR, VÁLIDA, PDF). Falta: que Ramiro pruebe los arreglos y marcarlo `[x]`. Después: paso 15 (mail).
+- **Hechos y probados:** pasos 1 a 14 (base, login, productoras, evento y lotes, página pública, reparto entre lotes, datos del checkout, reserva, cobro por transferencia y Mercado Pago con plata real el 8/10/2026, código firmado de cada entrada, y QR + PDF de cada entrada probados el 9/10/2026).
+- El panel todavía **no lista las compras pagas ni sus entradas** (llega en el paso 20): solo muestra cuántas y lo cobrado. El QR y el PDF de cada entrada se ven solo en el link secreto de la compra (todavía no se mandan por mail).
+- **Próximo paso: 15 — Enviar el mail.** Antes de programar, leer su nota "Del paso 14" en `PASOS.md`: el mail no tiene la llave del link, así que hay que armar las entradas por id de orden.
 
 ## Acciones del dueño pendientes
 
 Cosas que hace Ramiro a mano (no se pueden hacer desde el chat). Lista completa en `PENDIENTES.md`.
 
-1. Probar los arreglos del paso 14 en producción (qué probar: `PASOS.md`, paso 14).
+Ninguna por ahora (9/10/2026: Ramiro probó el paso 14).
 
 ## Cómo trabajamos
 
@@ -76,5 +76,5 @@ Detalle en `.claude/rules/` (se cargan solas al tocar esos archivos) y permisos 
 
 ## Traspaso (último chat)
 
-- **9/10/2026:** paso 14 completo en código: QR + PDF, probado el borrador por Ramiro, dos revisiones con agentes y sus arreglos (nombre largo completo en el PDF, aviso de no compartir el link, nombres imprimibles, test de la ruta). Notas para los pasos 15, 16, 19, 20 y 21 en `PASOS.md`.
-- **Para el próximo chat:** si Ramiro confirma la prueba de los arreglos, marcar el paso 14 `[x]` y arrancar el paso 15 (mail): leer primero su nota "Del paso 14" (el mail no tiene la llave del link).
+- **9/10/2026:** paso 14 (QR y PDF) terminado: borrador, dos revisiones con agentes y sus arreglos, probado por Ramiro en producción ("anda todo bien") y marcado `[x]`. Notas para los pasos 15, 16, 19, 20 y 21 en `PASOS.md`.
+- **Para el próximo chat:** arrancar el paso 15 (mail) con `/empezar-paso 15`.
