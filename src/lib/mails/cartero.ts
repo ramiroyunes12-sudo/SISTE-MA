@@ -106,12 +106,30 @@ export function esLimiteDiario(error: unknown) {
   return typeof respuesta === "string" && /\b5\.4\.5\b/.test(respuesta);
 }
 
+// El servidor no dejó entrar a la cuenta. Gmail dice por qué con un código
+// (5.7.8, 5.7.9, 5.7.14): se guarda solo el código, nunca su texto.
+function motivoDeIngreso(responseCode: unknown, response: unknown) {
+  const detalle = typeof response === "string" ? /\b(5\.7\.\d{1,3})\b/.exec(response)?.[1] : undefined;
+  const numero = typeof responseCode === "number" ? `${responseCode}${detalle ? ` ${detalle}` : ""}` : (detalle ?? "");
+  const codigo = numero ? ` (código ${numero})` : "";
+  if (detalle === "5.7.9") {
+    return `Gmail pide una contraseña de aplicación: SMTP_CLAVE tiene que ser la de 16 letras de myaccount.google.com/apppasswords, no la contraseña de la cuenta${codigo}.`;
+  }
+  if (detalle === "5.7.14") {
+    return `Gmail bloqueó el ingreso a la cuenta: entrá a esa cuenta desde el navegador, revisá los avisos de seguridad de Google y confirmá que fuiste vos${codigo}.`;
+  }
+  if (detalle === "5.7.8") {
+    return `Gmail no acepta el usuario o la contraseña: SMTP_USUARIO tiene que ser la dirección completa (…@gmail.com) y SMTP_CLAVE la contraseña de aplicación de esa misma cuenta${codigo}.`;
+  }
+  return `El servidor de mail rechazó el usuario o la contraseña (SMTP_USUARIO y SMTP_CLAVE)${codigo}.`;
+}
+
 // Por qué no salió un mail, en palabras simples y sin datos de la persona (el
 // servidor a veces repite el email en su respuesta: no se guarda).
 export function describirErrorDeMail(error: unknown): string {
   const e = (typeof error === "object" && error !== null ? error : {}) as { code?: unknown; responseCode?: unknown; response?: unknown };
   const codigo = typeof e.code === "string" ? e.code : "";
-  if (codigo === "EAUTH") return "El servidor de mail rechazó el usuario o la contraseña (SMTP_USUARIO y SMTP_CLAVE).";
+  if (codigo === "EAUTH") return motivoDeIngreso(e.responseCode, e.response);
   if (esLimiteDiario(error)) return "Se llegó al límite de mails por día de la cuenta: se vuelve a intentar cada una hora.";
   if (["ECONNECTION", "ETIMEDOUT", "ESOCKET", "EDNS", "ECONNREFUSED", "ECONNRESET", "ETLS"].includes(codigo)) {
     return "No se pudo conectar con el servidor de mail.";

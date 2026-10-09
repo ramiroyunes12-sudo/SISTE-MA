@@ -147,7 +147,9 @@ export async function reintentarMailsAccion(eventoId: string): Promise<EstadoPag
     const { enviados, fallidos, sinConfigurar } = await reintentarMailsDelEvento(obtenerDb(), evento.id, carteroSmtp());
     refresh();
     if (sinConfigurar) return { error: "Los mails no salen: falta configurar el servidor de mail (ver abajo)." };
-    if (enviados === 0 && fallidos === 0) return { listo: "No había mails para mandar (o se están mandando ahora)." };
+    if (enviados === 0 && fallidos === 0) {
+      return { listo: "Ya se están mandando (o no había ninguno para mandar): recargá la página en un minuto para ver cómo salieron." };
+    }
     const partes = [
       enviados && `${enviados === 1 ? "Salió 1 mail" : `Salieron ${enviados} mails`}`,
       fallidos && `${fallidos === 1 ? "1 volvió a fallar" : `${fallidos} volvieron a fallar`}`,
