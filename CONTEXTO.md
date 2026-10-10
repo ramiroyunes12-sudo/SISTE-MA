@@ -80,5 +80,5 @@ Detalle en `.claude/rules/` (se cargan solas al tocar esos archivos) y permisos 
 
 ## Traspaso (último chat)
 
-- **10/10/2026:** paso 18 en borrador: búsqueda por DNI o nombre, marcar el ingreso sin QR (organizador y ADMIN) y contador en la pantalla de la puerta. Probado en local con Chromium como validador y organizador; 352 tests (0 salteados), typecheck, lint y build. Paso 17: Ramiro probó los arreglos menos la prueba (4).
-- **Para el próximo chat:** si Ramiro confirmó la prueba (4) del paso 17, marcarlo `[x]`. Seguir el paso 18 con la revisión con agentes en paralelo (seguridad y datos personales de la búsqueda, carreras entre marcar y escanear, pantalla del celu), verificar cada hallazgo y commit `Paso 18: arreglos de la revisión con agentes`. Arrancar con `/empezar-paso 18`.
+- **10/10/2026:** paso 17 `[x]` (Ramiro probó los arreglos). Paso 18: borrador publicado (PR #15) y probado por Ramiro en su iPhone; se lanzó la revisión con 3 agentes (seguridad y datos personales, base y carreras, pantalla del celu).
+- **Para el próximo chat:** si la revisión no quedó anotada en `PASOS.md` (paso 18, "Revisado con…"), volver a hacerla: agentes en paralelo, verificar cada hallazgo, arreglar con su test y commit `Paso 18: arreglos de la revisión con agentes`. Arrancar con `/empezar-paso 18`.
