@@ -20,13 +20,27 @@ describe("lo que ve la puerta", () => {
       "yo",
       AHORA,
     );
-    expect(otro).toMatchObject({ resultado: "ya_ingreso", entro: "a las 23:41", por: "Beto" });
+    expect(otro).toMatchObject({ resultado: "ya_ingreso", entro: "a las 23:41", por: "Beto" }); // hace 89 minutos
     const yo = respuestaPuerta(
       { resultado: "ya_ingreso", entrada: ENTRADA, usadaEn, validadaPor: { id: "yo", nombre: "Ana" } },
       "yo",
       AHORA,
     );
     expect(yo).toMatchObject({ entro: "a las 23:41", por: "vos" });
+  });
+
+  it("YA INGRESÓ en la última hora: cuánto hace (para no confundir un QR repetido con el escaneo propio que se cortó)", () => {
+    const ya = (segundos: number) =>
+      respuestaPuerta(
+        { resultado: "ya_ingreso", entrada: ENTRADA, usadaEn: new Date(AHORA.getTime() - segundos * 1000), validadaPor: null },
+        "yo",
+        AHORA,
+      );
+    expect(ya(20)).toMatchObject({ entro: "a las 01:09, hace menos de un minuto" });
+    expect(ya(90)).toMatchObject({ entro: "a las 01:08, hace 1 minuto" });
+    expect(ya(59 * 60)).toMatchObject({ entro: "a las 00:11, hace 59 minutos" });
+    expect(ya(60 * 60)).toMatchObject({ entro: "a las 00:10" });
+    expect(ya(-30)).toMatchObject({ entro: "a las 01:10, hace menos de un minuto" }); // reloj de otro servidor adelantado
   });
 
   it("YA INGRESÓ hace más de 12 horas: con el día", () => {
