@@ -104,7 +104,7 @@ function Resultado({ verificada: v, codigo }: { verificada: EntradaVerificada; c
           {v.resultado === "usada" && v.usadaEn && (
             <p>
               Entró: {v.usadaEn}
-              {v.validadaPor && <> · la escaneó {v.validadaPor}</>}
+              {v.validadaPor && <> · {v.porDni ? `la marcó ${v.validadaPor} por DNI` : `la escaneó ${v.validadaPor}`}</>}
             </p>
           )}
           {v.resultado === "sin_pagar" && <p>La compra no está paga (está pendiente, venció o se canceló).</p>}

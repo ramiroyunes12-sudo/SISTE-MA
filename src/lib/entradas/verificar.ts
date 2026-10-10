@@ -5,7 +5,7 @@
 // entre las entradas que el usuario puede ver (las de su productora; el ADMIN,
 // todas) y se mira que sea de este evento. De una entrada de otro evento no se
 // dice nada más, y una de otra productora es como si no existiera.
-import type { PrismaClient } from "@/generated/prisma/client";
+import type { MetodoIngreso, PrismaClient } from "@/generated/prisma/client";
 import { type Alcance, filtroDeEventos } from "@/lib/auth/alcance";
 
 import { leerCodigo } from "./codigo";
@@ -17,6 +17,7 @@ export type DatosEntrada = {
   compra: number;
   usadaEn: Date | null;
   validadaPor: { id: string; nombre: string } | null; // quién la escaneó en la puerta
+  metodo: MetodoIngreso | null; // cómo entró: con el QR o buscada por DNI o nombre
 };
 
 export type Verificacion =
@@ -31,9 +32,19 @@ export async function verificarCodigo(
 ): Promise<Verificacion> {
   const leido = leerCodigo(texto);
   if (!leido.ok) return { resultado: "no_valida", motivo: leido.motivo };
+  return verificarEntrada(db, eventoId, alcance, { codigo: leido.codigo });
+}
 
+// Lo mismo, con el código ya leído o con el id de la entrada (la búsqueda por
+// DNI o nombre de la puerta).
+export async function verificarEntrada(
+  db: PrismaClient,
+  eventoId: string,
+  alcance: Alcance,
+  donde: { codigo: string } | { id: string },
+): Promise<Verificacion> {
   const entrada = await db.entrada.findFirst({
-    where: { codigo: leido.codigo, evento: filtroDeEventos(alcance) },
+    where: { ...donde, evento: filtroDeEventos(alcance) },
     select: {
       id: true,
       eventoId: true,
@@ -44,6 +55,7 @@ export async function verificarCodigo(
       validadaPor: { select: { id: true, nombre: true } },
       tipoEntrada: { select: { nombre: true } },
       orden: { select: { numero: true, estado: true } },
+      escaneos: { where: { resultado: "PASA" }, select: { metodo: true }, orderBy: { creadoEn: "desc" }, take: 1 },
     },
   });
   if (!entrada) return { resultado: "no_valida", motivo: "no_existe" };
@@ -56,6 +68,7 @@ export async function verificarCodigo(
     compra: entrada.orden.numero,
     usadaEn: entrada.usadaEn,
     validadaPor: entrada.validadaPor,
+    metodo: entrada.estado === "USADA" ? (entrada.escaneos[0]?.metodo ?? null) : null,
   };
   const entradaId = entrada.id;
   if (entrada.estado === "USADA") return { resultado: "usada", entradaId, entrada: datos };

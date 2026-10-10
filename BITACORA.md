@@ -2,6 +2,13 @@
 
 Una entrada por chat, la más nueva arriba. Corta: qué se hizo, qué quedó y cómo se probó. El detalle está en los commits y en `PASOS.md`.
 
+## 10/10/2026 — Paso 18: búsqueda por DNI o nombre y contador (borrador)
+- Ramiro probó los arreglos del paso 17: modo avión y cámara pausada anduvieron; falta la prueba (4), evento mal copiado (se le explicó cómo).
+- Decidido con Ramiro: buscar por DNI completo o nombre (desde 3 letras, hasta 10); marcar el ingreso sin QR solo el organizador y el ADMIN; "Ingresaron X de Y" para todos.
+- Borrador: `src/lib/entradas/buscar.ts` (búsqueda y contador), `marcarEntrada` en `escanear.ts` (mismo `UPDATE` condicionado, anotado `DNI`), rutas `/api/puerta/buscar`, `/marcar` y `/contador` (lo común en `comun.ts`), pantalla con contador y pestañas (`puerta.tsx`, `buscar.tsx`, `resultado.tsx`). YA INGRESÓ dice "por DNI" si entró sin el QR (también en "Verificar una entrada").
+- Probado en local con Chromium (390 y 320 px) como validador y organizador; los tests fallan si se saca la condición del `UPDATE`, el filtro de pagas, el DNI completo o el chequeo de productora. 352 tests (0 salteados), typecheck, lint y build.
+- Quedó: la revisión con agentes y que Ramiro lo pruebe.
+
 ## 10/10/2026 — Pasos 16 (probado) y 17: escáner de la puerta (borrador probado y revisión)
 - Decidido con Ramiro: escanear = entra (la entrada queda usada al leerla; se ven nombre, DNI y tipo, y un botón para la siguiente).
 - Borrador: `src/lib/entradas/escanear.ts` (un solo `UPDATE` condicionado + registro en `escaneos`), `POST /api/puerta/escanear` (ruta y no acción, para cortar a los 8 s sin trabar los siguientes), `/validar` (eventos de la productora) y `/validar/<evento>` (cámara con BarcodeDetector o jsQR, verde/rojo en pantalla completa, sonido, vibración, linterna, código a mano), panel "Validadores" del organizador (`soloRol` en `productoras.ts`).

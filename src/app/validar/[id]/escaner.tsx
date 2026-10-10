@@ -11,18 +11,13 @@
 // dos miran solo el cuadrado que se ve en pantalla: nunca se lee un QR que no
 // se ve (el de la persona de atrás, la entrada de abajo en la misma pantalla),
 // y con dos a la vista no se lee ninguno.
-import Link from "next/link";
-import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type FormEvent, type Ref, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 
-import {
-  bloqueaRepetir,
-  type ErrorPuerta,
-  leerRespuestaPuerta,
-  type PersonaPuerta,
-  type RespuestaPuerta,
-} from "@/lib/entradas/puerta";
+import { bloqueaRepetir, leerRespuestaPuerta } from "@/lib/entradas/puerta";
 
-type Resultado = RespuestaPuerta | ErrorPuerta;
+import { pedirPuerta } from "./pedir";
+import { PantallaResultado, type Resultado } from "./resultado";
+
 type Fase =
   | { tipo: "inicio"; aviso?: string }
   | { tipo: "abriendo" }
@@ -32,30 +27,27 @@ type Fase =
   | { tipo: "resultado"; resultado: Resultado };
 type Lector = (video: HTMLVideoElement) => Promise<string | null>;
 
-const ESPERA_MS = 8_000; // sin respuesta en este tiempo: NO VÁLIDA (escanear de nuevo)
 const ENTRE_CUADROS_MS = 100;
 const MISMA_ENTRADA_MS = 10_000; // la entrada de recién, todavía delante de la cámara: no se vuelve a mandar
 const LADO_JSQR = 640; // jsQR mira el cuadrado del centro achicado a esto (más rápido)
 const LADO_NATIVO = 1_080; // el lector de Android, el mismo cuadrado casi sin achicar
 const LARGO_ENVIADO = 200; // un QR que no es una entrada puede ser larguísimo: con esto el servidor ya dice que no lo es
 
-const MOTIVOS: Record<Extract<RespuestaPuerta, { resultado: "no_valida" }>["motivo"], string> = {
-  formato: "Este QR no es una entrada.",
-  firma: "El código fue modificado: es trucho.",
-  no_existe: "No encontramos esta entrada.",
-  otro_evento: "Es una entrada de otro evento.",
-  sin_pagar: "La compra no está paga.",
-  anulada: "La entrada se anuló o la compra se devolvió.",
-};
+// Lo que hacen las pestañas de la puerta al tocarlas: al ir a "Buscar", la
+// cámara se apaga (batería); al volver, se prende sola si estaba prendida (el
+// permiso ya está dado, y es en el toque: el iPhone deja sonar).
+export type ControlEscaner = { pausar(): void; seguir(): void };
 
-const ERRORES: Record<ErrorPuerta["error"], string> = {
-  conexion: "No se pudo verificar: falló la conexión. Escaneala de nuevo.",
-  sesion: "Se cerró tu sesión. Volvé a ingresar para seguir escaneando.",
-  evento: "Este evento ya no está disponible.",
-  pedido: "No se pudo verificar. Recargá la página y probá de nuevo.",
-};
-
-export function Escaner({ eventoId }: { eventoId: string }) {
+// alResultado: después de cada resultado (para poner al día el contador).
+export function Escaner({
+  eventoId,
+  alResultado,
+  ref,
+}: {
+  eventoId: string;
+  alResultado: () => void;
+  ref?: Ref<ControlEscaner>;
+}) {
   const [fase, setFase] = useState<Fase>({ tipo: "inicio" });
   const [repetida, setRepetida] = useState(false);
   const [linterna, setLinterna] = useState<boolean | null>(null); // null: el celu no tiene
@@ -86,8 +78,9 @@ export function Escaner({ eventoId }: { eventoId: string }) {
       const resultado = await pedir(eventoId, codigo);
       avisar(sonido.current, resultado);
       setFase({ tipo: "resultado", resultado });
+      alResultado();
     },
-    [eventoId],
+    [eventoId, alResultado],
   );
 
   async function abrirCamara() {
@@ -176,6 +169,18 @@ export function Escaner({ eventoId }: { eventoId: string }) {
     sonido.current?.resume().catch(() => {});
     verificar(codigo);
   }
+
+  useImperativeHandle(ref, () => ({
+    pausar() {
+      detenerCamara();
+      setFase((actual) =>
+        actual.tipo === "escaneando" || actual.tipo === "abriendo" ? { tipo: "inicio", aviso: "La cámara se pausó." } : actual,
+      );
+    },
+    seguir() {
+      if (quiereCamara.current && fase.tipo === "inicio") abrirCamara();
+    },
+  }));
 
   // Leer cuadros mientras se está escaneando.
   useEffect(() => {
@@ -338,104 +343,11 @@ function Cartel({ children }: { children: string }) {
   );
 }
 
-// El resultado, en toda la pantalla: verde si pasa, rojo si no.
-function PantallaResultado({ resultado, alSeguir }: { resultado: Resultado; alSeguir: () => void }) {
-  const boton = useRef<HTMLButtonElement>(null);
-  // Un toque justo cuando aparece (que era para otra cosa) no lo cierra.
-  const [listo, setListo] = useState(false);
-  useEffect(() => {
-    const espera = setTimeout(() => setListo(true), 600);
-    return () => clearTimeout(espera);
-  }, []);
-  useEffect(() => {
-    if (listo) boton.current?.focus();
-  }, [listo]);
-
-  const pasa = "resultado" in resultado && resultado.resultado === "pasa";
-  const titulo = "error" in resultado ? "NO VÁLIDA" : { pasa: "PASA", ya_ingreso: "YA INGRESÓ", no_valida: "NO VÁLIDA" }[resultado.resultado];
-
-  let detalle: string | null = null;
-  if ("error" in resultado) detalle = ERRORES[resultado.error];
-  else if (resultado.resultado === "no_valida") detalle = MOTIVOS[resultado.motivo];
-  else if (resultado.resultado === "ya_ingreso") {
-    const quien = resultado.por === "vos" ? "la escaneaste vos" : resultado.por ? `la escaneó ${resultado.por}` : null;
-    detalle = ["Entró", resultado.entro].filter(Boolean).join(" ") + (quien ? ` · ${quien}` : "") + ".";
-  }
-  const persona = "resultado" in resultado ? resultado.persona : undefined;
-
-  return (
-    <div
-      role="alert"
-      className={`fixed inset-0 z-50 flex flex-col overflow-y-auto text-white ${pasa ? "bg-ok" : "bg-error"}`}
-    >
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-4 px-5 pt-6 pb-4 min-[400px]:gap-5 min-[400px]:pt-10">
-        {/* Más chico en celulares angostos: "YA INGRESÓ" no entraba en 360 px. */}
-        <p className="flex items-center gap-3 font-display text-5xl font-extrabold min-[400px]:text-6xl">
-          <span aria-hidden="true">{pasa ? "✓" : "✕"}</span>
-          <span className="min-w-0 [overflow-wrap:anywhere]">{titulo}</span>
-        </p>
-        {detalle && <p className="text-2xl font-semibold">{detalle}</p>}
-        {persona && <DatosPersona persona={persona} grande={pasa} />}
-      </div>
-      <div className="sticky bottom-0 mx-auto w-full max-w-md px-5 pt-2 pb-6">
-        {"error" in resultado && resultado.error === "sesion" ? (
-          <Link href="/ingresar" className="flex min-h-16 items-center justify-center rounded-2xl bg-white text-xl font-bold text-tinta">
-            Ingresar
-          </Link>
-        ) : "error" in resultado && resultado.error === "evento" ? (
-          <Link href="/validar" className="flex min-h-16 items-center justify-center rounded-2xl bg-white text-xl font-bold text-tinta">
-            Elegir otro evento
-          </Link>
-        ) : (
-          <button
-            ref={boton}
-            type="button"
-            onClick={() => listo && alSeguir()}
-            className="min-h-16 w-full rounded-2xl bg-white text-xl font-bold text-tinta"
-          >
-            Escanear otra entrada
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function DatosPersona({ persona, grande }: { persona: PersonaPuerta; grande: boolean }) {
-  return (
-    <div className="flex flex-col gap-2 rounded-2xl bg-black/20 p-4">
-      <p className={`font-bold [overflow-wrap:anywhere] ${grande ? "text-3xl" : "text-2xl"}`}>
-        {persona.titular ?? "Sin nombre todavía"}
-      </p>
-      {persona.dni && <p className={grande ? "text-3xl" : "text-2xl"}>DNI {persona.dni}</p>}
-      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xl">
-        <span className="rounded-lg bg-white px-3 py-0.5 font-extrabold text-tinta uppercase">{persona.tipo}</span>
-        <span className="text-white/90">Compra N° {persona.compra}</span>
-      </p>
-    </div>
-  );
-}
-
 // ─── Servidor, cámara, sonido ────────────────────────────────────────────────
 
 async function pedir(eventoId: string, codigo: string): Promise<Resultado> {
-  const control = new AbortController();
-  const corte = setTimeout(() => control.abort(), ESPERA_MS);
-  try {
-    const respuesta = await fetch("/api/puerta/escanear", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ eventoId, codigo: codigo.slice(0, LARGO_ENVIADO) }),
-      cache: "no-store",
-      signal: control.signal,
-    });
-    const cuerpo: unknown = await respuesta.json();
-    return leerRespuestaPuerta(respuesta.ok, cuerpo);
-  } catch {
-    return { error: "conexion" };
-  } finally {
-    clearTimeout(corte);
-  }
+  const respuesta = await pedirPuerta("/api/puerta/escanear", { eventoId, codigo: codigo.slice(0, LARGO_ENVIADO) });
+  return respuesta ? leerRespuestaPuerta(respuesta.ok, respuesta.cuerpo) : { error: "conexion" };
 }
 
 type Detector = { detect(fuente: HTMLCanvasElement): Promise<{ rawValue: string }[]> };

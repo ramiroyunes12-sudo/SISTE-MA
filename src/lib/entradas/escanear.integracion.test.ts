@@ -8,7 +8,7 @@ import { PrismaClient } from "@/generated/prisma/client";
 import type { Alcance } from "@/lib/auth/alcance";
 
 import { firmarCodigo, nuevoCodigo } from "./codigo";
-import { escanearCodigo, eventosDeLaPuerta } from "./escanear";
+import { escanearCodigo, eventosDeLaPuerta, marcarEntrada } from "./escanear";
 
 const url = process.env.TEST_DATABASE_URL;
 
@@ -133,6 +133,7 @@ describe.skipIf(!url)("escanear en la puerta", () => {
       entrada: { titular: "Persona de Prueba", dni: "30111222", tipo: "VIP", compra: numero },
       usadaEn: AHORA,
       validadaPor: validador,
+      metodo: "QR",
     });
     const guardada = await db.entrada.findUniqueOrThrow({ where: { id } });
     expect(guardada).toMatchObject({ estado: "USADA", usadaEn: AHORA, validadaPorId: validador.id });
@@ -227,6 +228,94 @@ describe.skipIf(!url)("escanear en la puerta", () => {
     const { firmado, id } = await entrada("PAGADA", "VALIDA");
     const ajena = (await db.productora.create({ data: { nombre: `Ajena ${crypto.randomUUID()}` } })).id;
     expect(await escanear(firmado, { alcance: { todo: false, productoraId: ajena } })).toBeNull();
+    expect((await db.entrada.findUniqueOrThrow({ where: { id } })).estado).toBe("VALIDA");
+    expect(await escaneosDe(id)).toHaveLength(0);
+  });
+
+  // ─── Sin el QR: buscada por DNI o nombre y marcada a mano ───
+
+  const marcar = (entradaId: string, opciones: { usuario?: { id: string }; alcance?: Alcance; ahora?: Date } = {}) =>
+    marcarEntrada(db, {
+      eventoId,
+      alcance: opciones.alcance ?? TODO,
+      usuarioId: (opciones.usuario ?? validador).id,
+      entradaId,
+      ahora: opciones.ahora ?? AHORA,
+    });
+
+  it("marcar por DNI: PASA, queda usada y se anota como DNI", async () => {
+    const { id, numero } = await entrada("PAGADA", "VALIDA");
+    expect(await marcar(id)).toEqual({
+      resultado: "pasa",
+      entrada: { titular: "Persona de Prueba", dni: "30111222", tipo: "VIP", compra: numero },
+    });
+    expect(await db.entrada.findUniqueOrThrow({ where: { id } })).toMatchObject({
+      estado: "USADA",
+      usadaEn: AHORA,
+      validadaPorId: validador.id,
+    });
+    expect((await escaneosDe(id)).map((e) => [e.metodo, e.resultado])).toEqual([["DNI", "PASA"]]);
+  });
+
+  it("marcada por DNI y después su QR: YA INGRESÓ, diciendo que entró por DNI (y al revés, que entró con el QR)", async () => {
+    const porDni = await entrada("PAGADA", "VALIDA");
+    await marcar(porDni.id);
+    expect(await escanear(porDni.firmado, { usuario: otroValidador })).toMatchObject({
+      resultado: "ya_ingreso",
+      usadaEn: AHORA,
+      validadaPor: validador,
+      metodo: "DNI",
+    });
+
+    const conQr = await entrada("PAGADA", "VALIDA");
+    await escanear(conQr.firmado);
+    expect(await marcar(conQr.id, { usuario: otroValidador })).toMatchObject({
+      resultado: "ya_ingreso",
+      validadaPor: validador,
+      metodo: "QR",
+    });
+    expect((await escaneosDe(conQr.id)).map((e) => [e.metodo, e.resultado])).toEqual([
+      ["QR", "PASA"],
+      ["DNI", "YA_INGRESO"],
+    ]);
+  });
+
+  it("su QR y la búsqueda a la vez, en varias puertas: entra una sola vez", async () => {
+    const { firmado, id } = await entrada("PAGADA", "VALIDA");
+    const resultados = await Promise.all(
+      Array.from({ length: 8 }, (_, i) => (i % 2 ? escanear(firmado, { usuario: otroValidador }) : marcar(id))),
+    );
+    expect(resultados.filter((r) => r?.resultado === "pasa")).toHaveLength(1);
+    expect(resultados.filter((r) => r?.resultado === "ya_ingreso")).toHaveLength(7);
+    expect((await escaneosDe(id)).filter((e) => e.resultado === "PASA")).toHaveLength(1);
+  });
+
+  it("marcar sin pagar, anulada, devuelta o de otro evento: NO VÁLIDA y no cambia", async () => {
+    const casos = [
+      { estado: ["PENDIENTE", "PENDIENTE"], motivo: "sin_pagar" },
+      { estado: ["PAGADA", "ANULADA"], motivo: "anulada" },
+      { estado: ["REEMBOLSADA", "VALIDA"], motivo: "anulada" },
+    ] as const;
+    for (const { estado, motivo } of casos) {
+      const { id } = await entrada(estado[0], estado[1]);
+      expect(await marcar(id), motivo).toMatchObject({ resultado: "no_valida", motivo });
+      expect((await db.entrada.findUniqueOrThrow({ where: { id } })).estado).toBe(estado[1]);
+      expect((await escaneosDe(id)).map((e) => [e.metodo, e.resultado])).toEqual([["DNI", "NO_VALIDA"]]);
+    }
+    const deOtro = await entrada("PAGADA", "VALIDA", { evento: "otro" });
+    expect(await marcar(deOtro.id)).toEqual({ resultado: "no_valida", motivo: "otro_evento" });
+    expect((await db.entrada.findUniqueOrThrow({ where: { id: deOtro.id } })).estado).toBe("VALIDA");
+  });
+
+  it("marcar una entrada que no existe o un id cualquiera: NO VÁLIDA", async () => {
+    expect(await marcar(crypto.randomUUID())).toEqual({ resultado: "no_valida", motivo: "no_existe" });
+    expect(await marcar("no-es-un-id")).toEqual({ resultado: "no_valida", motivo: "no_existe" });
+  });
+
+  it("marcar en un evento de otra productora: null, sin tocar la entrada ni anotar nada", async () => {
+    const { id } = await entrada("PAGADA", "VALIDA");
+    const ajena = (await db.productora.create({ data: { nombre: `Ajena ${crypto.randomUUID()}` } })).id;
+    expect(await marcar(id, { alcance: { todo: false, productoraId: ajena } })).toBeNull();
     expect((await db.entrada.findUniqueOrThrow({ where: { id } })).estado).toBe("VALIDA");
     expect(await escaneosDe(id)).toHaveLength(0);
   });

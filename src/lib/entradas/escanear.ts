@@ -11,11 +11,11 @@
 // leído se guarda solo un código con la firma mal, sin la firma, para
 // investigar QR truchos: uno bien firmado (por ejemplo, de otro evento) es un
 // QR que sirve y no se guarda, y un texto cualquiera puede traer cualquier cosa.
-import type { MetodoIngreso, PrismaClient } from "@/generated/prisma/client";
+import { type MetodoIngreso, Prisma, type PrismaClient } from "@/generated/prisma/client";
 import { type Alcance, filtroDeEventos } from "@/lib/auth/alcance";
 
 import { leerCodigo } from "./codigo";
-import { verificarCodigo } from "./verificar";
+import { verificarEntrada } from "./verificar";
 
 export type DatosPuerta = { titular: string | null; dni: string | null; tipo: string; compra: number };
 
@@ -28,6 +28,7 @@ export type Escaneado =
       entrada: DatosPuerta;
       usadaEn: Date | null;
       validadaPor: { id: string; nombre: string } | null;
+      metodo: MetodoIngreso | null; // cómo entró: con el QR o buscada por DNI o nombre
     }
   | { resultado: "no_valida"; motivo: MotivoNoValida; entrada?: DatosPuerta };
 
@@ -35,20 +36,15 @@ export type Escaneado =
 // acreditó el pago justo), se vuelve a probar; más de esto, error.
 const INTENTOS = 3;
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+type Pedido = { eventoId: string; alcance: Alcance; usuarioId: string; ahora?: Date };
+
 // null si el evento no existe o no es de quien escanea (su productora; el
 // ADMIN, todos): no se toca ni se anota nada.
-export async function escanearCodigo(
-  db: PrismaClient,
-  pedido: { eventoId: string; alcance: Alcance; usuarioId: string; texto: unknown; metodo?: MetodoIngreso; ahora?: Date },
-): Promise<Escaneado | null> {
+export async function escanearCodigo(db: PrismaClient, pedido: Pedido & { texto: unknown }): Promise<Escaneado | null> {
   const { eventoId, alcance, usuarioId, texto } = pedido;
-  const metodo = pedido.metodo ?? "QR";
-  const ahora = pedido.ahora ?? new Date();
-
-  const evento = await db.evento.findFirst({ where: { id: eventoId, ...filtroDeEventos(alcance) }, select: { id: true } });
-  if (!evento) return null;
-  const anotar = (resultado: "YA_INGRESO" | "NO_VALIDA", entradaId: string | null, codigoLeido: string | null = null) =>
-    db.escaneo.create({ data: { eventoId, entradaId, usuarioId, metodo, resultado, codigoLeido } });
+  if (!(await esDeLaPuerta(db, eventoId, alcance))) return null;
 
   const leido = leerCodigo(texto);
   if (!leido.ok) {
@@ -57,9 +53,47 @@ export async function escanearCodigo(
     // sola se podría volver a armar su QR). La parte al azar no agrega nada:
     // las de verdad ya están en la base.
     const sinFirma = leido.motivo === "firma" && typeof texto === "string";
-    await anotar("NO_VALIDA", null, sinFirma ? texto.trim().toUpperCase().split("-").slice(0, 2).join("-") : null);
+    await db.escaneo.create({
+      data: {
+        eventoId,
+        usuarioId,
+        metodo: "QR",
+        resultado: "NO_VALIDA",
+        codigoLeido: sinFirma ? texto.trim().toUpperCase().split("-").slice(0, 2).join("-") : null,
+      },
+    });
     return { resultado: "no_valida", motivo: leido.motivo };
   }
+  return marcar(db, pedido, "QR", { codigo: leido.codigo });
+}
+
+// Marcar el ingreso sin el QR, desde la búsqueda por DNI o nombre (quién
+// puede: puedeMarcarSinQr, en puerta.ts). El mismo UPDATE condicionado que el
+// escáner, por id de entrada, y queda anotado como "DNI" en `escaneos`.
+export async function marcarEntrada(db: PrismaClient, pedido: Pedido & { entradaId: string }): Promise<Escaneado | null> {
+  if (!(await esDeLaPuerta(db, pedido.eventoId, pedido.alcance))) return null;
+  if (!UUID.test(pedido.entradaId)) {
+    await db.escaneo.create({
+      data: { eventoId: pedido.eventoId, usuarioId: pedido.usuarioId, metodo: "DNI", resultado: "NO_VALIDA" },
+    });
+    return { resultado: "no_valida", motivo: "no_existe" };
+  }
+  return marcar(db, pedido, "DNI", { id: pedido.entradaId });
+}
+
+async function esDeLaPuerta(db: PrismaClient, eventoId: string, alcance: Alcance) {
+  return !!(await db.evento.findFirst({ where: { id: eventoId, ...filtroDeEventos(alcance) }, select: { id: true } }));
+}
+
+async function marcar(
+  db: PrismaClient,
+  { eventoId, alcance, usuarioId, ahora = new Date() }: Pedido,
+  metodo: MetodoIngreso,
+  donde: { codigo: string } | { id: string },
+): Promise<Escaneado> {
+  const anotar = (resultado: "YA_INGRESO" | "NO_VALIDA", entradaId: string | null) =>
+    db.escaneo.create({ data: { eventoId, entradaId, usuarioId, metodo, resultado } });
+  const esta = "codigo" in donde ? Prisma.sql`e.codigo = ${donde.codigo}` : Prisma.sql`e.id = ${donde.id}::uuid`;
 
   for (let intento = 0; intento < INTENTOS; intento++) {
     const pasada = await db.$transaction(async (tx) => {
@@ -67,7 +101,7 @@ export async function escanearCodigo(
         UPDATE entradas.entradas AS e
         SET estado = 'USADA', usada_en = ${ahora}, validada_por_id = ${usuarioId}::uuid, actualizado_en = ${ahora}
         FROM entradas.ordenes AS o, entradas.tipos_entrada AS t
-        WHERE e.codigo = ${leido.codigo}
+        WHERE ${esta}
           AND e.evento_id = ${eventoId}::uuid
           AND e.estado = 'VALIDA'
           AND o.id = e.orden_id AND o.estado = 'PAGADA'
@@ -83,16 +117,16 @@ export async function escanearCodigo(
     }
 
     // No cambió nada: ¿por qué?
-    const v = await verificarCodigo(db, eventoId, alcance, texto);
+    const v = await verificarEntrada(db, eventoId, alcance, donde);
     if (v.resultado === "valida") continue; // pasó a válida recién: otra vez
     if (v.resultado === "no_valida") {
       await anotar("NO_VALIDA", null);
       return { resultado: "no_valida", motivo: v.motivo };
     }
-    const { usadaEn, validadaPor, ...entrada } = v.entrada;
+    const { usadaEn, validadaPor, metodo: entroCon, ...entrada } = v.entrada;
     if (v.resultado === "usada") {
       await anotar("YA_INGRESO", v.entradaId);
-      return { resultado: "ya_ingreso", entrada, usadaEn, validadaPor };
+      return { resultado: "ya_ingreso", entrada, usadaEn, validadaPor, metodo: entroCon };
     }
     await anotar("NO_VALIDA", v.entradaId);
     return { resultado: "no_valida", motivo: v.resultado, entrada };
