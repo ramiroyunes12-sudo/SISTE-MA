@@ -23,6 +23,7 @@ Sistema de venta de entradas por lotes para varias **productoras** (se alquila p
 - Los mails salen por Gmail (`sistemaentradas@gmail.com`, contraseña de aplicación). Ramiro no quiere pagar un servicio de mails: se queda Gmail aunque algunos caigan en spam.
 - **Paso 16** ("Compra confirmada" y "Reenviar mis entradas"): borrador probado por Ramiro (9/10) y **arreglos de la revisión con agentes listos** (10/10/2026). Falta que Ramiro pruebe los arreglos para marcarlo `[x]`.
 - Decidido por Ramiro (10/10): **la menor cantidad de mails**. Las compras de una misma persona (mismo email) en un evento que salen a la vez van en un solo mail; el reenvío llega con el asunto "Te reenviamos tus entradas…".
+- **Paso 17** (escáner de la puerta y pantalla "Validadores"): **borrador listo** (10/10/2026). Decidido por Ramiro: escanear = entra (la entrada queda usada al leerla, se ven los datos y un botón para la siguiente). Falta que Ramiro lo pruebe en el celu y la revisión con agentes.
 
 ## Acciones del dueño pendientes
 
@@ -65,19 +66,19 @@ Detalle en `.claude/rules/` (se cargan solas al tocar esos archivos) y permisos 
 |---|---|
 | `src/app/e/[slug]` | Página pública del evento, "Continuar" (reserva) y `mis-entradas` ("Reenviar mis entradas" con email y DNI) |
 | `src/app/compra/[llave]` | La compra: datos, reloj, pago, "Compra confirmada" con el QR de las entradas, "Reenviar el mail" y `pdf/` (descarga) |
-| `src/app/admin/` | Panel: `eventos` (lotes, pagos, verificar entrada), `productoras` (gente, cobros), `claves` |
-| `src/app/validar` | Puerta (escáner en el paso 17) |
-| `src/app/api/` | `mercadopago/aviso` (aviso de pagos), `mails/pendientes` (tarea diaria de Vercel), `salud` (estado de la base) |
+| `src/app/admin/` | Panel: `eventos` (lotes, pagos, verificar entrada), `productoras` (gente, cobros), `validadores` (del organizador), `claves` |
+| `src/app/validar` | Puerta: elegir el evento y `[id]` (el escáner, `escaner.tsx`: cámara, BarcodeDetector o jsQR, resultado en pantalla completa) |
+| `src/app/api/` | `mercadopago/aviso` (aviso de pagos), `mails/pendientes` (tarea diaria de Vercel), `puerta/escanear` (el escáner manda el código), `salud` (estado de la base) |
 | `src/lib/auth` | Login, sesiones, contraseñas, `alcance.ts` (qué ve cada rol) |
 | `src/lib/eventos` | Guardar evento, lotes, vista pública |
 | `src/lib/ventas` | Reparto por lote, reservas, órdenes, turno del evento, simulación |
 | `src/lib/pagos` | Cobros, confirmar, montos únicos, cuenta de Mercado Pago |
-| `src/lib/entradas` | Código firmado (`codigo.ts`), verificar, QR (`qr.ts`, también el PNG del mail), entradas con QR (`imprimir.ts`), PDF (`pdf.ts`, `texto-pdf.ts`, `descarga.ts`) |
+| `src/lib/entradas` | Código firmado (`codigo.ts`), verificar, escanear en la puerta (`escanear.ts`, `puerta.ts`: lo que ve la puerta), QR (`qr.ts`, también el PNG del mail), entradas con QR (`imprimir.ts`), PDF (`pdf.ts`, `texto-pdf.ts`, `descarga.ts`) |
 | `src/lib/mails` | Mail con las entradas: SMTP (`cartero.ts`), contenido (`entradas.ts`, una o varias compras de la misma persona), envío una sola vez, compras juntas y reintentos (`pendientes.ts`), reenviar con límite (`reenviar.ts`), `after()` (`despues.ts`). El WhatsApp para consultas: `src/lib/ayuda.ts` |
 | `prisma/` | `schema.prisma`, migraciones, datos de prueba |
 | `scripts/` | `migrar.mjs` (deploy), `usuario.ts` (crear ADMIN / resetear contraseña) |
 
 ## Traspaso (último chat)
 
-- **9-10/10/2026:** paso 16. Borrador (9/10, PR #9 mergeado): Ramiro lo probó y creyó que el reenvío mandaba una sola compra; salieron las 4, pero Gmail las escondió en la conversación de cada compra. Arreglado: otro asunto para el reenvío y, pedido por Ramiro, un solo mail con todas las compras de la persona. Revisión con 4 agentes (seguridad, carreras x2, pantallas): arreglados los hallazgos, cada uno con su test (detalle en `PASOS.md`). 305 tests, 0 salteados.
-- **Para el próximo chat:** si Ramiro confirma que probó los arreglos del paso 16 (ver "Para probarlo" en `PASOS.md`), marcarlo `[x]` y arrancar el paso 17 (escáner) con `/empezar-paso 17`.
+- **10/10/2026:** paso 17, borrador. Escáner en `/validar/<evento>` (marca usada con un solo `UPDATE` condicionado; test con 8 escaneos a la vez: entra 1), ruta `POST /api/puerta/escanear`, pantalla "Validadores" del organizador (solo validadores de su productora). Probado en local con la cámara falsa de Chromium a 390 y 320 px. 322 tests, 0 salteados, build. El paso 16 sigue esperando la prueba de Ramiro.
+- **Para el próximo chat:** si Ramiro probó el paso 16, marcarlo `[x]`. Con lo que diga de su prueba del escáner (ver "Para probarlo" del paso 17 en `PASOS.md`), arreglar y hacer la revisión con agentes del paso 17 (seguridad de la ruta y los validadores, carreras del escaneo, la pantalla en iPhone y Android): `/empezar-paso 17`.

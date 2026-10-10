@@ -1,7 +1,7 @@
 "use client";
 
 // "Verificar una entrada": se pega el código (el del QR) y dice si es válida y
-// de quién es. Solo mira: no la marca usada (eso lo hace el escáner, paso 17).
+// de quién es. Solo mira: no la marca usada (eso lo hace el escáner de la puerta).
 import { type FormEvent, startTransition, useActionState, useState } from "react";
 
 import { BotonPrincipal, ESTILO_CAMPO, MensajeError } from "@/components/formulario";
@@ -101,7 +101,12 @@ function Resultado({ verificada: v, codigo }: { verificada: EntradaVerificada; c
           <p>
             {v.tipo} · Compra N° {v.compra}
           </p>
-          {v.resultado === "usada" && v.usadaEn && <p>Entró: {v.usadaEn}</p>}
+          {v.resultado === "usada" && v.usadaEn && (
+            <p>
+              Entró: {v.usadaEn}
+              {v.validadaPor && <> · la escaneó {v.validadaPor}</>}
+            </p>
+          )}
           {v.resultado === "sin_pagar" && <p>La compra no está paga (está pendiente, venció o se canceló).</p>}
           {v.resultado === "anulada" && <p>La entrada se anuló o la compra se devolvió.</p>}
         </div>

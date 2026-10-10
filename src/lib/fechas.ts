@@ -58,3 +58,9 @@ export function formatearFecha(fecha: Date) {
   const p = partes(fecha);
   return `${dia} ${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}`;
 }
+
+// Solo la hora: "23:41".
+export function formatearHora(fecha: Date) {
+  const p = partes(fecha);
+  return `${p.hour}:${p.minute}`;
+}

@@ -2,6 +2,12 @@
 
 Una entrada por chat, la más nueva arriba. Corta: qué se hizo, qué quedó y cómo se probó. El detalle está en los commits y en `PASOS.md`.
 
+## 10/10/2026 — Paso 17: escáner de la puerta (borrador)
+- Decidido con Ramiro: escanear = entra (la entrada queda usada al leerla; se ven nombre, DNI y tipo, y un botón para la siguiente).
+- Borrador: `src/lib/entradas/escanear.ts` (un solo `UPDATE` condicionado + registro en `escaneos`), `POST /api/puerta/escanear` (ruta y no acción, para cortar a los 8 s sin trabar los siguientes), `/validar` (eventos de la productora) y `/validar/<evento>` (cámara con BarcodeDetector o jsQR, verde/rojo en pantalla completa, sonido, vibración, linterna, código a mano), panel "Validadores" del organizador (`soloRol` en `productoras.ts`).
+- Probado en local con la cámara falsa de Chromium (camino de iPhone). 322 tests (0 salteados), typecheck, lint y build.
+- Quedó: la prueba de Ramiro en el celu y la revisión con agentes. El paso 16 sigue esperando su prueba.
+
 ## 9-10/10/2026 — Paso 16: "Compra confirmada" y "Reenviar mis entradas"
 - Decidido con Ramiro: reenviar desde cada evento (email + DNI); link propio por entrada, más adelante. Después de probar el borrador: la menor cantidad de mails (las compras de una persona en un evento, juntas en un mail).
 - Borrador (PR #9): `src/lib/mails/reenviar.ts` (reenviar = dejar la orden "falta el mail" con un `UPDATE` condicionado), "Compra confirmada" como el diseño, `/e/<evento>/mis-entradas`.

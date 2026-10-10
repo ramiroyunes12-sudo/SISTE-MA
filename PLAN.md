@@ -32,7 +32,7 @@ Plataforma para vender entradas por lotes, enviar el QR por mail y validarlo en 
 - **PostgreSQL** (Supabase o Neon).
 - **Mercado Pago** Checkout Pro + webhooks.
 - **Nodemailer + Gmail SMTP** (después Resend).
-- `qrcode`, `pdf-lib`, `html5-qrcode`, `exceljs`.
+- `qrcode`, `pdf-lib`, `jsqr` (leer el QR en iPhone; en Android, el lector del navegador), `exceljs`.
 - Hosting: Vercel + Supabase.
 
 ## Modelo de datos

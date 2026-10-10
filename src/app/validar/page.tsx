@@ -3,16 +3,22 @@ import Link from "next/link";
 
 import { BotonSalir } from "@/components/boton-salir";
 import { requerirUsuario } from "@/lib/auth/actual";
+import { alcanceDe } from "@/lib/auth/alcance";
+import { obtenerDb } from "@/lib/db";
+import { eventosDeLaPuerta } from "@/lib/entradas/escanear";
+import { formatearFecha } from "@/lib/fechas";
 
 export const metadata: Metadata = {
   title: "Escáner",
   robots: { index: false, follow: false },
 };
 
-// Puerta: acá va a ir el escáner de QR (paso 17) y la búsqueda por DNI (paso 18).
+// Puerta: elegir el evento y abrir su escáner (/validar/<evento>). La
+// búsqueda por DNI llega en el paso 18.
 export default async function PaginaValidar({ searchParams }: PageProps<"/validar">) {
   const usuario = await requerirUsuario(["ADMIN", "ORGANIZADOR", "VALIDADOR"]);
   const { contrasena } = await searchParams;
+  const eventos = await eventosDeLaPuerta(obtenerDb(), alcanceDe(usuario));
 
   return (
     <div className="flex flex-1 flex-col font-sans">
@@ -34,10 +40,31 @@ export default async function PaginaValidar({ searchParams }: PageProps<"/valida
           </p>
         )}
         <h1 className="font-display text-3xl font-extrabold">Hola, {usuario.nombre}</h1>
-        <p className="text-tenue">
-          Acá va a estar el escáner para leer los QR en la puerta y la búsqueda por DNI. Todavía no está listo.
-        </p>
-        <Link href="/cuenta/contrasena" className="text-sm font-semibold text-acento hover:text-acento-hover">
+        {eventos.length === 0 ? (
+          <p className="text-tenue">No hay eventos para hoy ni próximos. Cuando haya uno, va a aparecer acá para escanear.</p>
+        ) : (
+          <>
+            <p className="text-tenue">Elegí el evento en el que estás para abrir el escáner:</p>
+            <ul className="flex flex-col gap-3">
+              {eventos.map((evento) => (
+                <li key={evento.id}>
+                  <Link
+                    href={`/validar/${evento.id}`}
+                    className="flex min-h-16 flex-col justify-center gap-0.5 rounded-2xl border-2 border-tinta bg-superficie px-4 py-3 no-underline hover:bg-tinta/5"
+                  >
+                    <span className="text-lg font-bold [overflow-wrap:anywhere]">{evento.nombre}</span>
+                    <span className="text-sm text-tenue">
+                      {formatearFecha(evento.fecha)} · {evento.lugar}
+                      {usuario.rol === "ADMIN" && ` · ${evento.productora.nombre}`}
+                      {evento.estado === "BORRADOR" && " · borrador"}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        <Link href="/cuenta/contrasena" className="mt-4 text-sm font-semibold text-acento hover:text-acento-hover">
           Cambiar mi contraseña
         </Link>
       </main>

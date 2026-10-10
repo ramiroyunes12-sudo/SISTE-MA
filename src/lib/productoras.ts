@@ -119,18 +119,23 @@ export async function agregarPersona(
   }
 }
 
+// Lo que puede tocar cada pantalla: el ADMIN (Productoras), a cualquiera de
+// la productora; un organizador (Validadores), solo a los validadores
+// (soloRol), nunca a otro organizador ni a sí mismo.
+type Opciones = { soloRol?: RolDeProductora };
+
 // Contraseña temporal nueva para alguien de la productora (la olvidó o no
 // llegó a usar la anterior). Le destraba la cuenta y le cierra las sesiones.
 export async function nuevaTemporal(
   db: PrismaClient,
   productoraId: string,
   usuarioId: string,
-  ahora = new Date(),
+  { soloRol, ahora = new Date() }: Opciones & { ahora?: Date } = {},
 ): Promise<{ ok: true; cuenta: CuentaNueva } | { ok: false; error: string }> {
   const { temporal, venceEn, datos } = await prepararTemporal(ahora);
   const usuario = await db.$transaction(async (tx) => {
     const encontrado = await tx.usuario.findFirst({
-      where: { id: usuarioId, productoraId },
+      where: { id: usuarioId, productoraId, ...(soloRol && { rol: soloRol }) },
       select: { id: true, email: true, activo: true, productora: { select: { activa: true } } },
     });
     if (!encontrado) return null;
@@ -149,9 +154,13 @@ export async function cambiarActivo(
   productoraId: string,
   usuarioId: string,
   activo: boolean,
+  { soloRol }: Opciones = {},
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const encontrado = await db.$transaction(async (tx) => {
-    const { count } = await tx.usuario.updateMany({ where: { id: usuarioId, productoraId }, data: { activo } });
+    const { count } = await tx.usuario.updateMany({
+      where: { id: usuarioId, productoraId, ...(soloRol && { rol: soloRol }) },
+      data: { activo },
+    });
     if (count === 1 && !activo) await tx.sesion.deleteMany({ where: { usuarioId } });
     return count === 1;
   });

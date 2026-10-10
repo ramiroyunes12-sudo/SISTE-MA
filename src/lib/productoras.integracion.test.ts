@@ -111,6 +111,34 @@ describe.skipIf(!url)("productoras y su gente", { timeout: 60_000 }, () => {
     expect(await ingresarConContrasena(db, una.email, nuevaCuenta.cuenta.temporal)).toMatchObject({ ok: false });
   });
 
+  it("pantalla Validadores (soloRol): toca validadores de la productora, nunca a un organizador", async () => {
+    const una = await nueva();
+    const organizador = await db.usuario.findUniqueOrThrow({ where: { email: una.email } });
+    const token = await crearSesion(db, organizador.id);
+    const SOLO = { soloRol: "VALIDADOR" } as const;
+
+    // a otro organizador (ni a sí mismo) no le cambia la contraseña ni lo desactiva
+    expect(await nuevaTemporal(db, una.productoraId, organizador.id, SOLO)).toMatchObject({ ok: false });
+    expect(await cambiarActivo(db, una.productoraId, organizador.id, false, SOLO)).toMatchObject({ ok: false });
+    expect(await validarSesion(db, token)).not.toBeNull();
+    expect(await ingresarConContrasena(db, una.email, una.cuenta.temporal)).toMatchObject({ ok: true });
+
+    // a un validador de su productora, sí
+    const email = `v-${unico()}@ejemplo.com`;
+    const alta = await agregarPersona(db, una.productoraId, { nombrePersona: "Vale Puerta", email, rol: "VALIDADOR" });
+    if (!alta.ok) throw new Error(JSON.stringify(alta.errores));
+    const validador = await db.usuario.findUniqueOrThrow({ where: { email } });
+    const nuevaCuenta = await nuevaTemporal(db, una.productoraId, validador.id, SOLO);
+    expect(nuevaCuenta).toMatchObject({ ok: true, cuenta: { email } });
+    expect(await cambiarActivo(db, una.productoraId, validador.id, false, SOLO)).toEqual({ ok: true });
+    expect((await db.usuario.findUniqueOrThrow({ where: { id: validador.id } })).activo).toBe(false);
+
+    // y a uno de otra productora, no
+    const otra = await nueva();
+    expect(await nuevaTemporal(db, otra.productoraId, validador.id, SOLO)).toMatchObject({ ok: false });
+    expect(await cambiarActivo(db, otra.productoraId, validador.id, true, SOLO)).toMatchObject({ ok: false });
+  });
+
   it("desactivar la productora deja afuera a toda su gente; reactivarla los deja volver", async () => {
     const una = await nueva();
     const persona = await db.usuario.findUniqueOrThrow({ where: { email: una.email } });

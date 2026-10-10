@@ -134,13 +134,14 @@ export function FormularioEditarProductora({
   );
 }
 
-export function FormularioAgregarPersona({ accion: accionAgregar }: { accion: Accion }) {
+// soloValidadores: la pantalla "Validadores" de un organizador (sin elegir qué puede hacer).
+export function FormularioAgregarPersona({ accion: accionAgregar, soloValidadores = false }: { accion: Accion; soloValidadores?: boolean }) {
   const [estado, accion, enviando] = useActionState(accionAgregar, {});
   const errores = estado.errores ?? {};
   return (
     <form action={accion} className="flex flex-col gap-4 border-t border-borde p-5">
-      <h3 className="font-bold">Sumar una persona</h3>
-      <div className="grid gap-4 sm:grid-cols-3">
+      <h3 className="font-bold">{soloValidadores ? "Sumar un validador" : "Sumar una persona"}</h3>
+      <div className={`grid gap-4 ${soloValidadores ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
         <Campo
           etiqueta="Nombre y apellido"
           id="nombrePersona"
@@ -150,15 +151,17 @@ export function FormularioAgregarPersona({ accion: accionAgregar }: { accion: Ac
           required
         />
         <Campo etiqueta="Email" id="email-persona" name="email" type="email" error={errores.email} required />
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="rol" className="text-sm font-semibold">
-            Qué puede hacer
-          </label>
-          <select id="rol" name="rol" defaultValue="ORGANIZADOR" className={`h-12 ${ESTILO_CAMPO}`}>
-            <option value="ORGANIZADOR">Organizador (eventos y números)</option>
-            <option value="VALIDADOR">Validador (solo la puerta)</option>
-          </select>
-        </div>
+        {!soloValidadores && (
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="rol" className="text-sm font-semibold">
+              Qué puede hacer
+            </label>
+            <select id="rol" name="rol" defaultValue="ORGANIZADOR" className={`h-12 ${ESTILO_CAMPO}`}>
+              <option value="ORGANIZADOR">Organizador (eventos y números)</option>
+              <option value="VALIDADOR">Validador (solo la puerta)</option>
+            </select>
+          </div>
+        )}
       </div>
       {!enviando && <MensajeError>{errores.general}</MensajeError>}
       {!enviando && estado.cuenta && <CuentaCreada cuenta={estado.cuenta} />}
