@@ -4,7 +4,7 @@
 // Permisos y errores: ../comun.ts.
 import type { NextRequest } from "next/server";
 
-import { alcanceDe } from "@/lib/auth/alcance";
+import { alcanceDeLaPuerta } from "@/lib/auth/alcance";
 import { obtenerDb } from "@/lib/db";
 import { escanearCodigo } from "@/lib/entradas/escanear";
 import { respuestaPuerta } from "@/lib/entradas/puerta";
@@ -17,7 +17,7 @@ export function POST(request: NextRequest) {
     const ahora = new Date();
     const escaneado = await escanearCodigo(obtenerDb(), {
       eventoId,
-      alcance: alcanceDe(usuario),
+      alcance: alcanceDeLaPuerta(usuario),
       usuarioId: usuario.id,
       texto: codigo,
       ahora,

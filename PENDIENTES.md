@@ -18,4 +18,5 @@ Lo que **no** está atado a un paso de `PASOS.md`: acciones manuales del dueño 
 | Plan B de transferencias | Que quien compra pegue el código del comprobante ("ID COELSA" = `e2e_id` en Mercado Pago). Probar antes con 2-3 apps de bancos. |
 | Limitar intentos de login por IP | Opcional, con el firewall de Vercel (hoy hay bloqueo por cuenta). |
 | Link propio por entrada | Un link firmado por entrada para pasársela a quien va sin darle el link de toda la compra (decidido el 9/10/2026 dejarlo para más adelante: hoy se pasa el PDF). Se puede armar sin guardar nada (id de la entrada + firma) y sumarlo a la compra y al mail. |
+| Cuánto se guardan las búsquedas de la puerta | La tabla `busquedas` guarda quién buscó qué en la puerta (DNI y nombres escritos), pedido por Ramiro el 10/10/2026. Decidir cuándo se borran (por ejemplo, 30 días después del evento) y si el panel las muestra (paso 20). |
 | Índices para 6 claves foráneas | Los sugiere Supabase (entradas.lote/orden/tipo, validada_por, escaneos.usuario, ordenes.emitida_por). Sumarlos en una migración cuando haya datos. |

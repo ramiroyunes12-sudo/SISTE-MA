@@ -23,7 +23,8 @@ Sistema de venta de entradas por lotes para varias **productoras** (se alquila p
 - Los mails salen por Gmail (`sistemaentradas@gmail.com`, contraseña de aplicación). Ramiro no quiere pagar un servicio de mails: se queda Gmail aunque algunos caigan en spam.
 - Decidido por Ramiro (10/10): **las devoluciones de plata no van por el sistema**; quien la pide se contacta con él (WhatsApp de ayuda). En el paso 20, en vez de reembolsos, ver un "Anular compra" para que esos QR no entren.
 - Decidido por Ramiro (10/10): **la menor cantidad de mails**. Las compras de una misma persona (mismo email) en un evento que salen a la vez van en un solo mail; el reenvío llega con el asunto "Te reenviamos tus entradas…".
-- **Paso 18** (buscar por DNI o nombre y contador en la puerta): **borrador probado por Ramiro en producción** (10/10/2026); revisión con agentes en curso. Decidido por Ramiro: DNI completo o nombre desde 3 letras (hasta 10); marcar el ingreso sin QR, solo organizador y ADMIN; "Ingresaron X de Y" para todos. Después de la revisión, que Ramiro pruebe los arreglos (ver "Para probarlo" del paso 18 en `PASOS.md`).
+- **Paso 18** (buscar por DNI o nombre y contador en la puerta): borrador probado por Ramiro en producción y **arreglos de la revisión con agentes listos** (10/10/2026). Decidido por Ramiro: DNI completo o nombre desde 3 letras (hasta 10); marcar el ingreso sin QR, solo organizador y ADMIN; "Ingresaron X de Y" para todos; un validador usa la puerta solo de 12 h antes a 24 h después del evento y hace hasta 5 búsquedas por minuto; cada búsqueda queda anotada (quién, qué y cuándo, tabla `busquedas`). Falta que Ramiro pruebe los arreglos ("Arreglos para probar" del paso 18 en `PASOS.md`).
+- Decidido por Ramiro (10/10): **como mucho 4 entradas por compra** en cualquier evento (el panel deja de 1 a 4).
 
 ## Acciones del dueño pendientes
 
@@ -69,16 +70,16 @@ Detalle en `.claude/rules/` (se cargan solas al tocar esos archivos) y permisos 
 | `src/app/admin/` | Panel: `eventos` (lotes, pagos, verificar entrada), `productoras` (gente, cobros), `validadores` (del organizador), `claves` |
 | `src/app/validar` | Puerta: elegir el evento y `[id]`: `puerta.tsx` (contador y pestañas), `escaner.tsx` (cámara, BarcodeDetector o jsQR), `buscar.tsx` (DNI o nombre, marcar ingreso), `resultado.tsx` (verde/rojo en pantalla completa) |
 | `src/app/api/` | `mercadopago/aviso` (aviso de pagos), `mails/pendientes` (tarea diaria de Vercel), `puerta/` (`escanear`, `buscar`, `marcar` y `contador`; lo común en `comun.ts`), `salud` (estado de la base) |
-| `src/lib/auth` | Login, sesiones, contraseñas, `alcance.ts` (qué ve cada rol) |
+| `src/lib/auth` | Login, sesiones, contraseñas, `alcance.ts` (qué ve cada rol; `alcanceDeLaPuerta`: la ventana del validador) |
 | `src/lib/eventos` | Guardar evento, lotes, vista pública |
 | `src/lib/ventas` | Reparto por lote, reservas, órdenes, turno del evento, simulación |
 | `src/lib/pagos` | Cobros, confirmar, montos únicos, cuenta de Mercado Pago |
-| `src/lib/entradas` | Código firmado (`codigo.ts`), verificar, escanear y marcar sin QR en la puerta (`escanear.ts`), buscar por DNI o nombre y el contador (`buscar.ts`), lo que ve la puerta (`puerta.ts`), QR (`qr.ts`, también el PNG del mail), entradas con QR (`imprimir.ts`), PDF (`pdf.ts`, `texto-pdf.ts`, `descarga.ts`) |
+| `src/lib/entradas` | Código firmado (`codigo.ts`), verificar, escanear y marcar sin QR en la puerta (`escanear.ts`), buscar por DNI o nombre, tope y registro de búsquedas, y el contador (`buscar.ts`), lo que ve la puerta (`puerta.ts`), QR (`qr.ts`, también el PNG del mail), entradas con QR (`imprimir.ts`), PDF (`pdf.ts`, `texto-pdf.ts`, `descarga.ts`) |
 | `src/lib/mails` | Mail con las entradas: SMTP (`cartero.ts`), contenido (`entradas.ts`, una o varias compras de la misma persona), envío una sola vez, compras juntas y reintentos (`pendientes.ts`), reenviar con límite (`reenviar.ts`), `after()` (`despues.ts`). El WhatsApp para consultas: `src/lib/ayuda.ts` |
 | `prisma/` | `schema.prisma`, migraciones, datos de prueba |
 | `scripts/` | `migrar.mjs` (deploy), `usuario.ts` (crear ADMIN / resetear contraseña) |
 
 ## Traspaso (último chat)
 
-- **10/10/2026:** paso 17 `[x]` (Ramiro probó los arreglos). Paso 18: borrador publicado (PR #15) y probado por Ramiro en su iPhone; se lanzó la revisión con 3 agentes (seguridad y datos personales, base y carreras, pantalla del celu).
-- **Para el próximo chat:** si la revisión no quedó anotada en `PASOS.md` (paso 18, "Revisado con…"), volver a hacerla: agentes en paralelo, verificar cada hallazgo, arreglar con su test y commit `Paso 18: arreglos de la revisión con agentes`. Arrancar con `/empezar-paso 18`.
+- **10/10/2026:** paso 17 `[x]`. Paso 18: borrador probado por Ramiro; revisión con 3 agentes (seguridad, base y carreras, pantalla del celu) y arreglos, cada uno con su test o reproducido en el navegador antes y después. Lo más importante: la cámara podía prenderse escondida en "Buscar" y marcar un QR de la fila. Decidido por Ramiro: ventana de 12 h antes a 24 h después para validadores, 5 búsquedas por minuto, registro de búsquedas y máximo 4 por compra (migración `20261010120000_busquedas_y_max_por_compra`). 361 tests (0 salteados), typecheck, lint y build.
+- **Para el próximo chat:** si Ramiro probó los arreglos del paso 18 ("Arreglos para probar" en `PASOS.md`), marcarlo `[x]` y arrancar el paso 19 (cortesías) con `/empezar-paso 19`.

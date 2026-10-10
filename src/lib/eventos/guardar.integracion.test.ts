@@ -21,7 +21,7 @@ function datos(cambios: Partial<EventoEditado> = {}): EventoValidado {
     lugar: "Lugar",
     direccion: "",
     descripcion: "",
-    maxPorCompra: "6",
+    maxPorCompra: "4",
     cupoCortesias: "10",
     estado: "BORRADOR",
     tipos: [

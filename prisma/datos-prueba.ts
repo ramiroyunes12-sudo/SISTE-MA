@@ -12,7 +12,7 @@ const EVENTO = {
   fecha: new Date("2026-11-21T23:00:00-03:00"), // sábado
   lugar: "Lugar de prueba",
   direccion: "Corrientes, Argentina",
-  maxPorCompra: 6,
+  maxPorCompra: 4,
   cupoCortesias: 50,
   estado: "PUBLICADO" as const,
 };

@@ -12,7 +12,7 @@
 // investigar QR truchos: uno bien firmado (por ejemplo, de otro evento) es un
 // QR que sirve y no se guarda, y un texto cualquiera puede traer cualquier cosa.
 import { type MetodoIngreso, Prisma, type PrismaClient } from "@/generated/prisma/client";
-import { type Alcance, filtroDeEventos } from "@/lib/auth/alcance";
+import { type Alcance, filtroDeEventos, HORAS_EN_LA_PUERTA } from "@/lib/auth/alcance";
 
 import { leerCodigo } from "./codigo";
 import { verificarEntrada } from "./verificar";
@@ -134,15 +134,12 @@ async function marcar(
   throw new Error("La entrada cambió de estado mientras se escaneaba");
 }
 
-// Un evento sigue en la puerta hasta 24 horas después de empezar (las fiestas
-// terminan de madrugada).
-const HORAS_EN_LA_PUERTA = 24;
-
 // Los eventos para elegir en la puerta: los de su productora (el ADMIN, todos)
-// que todavía no pasaron, del más cercano al más lejano.
+// que todavía no pasaron (hasta 24 horas después de empezar), del más cercano
+// al más lejano. Con el alcance de un validador, solo los de su ventana.
 export function eventosDeLaPuerta(db: PrismaClient, alcance: Alcance, ahora = new Date()) {
   return db.evento.findMany({
-    where: { ...filtroDeEventos(alcance), fecha: { gte: new Date(ahora.getTime() - HORAS_EN_LA_PUERTA * 60 * 60 * 1000) } },
+    where: { AND: [filtroDeEventos(alcance), { fecha: { gte: new Date(ahora.getTime() - HORAS_EN_LA_PUERTA * 60 * 60 * 1000) } }] },
     orderBy: { fecha: "asc" },
     select: { id: true, nombre: true, fecha: true, lugar: true, estado: true, productora: { select: { nombre: true } } },
   });
