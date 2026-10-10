@@ -21,6 +21,10 @@ export type EntradaParaPdf = {
   dni: string;
   codigoFirmado: string; // lo que va en el QR
   usada?: boolean; // ya se usó para entrar
+  // Si el PDF junta entradas de varias compras (el mail de una persona con
+  // varias compras), la compra de esta entrada; si no, la del PDF.
+  compra?: number;
+  totalEntradas?: number;
 };
 
 export type DatosPdf = {
@@ -135,7 +139,9 @@ function paginaDeEntrada(pdf: PDFDocument, fuentes: Fuentes, datos: DatosPdf, en
   y -= 8;
   const tipo = renglonTipoYLote(fuentes.negrita, aMayusculas(entrada.tipo), entrada.lote ? aMayusculas(entrada.lote) : "");
   y = escribir(pagina, tipo.texto, y, { fuente: fuentes.negrita, tamano: tipo.tamano, maximo: 1 });
-  y = escribir(pagina, `Entrada ${entrada.numero} de ${datos.totalEntradas} · Compra N° ${datos.compra}`, y, {
+  const compra = entrada.compra ?? datos.compra;
+  const total = entrada.totalEntradas ?? datos.totalEntradas;
+  y = escribir(pagina, `Entrada ${entrada.numero} de ${total} · Compra N° ${compra}`, y, {
     fuente: fuentes.normal,
     tamano: 8.5,
     color: TENUE,

@@ -180,8 +180,10 @@ En una compra paga, el link de la compra (`/compra/<llave>`) muestra cada entrad
 
 Cuando se confirma el pago, a quien compró le llega **"Tus entradas para …"** (`src/lib/mails/`): el evento, el QR de cada entrada con su nombre, DNI, tipo y lote, y adjuntos el PDF con todas y, con 2 o más, uno por persona (para mandarle a cada uno la suya). No lleva el link de la compra (en la base solo queda su huella).
 
+- **La menor cantidad de mails:** todas las entradas de una compra van en un solo mail. Y si a una misma persona (mismo email) le faltan a la vez los mails de varias compras del mismo evento (un reenvío, "Reintentar ahora"), van todas juntas en un mail (hasta 10 compras por mail; cada entrada dice de qué compra es).
+
 - **Remitente:** el nombre de la productora, desde la cuenta de mail de la plataforma (conviene que se llame, por ejemplo, `noresponder.entradas@gmail.com`). El mail dice que no se responda: para cualquier problema, el **WhatsApp de la plataforma** (`WHATSAPP_AYUDA`), que también va al pie de cada PDF y abajo de la página de la compra. Al tocarlo se abre WhatsApp con "Hola, tengo una consulta por la compra N° …" ya escrito.
-- **Cuándo sale:** nunca dentro de la confirmación del pago. Después de responder (con `after()` de Next), piden mandar los que faltan el aviso de Mercado Pago, la pantalla que espera el pago, el panel y el link de la compra paga; y una vez por día, a las 12:00, una tarea programada de Vercel (`/api/mails/pendientes`, protegida con `CRON_SECRET`). Cada mail se "toma" con un cambio condicionado en la base: aunque se pida varias veces a la vez, sale una sola vez.
+- **Cuándo sale:** nunca dentro de la confirmación del pago. Después de responder (con `after()` de Next), piden mandar los que faltan el aviso de Mercado Pago, la pantalla que espera el pago, el panel, el link de la compra paga y "Reenviar mis entradas"; y una vez por día, a las 12:00, una tarea programada de Vercel (`/api/mails/pendientes`, protegida con `CRON_SECRET`). Cada mail se "toma" con un cambio condicionado en la base: aunque se pida varias veces a la vez, sale una sola vez.
 - **Si falla:** queda anotado el motivo (sin datos de la persona) y se reintenta cada vez más espaciado (5 minutos, 15 minutos, 1 hora, 4 horas), hasta 5 intentos, la próxima vez que algo pida mandar. Si es el límite diario de Gmail, no cuenta como intento y espera una hora. En el panel, **Evento → Pagos → Mails con las entradas**: cuántos salieron, cuáles no y por qué, y **Reintentar ahora**.
 - El link de la compra paga ("¡Compra confirmada!") dice si el mail ya salió ("Te mandamos tus 2 entradas a …"). Si el envío no está configurado, no promete nada.
 - Las compras que ya estaban pagas antes de que existieran los mails no se mandan solas: aparecen en el panel como que no salieron, y con "Reintentar ahora" salen.
@@ -190,7 +192,8 @@ Cuando se confirma el pago, a quien compró le llega **"Tus entradas para …"**
 
 - En el link de la compra paga, abajo: **Reenviar el mail** (el link es el permiso).
 - Quien perdió el mail y el link: en la página del evento, **Reenviar mis entradas** (`/e/<evento>/mis-entradas`), con el email y el DNI de alguna de las entradas. La respuesta es siempre la misma: no dice si hay una compra con esos datos.
-- Siempre al email de la compra y como mucho **3 veces por día por compra** (`src/lib/mails/reenviar.ts`). Sale por el mismo camino que el primer mail: una sola vez y, si falla, se reintenta y aparece en el panel.
+- Siempre al email de la compra y como mucho **3 veces seguidas por compra**; para pedir más hay que esperar 24 horas desde el último (`src/lib/mails/reenviar.ts`). Sale por el mismo camino que el primer mail: una sola vez (con todas las compras de esa persona en el evento) y, si falla, se reintenta y aparece en el panel.
+- El reenvío llega con otro asunto, **"Te reenviamos tus entradas para … (compra N° …)"**, para que aparezca como mail nuevo: con el mismo asunto, Gmail lo esconde dentro de la conversación del primero. Las entradas son las mismas (los QR no cambian).
 
 | Variable | Qué es |
 |---|---|

@@ -51,7 +51,10 @@ export function FormularioDatos({
   }
 
   return (
-    <form onSubmit={alEnviar} noValidate className="flex flex-col gap-4">
+    // `action` además de onSubmit: si se toca el botón antes de que cargue el
+    // JavaScript, sale igual por POST (sin action, el navegador pondría los
+    // nombres, DNI y email en la dirección).
+    <form action={accion} onSubmit={alEnviar} noValidate className="flex flex-col gap-4">
       {entradas.map(({ tipo, titular, dni }, i) => (
         <fieldset key={i} className="flex flex-col gap-3 rounded-2xl border border-borde bg-superficie p-4">
           <legend className="sr-only">

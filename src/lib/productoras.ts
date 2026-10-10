@@ -29,7 +29,8 @@ function validarPersona(valor: { nombre?: unknown; email?: unknown; rol?: unknow
   const nombre = texto(valor.nombre);
   if (nombre.length < 2 || nombre.length > 80) errores[`${prefijo}nombrePersona`] = "Poné nombre y apellido.";
   const email = normalizarEmail(valor.email);
-  if (!EMAIL.test(email) || email.length > 200) errores[`${prefijo}email`] = "Poné un email válido.";
+  // Primero el largo: con un texto gigante el regex tarda minutos.
+  if (email.length > 200 || !EMAIL.test(email)) errores[`${prefijo}email`] = "Poné un email válido.";
   const rol = ROLES_DE_PRODUCTORA.find((r) => r === valor.rol) ?? "ORGANIZADOR";
   return { nombre, email, rol };
 }

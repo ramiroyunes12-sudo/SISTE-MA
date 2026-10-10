@@ -42,7 +42,10 @@ export function FormularioMisEntradas({
   }
 
   return (
-    <form onSubmit={alEnviar} noValidate className="flex flex-col gap-4">
+    // `action` además de onSubmit: si se toca el botón antes de que cargue el
+    // JavaScript, sale igual por POST (sin action, el navegador pondría el
+    // email y el DNI en la dirección).
+    <form action={accion} onSubmit={alEnviar} noValidate className="flex flex-col gap-4">
       <Campo
         etiqueta="Email"
         id="email"
@@ -76,8 +79,8 @@ export function FormularioMisEntradas({
           </svg>
           <span>
             <strong>Listo.</strong> Si hay compras pagas para este evento con ese email y ese DNI, te las volvemos a mandar a ese
-            email: un mail por compra, que dice &quot;Te reenviamos tus entradas&quot;. Puede tardar unos minutos: si no lo ves,
-            revisá en spam o promociones.
+            email, todas juntas en un mail que dice &quot;Te reenviamos tus entradas&quot;. Puede tardar unos minutos: si no lo
+            ves, revisá en spam o promociones.
           </span>
         </div>
       )}

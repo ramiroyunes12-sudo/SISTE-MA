@@ -114,7 +114,7 @@ export async function reenviarMailAccion(llave: string): Promise<EstadoReenvio> 
       case "limite":
         return {
           tipo: "aviso",
-          mensaje: `Ya te lo reenviamos ${MAX_REENVIOS_POR_DIA} veces hoy: probá mañana. Tus entradas están igual en esta página.`,
+          mensaje: `Ya te lo reenviamos ${MAX_REENVIOS_POR_DIA} veces seguidas: podés volver a pedirlo en 24 horas. Tus entradas están igual en esta página.`,
         };
       case "sin_configurar":
         return { tipo: "error", mensaje: "Ahora no podemos mandar mails. Tus entradas están en esta página: descargalas en PDF." };

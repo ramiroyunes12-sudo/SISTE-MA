@@ -8,9 +8,12 @@
 // la tarea programada de Vercel (/api/mails/pendientes).
 //
 // - Cada envío primero "toma" la orden con un UPDATE condicionado (anota en
-//   mailIntentoEn la hora real en que empieza y suma un intento): si dos
-//   envíos corren a la vez, solo uno la toma, y nadie toma una que se está
-//   mandando (hasta DURACION_MAXIMA_ENVIO_MS).
+//   mailIntentoEn la hora real en que empieza, suma un intento y borra el
+//   error del anterior): si dos envíos corren a la vez, solo uno la toma, y
+//   nadie toma una que se está mandando (hasta DURACION_MAXIMA_ENVIO_MS).
+// - Al terminar, anota el resultado solo si la orden sigue tomada por ese
+//   intento (mismo mailIntentoEn): si mientras tanto la pidieron de nuevo
+//   (reenviar.ts) o la tomó otro envío (este se colgó), no la pisa.
 // - Si falla, queda el motivo (sin datos de la persona) y se puede volver a
 //   intentar desde mailReintentarDesde: cada vez más espaciado (ESPERAS_MS),
 //   hasta MAX_INTENTOS; después, solo con "Reintentar" desde el panel. El
@@ -20,13 +23,17 @@
 //   ninguno.
 // - Sin servidor de mail configurado o sin CLAVE_CODIGOS no se intenta nada
 //   (no gasta intentos): sale cuando se configure.
+// - Cuantos menos mails, mejor: las compras que le faltan a una misma
+//   persona (mismo email) en el mismo evento salen juntas en un solo mail
+//   (hasta MAX_COMPRAS_POR_MAIL), se toman juntas y, si falla, se reintentan
+//   juntas. Por ejemplo, "Reenviar mis entradas" con varias compras.
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { whatsappDeAyuda } from "@/lib/ayuda";
 import { hayClaveDeCodigos } from "@/lib/entradas/codigo";
-import { entradasConQr } from "@/lib/entradas/imprimir";
-import { buscarCompraPorId } from "@/lib/ventas/ordenes";
+import { type EntradaConQr, entradasConQr } from "@/lib/entradas/imprimir";
+import { buscarCompraPorId, type Compra } from "@/lib/ventas/ordenes";
 
-import { type Cartero, configuracionSmtp, describirErrorDeMail, esLimiteDiario, type Mensaje } from "./cartero";
+import { type Cartero, configuracionSmtp, describirErrorDeMail, esLimiteDiario } from "./cartero";
 import { armarMailEntradas } from "./entradas";
 
 const MINUTO = 60_000;
@@ -41,7 +48,11 @@ export const ESPERA_LIMITE_DIARIO_MS = 60 * MINUTO;
 // lo manda el próximo envío): así no se pasa del tiempo de la función.
 const TOPE_VUELTA_MS = 25_000;
 const POR_CONSULTA = 10;
+// Compras de una misma persona que van juntas en un mail, como mucho (las que
+// siguen, en otro): así el mail no queda gigante.
+export const MAX_COMPRAS_POR_MAIL = 10;
 
+// Cuántos mails salieron y cuántos fallaron (un mail puede llevar varias compras).
 export type ResultadoEnvio = { enviados: number; fallidos: number; sinConfigurar?: true };
 
 const NO_HAY_ENTRADAS = "No tiene entradas para mandar.";
@@ -68,54 +79,75 @@ export function hayEnvioConfigurado() {
   return configuracionSmtp() !== null && hayClaveDeCodigos();
 }
 
-// El mail de una compra paga, armado desde la base (sin la llave del link).
-// null si no tiene a quién o qué mandar. Si ya la pidieron de nuevo
-// ("Reenviar mis entradas", reenviar.ts), va como reenvío: todo mail
-// después del primer reenvío es un reenvío.
-export async function mailDeOrden(db: PrismaClient, ordenId: string, ahora = new Date()): Promise<Mensaje | null> {
-  const compra = await buscarCompraPorId(db, ordenId, ahora);
-  if (!compra || compra.estado !== "PAGADA" || !compra.email) return null;
-  const entradas = entradasConQr(compra);
-  if (entradas.length === 0) return null;
-  const { reenviosCount, evento } = await db.orden.findUniqueOrThrow({
-    where: { id: compra.id },
-    select: { reenviosCount: true, evento: { select: { productora: { select: { nombre: true } } } } },
-  });
-  return armarMailEntradas({
-    para: compra.email,
+// El mail de las compras pagas `ids` (todas de la misma persona y del mismo
+// evento: las junta enviarJuntas), armado desde la base (sin la llave del
+// link). null si ninguna tiene algo para mandar; si no, el mail y qué compras
+// lleva. Va como reenvío si a todas ya las pidieron de nuevo ("Reenviar mis
+// entradas", reenviar.ts): todo mail después del primer reenvío es un reenvío.
+async function mailDeOrdenes(db: PrismaClient, ids: string[], ahora: Date) {
+  const compras: { compra: Compra; email: string; entradas: EntradaConQr[] }[] = [];
+  for (const id of ids) {
+    const compra = await buscarCompraPorId(db, id, ahora);
+    if (!compra || compra.estado !== "PAGADA" || !compra.email) continue;
+    const entradas = entradasConQr(compra);
+    if (entradas.length > 0) compras.push({ compra, email: compra.email, entradas });
+  }
+  if (compras.length === 0) return null;
+  compras.sort((a, b) => a.compra.numero - b.compra.numero);
+  const [primera] = compras;
+  const [ordenes, evento] = await Promise.all([
+    db.orden.findMany({ where: { id: { in: compras.map(({ compra }) => compra.id) } }, select: { reenviosCount: true } }),
+    db.evento.findUniqueOrThrow({ where: { id: primera.compra.evento.id }, select: { productora: { select: { nombre: true } } } }),
+  ]);
+  const mensaje = await armarMailEntradas({
+    para: primera.email,
     productora: evento.productora,
     ayuda: whatsappDeAyuda(),
-    compra: compra.numero,
-    totalEntradas: compra.entradas.length,
-    evento: compra.evento,
-    entradas,
-    reenvio: reenviosCount > 0,
+    evento: primera.compra.evento,
+    compras: compras.map(({ compra, entradas }) => ({ numero: compra.numero, totalEntradas: compra.entradas.length, entradas })),
+    reenvio: ordenes.every((orden) => orden.reenviosCount > 0),
   });
+  return { mensaje, incluidas: compras.map(({ compra }) => compra.id) };
 }
 
+// Manda en un solo mail la compra `ordenId` y las otras que le faltan a la
+// misma persona (mismo email) en el mismo evento, hasta MAX_COMPRAS_POR_MAIL.
 // `reloj`: la hora de cada paso (en los tests, una hora inventada que avanza).
-async function enviarUno(db: PrismaClient, cartero: Cartero, ordenId: string, reloj: () => Date) {
-  // Tomarla: si otro envío la tomó (o ya salió), no hace nada.
+async function enviarJuntas(db: PrismaClient, cartero: Cartero, ordenId: string, reloj: () => Date) {
   const tomada = reloj();
-  const [orden] = await db.orden.updateManyAndReturn({
-    where: { id: ordenId, ...pendientes(tomada) },
-    data: { mailIntentoEn: tomada, mailIntentos: { increment: 1 } },
-    select: { mailIntentos: true },
+  const orden = await db.orden.findFirst({ where: { AND: [pendientes(tomada), { id: ordenId }] }, select: { eventoId: true, email: true } });
+  if (!orden?.email) return "ocupada" as const; // otro envío la tomó (o ya salió)
+  const otras = await db.orden.findMany({
+    where: { AND: [pendientes(tomada), { id: { not: ordenId }, eventoId: orden.eventoId, email: orden.email }] },
+    orderBy: { pagadaEn: "asc" },
+    take: MAX_COMPRAS_POR_MAIL - 1,
+    select: { id: true },
   });
-  if (!orden) return "ocupada" as const;
+  // Tomarlas: las que otro envío tomó en el medio (o ya salieron) quedan afuera.
+  const tomadas = await db.orden.updateManyAndReturn({
+    where: { AND: [pendientes(tomada), { id: { in: [ordenId, ...otras.map((otra) => otra.id)] } }] },
+    data: { mailIntentoEn: tomada, mailIntentos: { increment: 1 }, mailError: null, mailReintentarDesde: null },
+    select: { id: true, mailIntentos: true },
+  });
+  if (tomadas.length === 0) return "ocupada" as const;
+  const ids = tomadas.map((tomadaYa) => tomadaYa.id);
+  // Lo que se anota al final, solo en las que siguen tomadas por este intento.
+  const siguenTomadas = (cuales: string[]) => ({ id: { in: cuales }, mailIntentoEn: tomada });
 
-  let mensaje: Mensaje | null;
+  let armado: Awaited<ReturnType<typeof mailDeOrdenes>>;
   try {
-    mensaje = await mailDeOrden(db, ordenId, tomada);
-    if (mensaje) await cartero.enviar(mensaje);
+    armado = await mailDeOrdenes(db, ids, tomada);
+    if (armado) await cartero.enviar(armado.mensaje);
   } catch (error) {
     const motivo = describirErrorDeMail(error);
-    // Solo el id y el motivo: nada de la persona en los logs.
-    console.error(`[mail] Compra ${ordenId}: ${motivo}`);
+    // Solo los ids y el motivo: nada de la persona en los logs.
+    console.error(`[mail] ${ids.length === 1 ? "Compra" : "Compras"} ${ids.join(", ")}: ${motivo}`);
     const limite = esLimiteDiario(error);
-    const espera = limite ? ESPERA_LIMITE_DIARIO_MS : ESPERAS_MS[Math.min(orden.mailIntentos, ESPERAS_MS.length) - 1];
-    await db.orden.update({
-      where: { id: ordenId },
+    // Se reintentan juntas: la espera de la que más intentos lleva.
+    const intentos = Math.max(...tomadas.map((tomadaYa) => tomadaYa.mailIntentos));
+    const espera = limite ? ESPERA_LIMITE_DIARIO_MS : ESPERAS_MS[Math.min(intentos, ESPERAS_MS.length) - 1];
+    await db.orden.updateMany({
+      where: siguenTomadas(ids),
       data: {
         mailError: motivo,
         mailReintentarDesde: new Date(reloj().getTime() + espera),
@@ -124,11 +156,14 @@ async function enviarUno(db: PrismaClient, cartero: Cartero, ordenId: string, re
     });
     return "fallo" as const;
   }
-  if (!mensaje) {
-    await db.orden.update({ where: { id: ordenId }, data: { mailIntentos: MAX_INTENTOS, mailError: NO_HAY_ENTRADAS } });
-    return "fallo" as const;
+  // Las que no tenían nada para mandar (por ejemplo, todas sus entradas anuladas) no se reintentan.
+  const incluidas = armado?.incluidas ?? [];
+  const sinNada = ids.filter((id) => !incluidas.includes(id));
+  if (sinNada.length > 0) {
+    await db.orden.updateMany({ where: siguenTomadas(sinNada), data: { mailIntentos: MAX_INTENTOS, mailError: NO_HAY_ENTRADAS } });
   }
-  await db.orden.update({ where: { id: ordenId }, data: { mailEnviadoEn: reloj(), mailError: null, mailReintentarDesde: null } });
+  if (incluidas.length === 0) return "fallo" as const;
+  await db.orden.updateMany({ where: siguenTomadas(incluidas), data: { mailEnviadoEn: reloj(), mailError: null, mailReintentarDesde: null } });
   return "enviado" as const;
 }
 
@@ -160,7 +195,7 @@ export async function enviarMailsPendientes(
     if (candidatas.length === 0) break;
     for (const { id } of candidatas) {
       if (Date.now() - inicio >= TOPE_VUELTA_MS) break;
-      const uno = await enviarUno(db, cartero, id, reloj);
+      const uno = await enviarJuntas(db, cartero, id, reloj);
       if (uno === "enviado") resultado.enviados++;
       if (uno === "fallo") resultado.fallidos++;
     }
