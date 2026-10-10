@@ -1,5 +1,5 @@
 // Verificar una entrada por su código: SOLO mira, no la marca usada (eso es
-// el escáner de la puerta, paso 17, con un UPDATE condicionado).
+// el escáner de la puerta, escanear.ts, con un UPDATE condicionado).
 //
 // Primero se revisa la firma (sin tocar la base); después se busca el código
 // entre las entradas que el usuario puede ver (las de su productora; el ADMIN,
@@ -10,11 +10,18 @@ import { type Alcance, filtroDeEventos } from "@/lib/auth/alcance";
 
 import { leerCodigo } from "./codigo";
 
-export type DatosEntrada = { titular: string | null; dni: string | null; tipo: string; compra: number; usadaEn: Date | null };
+export type DatosEntrada = {
+  titular: string | null;
+  dni: string | null;
+  tipo: string;
+  compra: number;
+  usadaEn: Date | null;
+  validadaPor: { id: string; nombre: string } | null; // quién la escaneó en la puerta
+};
 
 export type Verificacion =
   | { resultado: "no_valida"; motivo: "formato" | "firma" | "no_existe" | "otro_evento" }
-  | { resultado: "valida" | "usada" | "sin_pagar" | "anulada"; entrada: DatosEntrada };
+  | { resultado: "valida" | "usada" | "sin_pagar" | "anulada"; entradaId: string; entrada: DatosEntrada };
 
 export async function verificarCodigo(
   db: PrismaClient,
@@ -28,11 +35,13 @@ export async function verificarCodigo(
   const entrada = await db.entrada.findFirst({
     where: { codigo: leido.codigo, evento: filtroDeEventos(alcance) },
     select: {
+      id: true,
       eventoId: true,
       estado: true,
       titular: true,
       dni: true,
       usadaEn: true,
+      validadaPor: { select: { id: true, nombre: true } },
       tipoEntrada: { select: { nombre: true } },
       orden: { select: { numero: true, estado: true } },
     },
@@ -46,9 +55,13 @@ export async function verificarCodigo(
     tipo: entrada.tipoEntrada.nombre,
     compra: entrada.orden.numero,
     usadaEn: entrada.usadaEn,
+    validadaPor: entrada.validadaPor,
   };
-  if (entrada.estado === "USADA") return { resultado: "usada", entrada: datos };
-  if (entrada.estado === "ANULADA" || entrada.orden.estado === "REEMBOLSADA") return { resultado: "anulada", entrada: datos };
-  if (entrada.estado === "VALIDA" && entrada.orden.estado === "PAGADA") return { resultado: "valida", entrada: datos };
-  return { resultado: "sin_pagar", entrada: datos };
+  const entradaId = entrada.id;
+  if (entrada.estado === "USADA") return { resultado: "usada", entradaId, entrada: datos };
+  if (entrada.estado === "ANULADA" || entrada.orden.estado === "REEMBOLSADA") {
+    return { resultado: "anulada", entradaId, entrada: datos };
+  }
+  if (entrada.estado === "VALIDA" && entrada.orden.estado === "PAGADA") return { resultado: "valida", entradaId, entrada: datos };
+  return { resultado: "sin_pagar", entradaId, entrada: datos };
 }

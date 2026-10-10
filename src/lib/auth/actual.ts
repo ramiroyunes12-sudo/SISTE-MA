@@ -34,6 +34,17 @@ export async function requerirUsuario(roles: Rol[]) {
   return usuario;
 }
 
+// Para rutas que responden datos (Route Handlers), como el escáner: lo mismo
+// que requerirUsuario(), pero sin redirigir: null si no ingresó, si tiene que
+// cambiar la contraseña o si no tiene permiso (quien pidió decide qué mostrar).
+export async function usuarioConPermiso(roles: Rol[]) {
+  const sesion = await obtenerSesionActual();
+  if (!sesion) return null;
+  const { usuario } = sesion;
+  if (usuario.debeCambiarContrasena || !roles.includes(usuario.rol)) return null;
+  return usuario;
+}
+
 // Solo desde acciones (Server Actions): las páginas no pueden escribir cookies.
 export async function guardarCookieSesion(token: string, maxAge = DURACION_MAXIMA / 1000) {
   (await cookies()).set(COOKIE_SESION, token, {

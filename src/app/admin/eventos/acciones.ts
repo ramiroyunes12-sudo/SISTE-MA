@@ -173,11 +173,12 @@ export type EntradaVerificada = {
   tipo?: string;
   compra?: number;
   usadaEn?: string; // "sáb 21/11/2026 23:40"
+  validadaPor?: string; // quién la escaneó en la puerta
 };
 export type EstadoVerificacion = { error?: string; verificada?: EntradaVerificada };
 
 // "Verificar una entrada": pegar el código (el del QR) y ver si es válida y de
-// quién es. Solo mira: no la marca usada (eso es el escáner, paso 17).
+// quién es. Solo mira: no la marca usada (eso es el escáner de la puerta).
 export async function verificarEntradaAccion(
   eventoId: string,
   _anterior: EstadoVerificacion,
@@ -204,6 +205,7 @@ export async function verificarEntradaAccion(
         tipo: v.entrada.tipo,
         compra: v.entrada.compra,
         usadaEn: v.entrada.usadaEn ? formatearFecha(v.entrada.usadaEn) : undefined,
+        validadaPor: v.entrada.validadaPor?.nombre,
       },
     };
   } catch (error) {
