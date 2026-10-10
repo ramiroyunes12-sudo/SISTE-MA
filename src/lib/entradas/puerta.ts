@@ -21,8 +21,9 @@ export type RespuestaPuerta =
 export type IngresoPuerta = { entro: string | null; por: string | null; porDni: boolean };
 
 // Errores (sin resultado): la puerta los muestra como NO VÁLIDA, nunca como PASA.
-// permiso: un validador quiso marcar el ingreso sin el QR.
-const ERRORES = ["sesion", "evento", "pedido", "conexion", "permiso"] as const;
+// permiso: un validador quiso marcar el ingreso sin el QR; limite: un
+// validador que ya buscó 5 veces en el último minuto.
+const ERRORES = ["sesion", "evento", "pedido", "conexion", "permiso", "limite"] as const;
 export type ErrorPuerta = { error: (typeof ERRORES)[number] };
 const RESULTADOS: string[] = ["pasa", "ya_ingreso", "no_valida"];
 
@@ -110,7 +111,11 @@ export type EncontradaPuerta = { id: string; persona: PersonaPuerta; ingreso: In
 export type RespuestaBusqueda = { encontradas: EncontradaPuerta[]; hayMas: boolean } | { falta: "dni" | "corto" };
 const FALTAS: string[] = ["dni", "corto"];
 
-export function respuestaBusqueda(buscado: Buscado, usuarioId: string, ahora = new Date()): RespuestaBusqueda {
+export function respuestaBusqueda(
+  buscado: Exclude<Buscado, { resultado: "limite" }>,
+  usuarioId: string,
+  ahora = new Date(),
+): RespuestaBusqueda {
   if (buscado.resultado === "falta") return { falta: buscado.motivo };
   return {
     hayMas: buscado.hayMas,

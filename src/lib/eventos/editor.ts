@@ -7,6 +7,9 @@ export const ESTADOS_EVENTO = ["BORRADOR", "PUBLICADO", "FINALIZADO"] as const;
 export type EstadoEvento = (typeof ESTADOS_EVENTO)[number];
 
 export const MAX_TIPOS = 10;
+// Entradas por compra: como mucho 4 en cualquier evento (decidido por Ramiro,
+// 10/10/2026). Cada evento puede poner menos.
+export const MAX_POR_COMPRA = 4;
 export const MAX_LOTES = 10;
 const MAX_CUPO = 100_000;
 const MAX_PRECIO = 100_000_000; // centavos: un millón de pesos
@@ -115,8 +118,8 @@ export function validarEvento(
   const descripcion = texto(e.descripcion);
   if (descripcion.length > 5000) errores.descripcion = "Hasta 5000 caracteres.";
 
-  const maxPorCompra = entero(e.maxPorCompra, 1, 20);
-  if (maxPorCompra === null) errores.maxPorCompra = "Un número de 1 a 20.";
+  const maxPorCompra = entero(e.maxPorCompra, 1, MAX_POR_COMPRA);
+  if (maxPorCompra === null) errores.maxPorCompra = `Un número de 1 a ${MAX_POR_COMPRA}.`;
   const cupoCortesias = entero(e.cupoCortesias, 0, MAX_CUPO);
   if (cupoCortesias === null) errores.cupoCortesias = `Un número de 0 a ${MAX_CUPO}.`;
 

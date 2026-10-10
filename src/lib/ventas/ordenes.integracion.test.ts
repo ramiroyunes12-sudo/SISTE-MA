@@ -41,6 +41,7 @@ describe.skipIf(!url)("reserva de 15 minutos", { timeout: 120_000 }, () => {
         fecha: new Date("2030-03-07T23:00:00-03:00"),
         lugar: "Club",
         estado: "PUBLICADO",
+        maxPorCompra: 6, // un evento viejo: el panel ahora deja hasta 4, la base hasta 20
         tipos: {
           create: {
             nombre: "General",

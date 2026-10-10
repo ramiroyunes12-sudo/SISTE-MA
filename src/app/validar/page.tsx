@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { BotonSalir } from "@/components/boton-salir";
 import { requerirUsuario } from "@/lib/auth/actual";
-import { alcanceDe } from "@/lib/auth/alcance";
+import { alcanceDeLaPuerta } from "@/lib/auth/alcance";
 import { obtenerDb } from "@/lib/db";
 import { eventosDeLaPuerta } from "@/lib/entradas/escanear";
 import { formatearFecha } from "@/lib/fechas";
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 export default async function PaginaValidar({ searchParams }: PageProps<"/validar">) {
   const usuario = await requerirUsuario(["ADMIN", "ORGANIZADOR", "VALIDADOR"]);
   const { contrasena } = await searchParams;
-  const eventos = await eventosDeLaPuerta(obtenerDb(), alcanceDe(usuario));
+  const eventos = await eventosDeLaPuerta(obtenerDb(), alcanceDeLaPuerta(usuario));
 
   return (
     <div className="flex flex-1 flex-col font-sans">
@@ -41,7 +41,11 @@ export default async function PaginaValidar({ searchParams }: PageProps<"/valida
         )}
         <h1 className="font-display text-3xl font-extrabold">Hola, {usuario.nombre}</h1>
         {eventos.length === 0 ? (
-          <p className="text-tenue">No hay eventos para hoy ni próximos. Cuando haya uno, va a aparecer acá para escanear.</p>
+          <p className="text-tenue">
+            {usuario.rol === "VALIDADOR"
+              ? "Todavía no hay eventos para escanear. Cada evento aparece acá 12 horas antes de que empiece."
+              : "No hay eventos para hoy ni próximos. Cuando haya uno, va a aparecer acá para escanear."}
+          </p>
         ) : (
           <>
             <p className="text-tenue">Elegí el evento en el que estás para abrir el escáner:</p>

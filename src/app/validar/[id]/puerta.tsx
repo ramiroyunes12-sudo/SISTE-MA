@@ -7,9 +7,13 @@
 // El contador se pone al día después de cada escaneo o ingreso marcado y cada
 // 15 segundos (lo que entra por otras puertas), solo con la pantalla a la
 // vista. Si no se pudo, queda el último y lo dice.
+//
+// Mientras se verifica un QR o se marca un ingreso, las pestañas no se pueden
+// cambiar: si no, el resultado aparecía en la otra pestaña (o encima de otro).
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { type Contador, leerContador } from "@/lib/entradas/puerta";
+import { type Contador, leerContador, leerRespuestaPuerta } from "@/lib/entradas/puerta";
 
 import { Buscar } from "./buscar";
 import { type ControlEscaner, Escaner } from "./escaner";
@@ -29,7 +33,8 @@ export function Puerta({
 }) {
   const [modo, setModo] = useState<"escanear" | "buscar">("escanear");
   const [contador, setContador] = useState(contadorInicial);
-  const [desactualizado, setDesactualizado] = useState(false);
+  const [problema, setProblema] = useState<"conexion" | "sesion" | null>(null);
+  const [ocupado, setOcupado] = useState(false);
   const escaner = useRef<ControlEscaner>(null);
   const turno = useRef(0); // una respuesta vieja que llega tarde no pisa una nueva
 
@@ -39,7 +44,8 @@ export function Puerta({
     if (mio !== turno.current) return;
     const nuevo = respuesta && leerContador(respuesta.ok, respuesta.cuerpo);
     if (nuevo) setContador(nuevo);
-    setDesactualizado(!nuevo);
+    const error = respuesta && !respuesta.ok ? leerRespuestaPuerta(false, respuesta.cuerpo) : null;
+    setProblema(nuevo ? null : error && "error" in error && error.error === "sesion" ? "sesion" : "conexion");
   }, [eventoId]);
 
   useEffect(() => {
@@ -57,7 +63,7 @@ export function Puerta({
   }, [actualizar]);
 
   function irA(nuevo: "escanear" | "buscar") {
-    if (nuevo === modo) return;
+    if (nuevo === modo || ocupado) return;
     setModo(nuevo);
     if (nuevo === "buscar") escaner.current?.pausar();
     else escaner.current?.seguir();
@@ -76,7 +82,17 @@ export function Puerta({
         <div aria-hidden="true" className="h-2 overflow-hidden rounded-full bg-white/20">
           <div className="h-full rounded-full bg-white" style={{ width: `${total ? (100 * ingresaron) / total : 0}%` }} />
         </div>
-        {desactualizado && <p className="text-sm text-white/75">Sin conexión: puede no estar al día.</p>}
+        <p role="status" className="flex flex-wrap items-center gap-x-3 text-sm text-white/75 empty:hidden">
+          {problema === "conexion" && "Sin conexión: puede no estar al día."}
+          {problema === "sesion" && (
+            <>
+              Se cerró tu sesión.
+              <Link href="/ingresar" className="flex min-h-11 items-center font-semibold text-white underline">
+                Ingresar
+              </Link>
+            </>
+          )}
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
@@ -90,8 +106,9 @@ export function Puerta({
             key={destino}
             type="button"
             aria-pressed={modo === destino}
+            disabled={ocupado && modo !== destino}
             onClick={() => irA(destino)}
-            className={`min-h-12 rounded-xl px-3 font-bold leading-tight ${
+            className={`min-h-12 rounded-xl px-3 font-bold leading-tight disabled:opacity-50 ${
               modo === destino ? "bg-white text-tinta" : "border-2 border-white/50 text-white"
             }`}
           >
@@ -101,10 +118,10 @@ export function Puerta({
       </div>
 
       <div hidden={modo !== "escanear"}>
-        <Escaner ref={escaner} eventoId={eventoId} alResultado={actualizar} />
+        <Escaner ref={escaner} eventoId={eventoId} alResultado={actualizar} alOcupado={setOcupado} />
       </div>
       <div hidden={modo !== "buscar"}>
-        <Buscar eventoId={eventoId} puedeMarcar={puedeMarcar} alMarcar={actualizar} />
+        <Buscar eventoId={eventoId} puedeMarcar={puedeMarcar} alMarcar={actualizar} alOcupado={setOcupado} />
       </div>
     </div>
   );

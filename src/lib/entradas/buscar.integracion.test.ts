@@ -24,6 +24,7 @@ describe.skipIf(!url)("buscar en la puerta por DNI o nombre, y contar ingresos",
   let eventoId: string;
   let otroEventoId: string;
   let validador: { id: string; nombre: string };
+  let organizador: { id: string; rol: "ORGANIZADOR" };
   const TODO: Alcance = { todo: true };
   const AHORA = new Date("2030-01-02T00:41:00-03:00");
 
@@ -53,6 +54,14 @@ describe.skipIf(!url)("buscar en la puerta por DNI o nombre, y contar ingresos",
       data: { nombre: "Ana Puerta", email: `${crypto.randomUUID()}@ejemplo.com`, hashContrasena: "x", rol: "VALIDADOR", productoraId },
       select: { id: true, nombre: true },
     });
+    organizador = {
+      id: (
+        await db.usuario.create({
+          data: { nombre: "Olga Organiza", email: `${crypto.randomUUID()}@ejemplo.com`, hashContrasena: "x", rol: "ORGANIZADOR", productoraId },
+        })
+      ).id,
+      rol: "ORGANIZADOR",
+    };
   });
 
   afterAll(async () => {
@@ -91,8 +100,9 @@ describe.skipIf(!url)("buscar en la puerta por DNI o nombre, y contar ingresos",
     return { id: creada.id, compra: orden.numero };
   }
 
+  // El organizador no tiene tope de búsquedas (el validador, 5 por minuto: test aparte).
   const buscar = (texto: unknown, opciones: { alcance?: Alcance; evento?: string } = {}) =>
-    buscarEnLaPuerta(db, { eventoId: opciones.evento ?? eventoId, alcance: opciones.alcance ?? TODO, texto });
+    buscarEnLaPuerta(db, { eventoId: opciones.evento ?? eventoId, alcance: opciones.alcance ?? TODO, usuario: organizador, texto });
   const ids = async (texto: unknown) => {
     const buscado = await buscar(texto);
     return buscado?.resultado === "ok" ? buscado.entradas.map((e) => e.id) : buscado;
@@ -126,6 +136,16 @@ describe.skipIf(!url)("buscar en la puerta por DNI o nombre, y contar ingresos",
     expect(await ids(dni)).toEqual([paga.id]);
   });
 
+  it("DNI con un cero adelante: se encuentra con o sin el cero", async () => {
+    const sinCero = String(1_000_000 + Math.floor(Math.random() * 8_999_999)); // 7 números
+    const conCero = await entrada(`Ana ${unico()}`, `0${sinCero}`);
+    expect(await ids(sinCero)).toEqual([conCero.id]);
+    expect(await ids(`0${sinCero}`)).toEqual([conCero.id]);
+    const otro = String(1_000_000 + Math.floor(Math.random() * 8_999_999));
+    const guardadoSinCero = await entrada(`Ana ${unico()}`, otro);
+    expect(await ids(`0${otro.slice(0, 1)}.${otro.slice(1, 4)}.${otro.slice(4)}`)).toEqual([guardadoSinCero.id]);
+  });
+
   it("parte del DNI: no busca (para no ir listando a la gente)", async () => {
     const dni = unDni();
     await entrada(`Ana ${unico()}`, dni);
@@ -156,6 +176,22 @@ describe.skipIf(!url)("buscar en la puerta por DNI o nombre, y contar ingresos",
     expect(await buscar("  a . b ")).toEqual({ resultado: "falta", motivo: "corto" });
     expect(await buscar("%%%")).toEqual({ resultado: "falta", motivo: "corto" });
     expect(await buscar(undefined)).toEqual({ resultado: "falta", motivo: "corto" });
+    // Letras sueltas no suman: "a a a" sería buscar a todos los que tienen una "a".
+    expect(await buscar("a a a")).toEqual({ resultado: "falta", motivo: "corto" });
+    expect(await buscar("x y z jo")).toEqual({ resultado: "falta", motivo: "corto" });
+  });
+
+  it("letras con tilde que acepta el checkout aunque no sean del castellano (guaraní, vietnamita, nórdico)", async () => {
+    const a = unico().toLowerCase();
+    const guarani = await entrada(`Mbaracaỹ Ẽma ${a}`, unDni());
+    const vietnamita = await entrada(`Thị Nguyễn ${a}`, unDni());
+    const nordico = await entrada(`ØSTERGAARD Æbelø ${a}`, unDni());
+    expect(await ids(`mbaracay ${a}`)).toEqual([guarani.id]);
+    expect(await ids(`Mbaracaỹ ${a}`)).toEqual([guarani.id]);
+    expect(await ids(`ema ${a}`)).toEqual([guarani.id]);
+    expect(await ids(`nguyen thi ${a}`)).toEqual([vietnamita.id]);
+    expect(await ids(`østergaard ${a}`)).toEqual([nordico.id]);
+    expect(await ids(`æbelø ${a}`)).toEqual([nordico.id]);
   });
 
   it("hasta 10 resultados, y avisa que hay más", async () => {
@@ -185,6 +221,50 @@ describe.skipIf(!url)("buscar en la puerta por DNI o nombre, y contar ingresos",
     expect(await buscar(dni, { alcance: { todo: false, productoraId } })).toMatchObject({ resultado: "ok" });
   });
 
+  it("cada búsqueda queda anotada: quién, qué y cuándo (pedido por Ramiro); las que no buscan nada, no", async () => {
+    const dni = unDni();
+    await buscar(` ${dni} `);
+    expect(await db.busqueda.findMany({ where: { texto: dni }, select: { eventoId: true, usuarioId: true, creadoEn: true } })).toEqual([
+      { eventoId, usuarioId: organizador.id, creadoEn: expect.any(Date) },
+    ]);
+    const corto = `${unico().slice(0, 2)}`;
+    await buscar(corto);
+    expect(await db.busqueda.count({ where: { texto: corto } })).toBe(0);
+  });
+
+  it("validador: hasta 5 búsquedas por minuto (decidido por Ramiro); la sexta no busca", async () => {
+    const otro = await db.usuario.create({
+      data: { nombre: "Vale Puerta", email: `${crypto.randomUUID()}@ejemplo.com`, hashContrasena: "x", rol: "VALIDADOR", productoraId },
+    });
+    const dni = unDni();
+    await entrada(`Ana ${unico()}`, dni);
+    const comoValidador = (segundos: number) =>
+      buscarEnLaPuerta(db, {
+        eventoId,
+        alcance: TODO,
+        usuario: { id: otro.id, rol: "VALIDADOR" },
+        texto: dni,
+        ahora: new Date(AHORA.getTime() + segundos * 1000),
+      });
+    for (let i = 0; i < 5; i++) expect((await comoValidador(i * 10))?.resultado, `búsqueda ${i + 1}`).toBe("ok");
+    expect(await comoValidador(50)).toEqual({ resultado: "limite" });
+    expect(await db.busqueda.count({ where: { usuarioId: otro.id } })).toBe(5);
+    expect((await comoValidador(61))?.resultado).toBe("ok"); // pasó un minuto desde la primera
+  });
+
+  it("validador: 12 búsquedas a la vez también respetan el tope", async () => {
+    const otro = await db.usuario.create({
+      data: { nombre: "Vale Apurada", email: `${crypto.randomUUID()}@ejemplo.com`, hashContrasena: "x", rol: "VALIDADOR", productoraId },
+    });
+    const resultados = await Promise.all(
+      Array.from({ length: 12 }, () =>
+        buscarEnLaPuerta(db, { eventoId, alcance: TODO, usuario: { id: otro.id, rol: "VALIDADOR" }, texto: unDni(), ahora: AHORA }),
+      ),
+    );
+    expect(resultados.filter((r) => r?.resultado === "ok")).toHaveLength(5);
+    expect(resultados.filter((r) => r?.resultado === "limite")).toHaveLength(7);
+  });
+
   it("contador: ingresaron (usadas) de las que pueden entrar (válidas y usadas) de este evento", async () => {
     const evento = await crearEvento();
     tipos.set(evento.id, evento.tipoId);
@@ -195,6 +275,8 @@ describe.skipIf(!url)("buscar en la puerta por DNI o nombre, y contar ingresos",
     await entrada(`Ana ${unico()}`, unDni(), { evento: evento.id, orden: "PENDIENTE", estado: "PENDIENTE" });
     await entrada(`Ana ${unico()}`, unDni(), { evento: evento.id, estado: "ANULADA" });
     await entrada(`Ana ${unico()}`, unDni(), { evento: otroEventoId });
+    // Compra devuelta con la entrada todavía válida: la puerta no la deja pasar, no cuenta.
+    await entrada(`Ana ${unico()}`, unDni(), { evento: evento.id, orden: "REEMBOLSADA", estado: "VALIDA" });
     expect(await contar()).toEqual({ ingresaron: 0, total: 2 });
     await marcarEntrada(db, { eventoId: evento.id, alcance: TODO, usuarioId: validador.id, entradaId: usada.id });
     expect(await contar()).toEqual({ ingresaron: 1, total: 2 });

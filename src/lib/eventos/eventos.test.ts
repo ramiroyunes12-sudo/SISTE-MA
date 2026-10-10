@@ -81,7 +81,7 @@ describe("validar el evento", () => {
     lugar: "Club Regatas",
     direccion: "",
     descripcion: "",
-    maxPorCompra: "6",
+    maxPorCompra: "4",
     cupoCortesias: "50",
     estado: "PUBLICADO",
     tipos: [
@@ -103,7 +103,7 @@ describe("validar el evento", () => {
       slug: "fiesta-de-primavera",
       slugAutomatico: true,
       direccion: null,
-      maxPorCompra: 6,
+      maxPorCompra: 4,
       cupoCortesias: 50,
       tipos: [
         {
@@ -117,6 +117,20 @@ describe("validar el evento", () => {
       ],
     });
     expect(resultado.datos.fecha.toISOString()).toBe("2026-11-22T02:00:00.000Z");
+  });
+
+  it("máximo por compra: de 1 a 4 entradas (decidido por Ramiro, 10/10/2026)", () => {
+    for (const [maximo, ok] of [
+      ["1", true],
+      ["4", true],
+      ["5", false],
+      ["6", false],
+      ["0", false],
+    ] as const) {
+      const resultado = validarEvento({ ...valido(), maxPorCompra: maximo });
+      expect(resultado.ok, maximo).toBe(ok);
+      if (!resultado.ok) expect(resultado.errores.maxPorCompra).toBe("Un número de 1 a 4.");
+    }
   });
 
   it("arma la dirección sin tildes ni símbolos", () => {

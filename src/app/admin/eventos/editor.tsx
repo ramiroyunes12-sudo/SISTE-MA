@@ -5,7 +5,7 @@
 import { type FormEvent, startTransition, useActionState, useEffect, useState } from "react";
 
 import { BotonPrincipal, Campo, ErrorDeCampo, ESTILO_CAMPO, MensajeError } from "@/components/formulario";
-import { type Errores, type EventoEditado, MAX_LOTES, MAX_TIPOS, type LoteEditado } from "@/lib/eventos/editor";
+import { type Errores, type EventoEditado, MAX_LOTES, MAX_POR_COMPRA, MAX_TIPOS, type LoteEditado } from "@/lib/eventos/editor";
 import type { EstadoLote } from "@/lib/eventos/lotes";
 
 import { guardarEventoDesdeEditor } from "./acciones";
@@ -251,6 +251,7 @@ export function EditorEvento({
             value={evento.maxPorCompra}
             onChange={(e) => cambiar("maxPorCompra", e.target.value)}
             error={errores.maxPorCompra}
+            ayuda={`De 1 a ${MAX_POR_COMPRA}.`}
           />
           <Campo
             etiqueta="Cupo de cortesías (aparte de la venta)"

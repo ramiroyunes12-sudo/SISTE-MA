@@ -86,6 +86,7 @@ model Usuario {
   cortesiasEmitidas Orden[]     @relation("EmitidaPor")
   pagosRegistrados  Pago[]      @relation("RegistradoPor")
   escaneos          Escaneo[]
+  busquedas         Busqueda[]
 
   @@index([productoraId])
   @@map("usuarios")
@@ -128,7 +129,7 @@ model Evento {
   lugar             String
   direccion         String?
   flyerUrl          String?      @map("flyer_url")
-  maxPorCompra      Int          @default(6) @map("max_por_compra")
+  maxPorCompra      Int          @default(4) @map("max_por_compra") // 1 a 4 (decidido por Ramiro, 10/10/2026)
   cupoCortesias     Int          @default(0) @map("cupo_cortesias")
   cortesiasEmitidas Int          @default(0) @map("cortesias_emitidas")
   estado            EstadoEvento @default(BORRADOR)
@@ -140,6 +141,7 @@ model Evento {
   ordenes    Orden[]
   entradas   Entrada[]
   escaneos   Escaneo[]
+  busquedas  Busqueda[]
 
   @@index([productoraId])
   @@map("eventos")
@@ -250,8 +252,8 @@ model Orden {
   mailIntentos        Int       @default(0) @map("mail_intentos")
   mailError           String?   @map("mail_error") // por qué falló (sin datos de la persona)
   // "Reenviar mis entradas": máximo 3 por día por orden (paso 16).
-  reenviosCount Int       @default(0) @map("reenvios_count")
-  reenviosDesde DateTime? @map("reenvios_desde") @db.Timestamptz(3)
+  reenviosCount       Int       @default(0) @map("reenvios_count")
+  reenviosDesde       DateTime? @map("reenvios_desde") @db.Timestamptz(3)
 
   creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
   actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(3)
@@ -373,6 +375,26 @@ enum MetodoIngreso {
   QR
   DNI // búsqueda manual
 
+  @@schema("entradas")
+}
+
+// ─── Búsquedas en la puerta (por DNI o nombre) ───────────────────────────────
+
+// Quién buscó qué y cuándo (pedido por Ramiro, 10/10/2026), y el tope de
+// búsquedas por minuto de cada validador (src/lib/entradas/buscar.ts).
+model Busqueda {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  eventoId  String   @map("evento_id") @db.Uuid
+  usuarioId String   @map("usuario_id") @db.Uuid // quién buscó
+  texto     String // lo que escribió: un DNI o un nombre (dato personal)
+  creadoEn  DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  evento  Evento  @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+
+  @@index([usuarioId, creadoEn]) // el tope por minuto
+  @@index([eventoId, creadoEn])
+  @@map("busquedas")
   @@schema("entradas")
 }
 

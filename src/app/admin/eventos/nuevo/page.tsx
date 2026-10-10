@@ -25,7 +25,7 @@ export default async function PaginaNuevoEvento() {
         lugar: "",
         direccion: "",
         descripcion: "",
-        maxPorCompra: "6",
+        maxPorCompra: "4",
         cupoCortesias: "0",
         estado: "BORRADOR",
         tipos: [{ nombre: "General", lotes: [{ nombre: "Lote 1", precio: "", cupo: "" }] }],

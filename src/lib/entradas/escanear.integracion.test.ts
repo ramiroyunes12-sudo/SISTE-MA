@@ -5,9 +5,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { EstadoEntrada, EstadoOrden } from "@/generated/prisma/client";
 import { PrismaClient } from "@/generated/prisma/client";
-import type { Alcance } from "@/lib/auth/alcance";
+import { type Alcance, alcanceDeLaPuerta } from "@/lib/auth/alcance";
 
 import { firmarCodigo, nuevoCodigo } from "./codigo";
+import { contarIngresos } from "./buscar";
 import { escanearCodigo, eventosDeLaPuerta, marcarEntrada } from "./escanear";
 
 const url = process.env.TEST_DATABASE_URL;
@@ -318,6 +319,28 @@ describe.skipIf(!url)("escanear en la puerta", () => {
     expect(await marcar(id, { alcance: { todo: false, productoraId: ajena } })).toBeNull();
     expect((await db.entrada.findUniqueOrThrow({ where: { id } })).estado).toBe("VALIDA");
     expect(await escaneosDe(id)).toHaveLength(0);
+  });
+
+  it("validador: la puerta de un evento solo desde 12 horas antes hasta 24 horas después de que empieza", async () => {
+    const empieza = new Date("2030-01-01T23:00:00-03:00").getTime();
+    const hora = 60 * 60 * 1000;
+    const validadorEn = (ahora: number) => alcanceDeLaPuerta({ rol: "VALIDADOR", productora: { id: productoraId } }, new Date(ahora));
+    for (const [ahora, abierta] of [
+      [empieza - 13 * hora, false],
+      [empieza - 11 * hora, true],
+      [empieza + 23 * hora, true],
+      [empieza + 25 * hora, false],
+    ] as const) {
+      const { firmado } = await entrada("PAGADA", "VALIDA");
+      const alcance = validadorEn(ahora);
+      const momento = new Date(ahora).toISOString();
+      expect((await escanear(firmado, { alcance, ahora: new Date(ahora) }))?.resultado ?? null, momento).toBe(abierta ? "pasa" : null);
+      expect(!!(await contarIngresos(db, { eventoId, alcance })), momento).toBe(abierta);
+      expect((await eventosDeLaPuerta(db, alcance, new Date(ahora))).some((e) => e.id === eventoId), momento).toBe(abierta);
+    }
+    // El organizador, en cualquier momento (para probar antes).
+    const organizador = alcanceDeLaPuerta({ rol: "ORGANIZADOR", productora: { id: productoraId } }, new Date(empieza - 13 * hora));
+    expect(await contarIngresos(db, { eventoId, alcance: organizador })).not.toBeNull();
   });
 
   it("eventos para elegir: los de su productora que no pasaron hace más de 24 horas", async () => {

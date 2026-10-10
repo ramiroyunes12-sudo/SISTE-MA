@@ -5,7 +5,7 @@
 // recibe 403. Permisos y errores: ../comun.ts.
 import type { NextRequest } from "next/server";
 
-import { alcanceDe } from "@/lib/auth/alcance";
+import { alcanceDeLaPuerta } from "@/lib/auth/alcance";
 import { obtenerDb } from "@/lib/db";
 import { marcarEntrada } from "@/lib/entradas/escanear";
 import { puedeMarcarSinQr, respuestaPuerta } from "@/lib/entradas/puerta";
@@ -19,7 +19,7 @@ export function POST(request: NextRequest) {
     const ahora = new Date();
     const marcada = await marcarEntrada(obtenerDb(), {
       eventoId,
-      alcance: alcanceDe(usuario),
+      alcance: alcanceDeLaPuerta(usuario),
       usuarioId: usuario.id,
       entradaId,
       ahora,

@@ -38,14 +38,17 @@ const LARGO_ENVIADO = 200; // un QR que no es una entrada puede ser larguísimo:
 // permiso ya está dado, y es en el toque: el iPhone deja sonar).
 export type ControlEscaner = { pausar(): void; seguir(): void };
 
-// alResultado: después de cada resultado (para poner al día el contador).
+// alResultado: después de cada resultado (para poner al día el contador);
+// alOcupado: mientras verifica un código (las pestañas no se pueden cambiar).
 export function Escaner({
   eventoId,
   alResultado,
+  alOcupado,
   ref,
 }: {
   eventoId: string;
   alResultado: () => void;
+  alOcupado: (ocupado: boolean) => void;
   ref?: Ref<ControlEscaner>;
 }) {
   const [fase, setFase] = useState<Fase>({ tipo: "inicio" });
@@ -57,6 +60,7 @@ export function Escaner({
   const sonido = useRef<AudioContext | null>(null);
   const pantalla = useRef<{ release(): Promise<void> } | null>(null);
   const quiereCamara = useRef(false);
+  const pausada = useRef(false); // están en "Buscar": la cámara no se prende (leería QR escondida)
   const ultimo = useRef<string | null>(null);
   const reciente = useRef<{ texto: string; hasta: number } | null>(null);
   const apertura = useRef(0); // cuenta las aperturas de la cámara: detenerla deja vieja la que esté en curso
@@ -75,15 +79,21 @@ export function Escaner({
     async (codigo: string) => {
       ultimo.current = codigo.trim();
       setFase({ tipo: "verificando" });
+      alOcupado(true);
       const resultado = await pedir(eventoId, codigo);
       avisar(sonido.current, resultado);
       setFase({ tipo: "resultado", resultado });
+      alOcupado(false);
       alResultado();
     },
-    [eventoId, alResultado],
+    [eventoId, alResultado, alOcupado],
   );
 
   async function abrirCamara() {
+    if (pausada.current) {
+      setFase({ tipo: "inicio", aviso: "La cámara se pausó." });
+      return;
+    }
     quiereCamara.current = true;
     sonido.current ??= crearSonido(); // en el toque: si no, el iPhone no lo deja sonar
     sonido.current?.resume().catch(() => {});
@@ -172,12 +182,14 @@ export function Escaner({
 
   useImperativeHandle(ref, () => ({
     pausar() {
+      pausada.current = true;
       detenerCamara();
       setFase((actual) =>
         actual.tipo === "escaneando" || actual.tipo === "abriendo" ? { tipo: "inicio", aviso: "La cámara se pausó." } : actual,
       );
     },
     seguir() {
+      pausada.current = false;
       if (quiereCamara.current && fase.tipo === "inicio") abrirCamara();
     },
   }));
@@ -304,8 +316,9 @@ export function Escaner({
       </div>
 
       <details className="rounded-2xl border border-white/20 p-4">
-        <summary className="cursor-pointer py-2 font-semibold">¿No lee el QR? Escribí el código</summary>
-        <form onSubmit={escribirCodigo} className="mt-3 flex flex-col gap-3">
+        <summary className="cursor-pointer py-3 font-semibold">¿No lee el QR? Escribí el código</summary>
+        {/* Por POST: si se manda antes de que cargue la página, el código no queda en la dirección. */}
+        <form method="post" onSubmit={escribirCodigo} className="mt-3 flex flex-col gap-3">
           <label htmlFor="codigo-a-mano" className="text-sm text-white/80">
             El código que está abajo del QR (empieza con E1-). Si la entrada es válida, también queda usada.
           </label>
@@ -318,7 +331,7 @@ export function Escaner({
             autoCapitalize="characters"
             spellCheck={false}
             placeholder="E1-…"
-            className="h-12 rounded-xl border border-white/40 bg-white px-4 font-mono text-sm text-tinta"
+            className="h-12 rounded-xl border border-white/40 bg-white px-4 font-mono text-base text-tinta"
           />
           <button
             type="submit"

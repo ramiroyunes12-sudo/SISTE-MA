@@ -107,7 +107,7 @@ describe("lo que cree la pantalla de la puerta", () => {
   });
 
   it("los errores conocidos del servidor, tal cual", () => {
-    for (const error of ["sesion", "evento", "pedido", "conexion", "permiso"]) {
+    for (const error of ["sesion", "evento", "pedido", "conexion", "permiso", "limite"]) {
       expect(leerRespuestaPuerta(false, { error })).toEqual({ error });
     }
   });

@@ -271,7 +271,7 @@ describe.skipIf(!url)("reservas en los lotes", { timeout: 120_000 }, () => {
       lugar: evento.lugar,
       direccion: "",
       descripcion: "",
-      maxPorCompra: String(evento.maxPorCompra),
+      maxPorCompra: "4", // el panel deja hasta 4 (el evento de prueba tiene 6 en la base)
       cupoCortesias: "0",
       estado: evento.estado,
       tipos: cambiar(

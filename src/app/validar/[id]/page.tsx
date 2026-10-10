@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { requerirUsuario } from "@/lib/auth/actual";
-import { alcanceDe, filtroDeEventos } from "@/lib/auth/alcance";
+import { alcanceDeLaPuerta, filtroDeEventos } from "@/lib/auth/alcance";
 import { obtenerDb } from "@/lib/db";
 import { contarIngresos } from "@/lib/entradas/buscar";
 import { puedeMarcarSinQr } from "@/lib/entradas/puerta";
@@ -24,7 +24,7 @@ export default async function PaginaEscaner({ params }: PageProps<"/validar/[id]
   const usuario = await requerirUsuario(["ADMIN", "ORGANIZADOR", "VALIDADOR"]);
   const { id } = await params;
   if (!UUID.test(id)) notFound();
-  const alcance = alcanceDe(usuario);
+  const alcance = alcanceDeLaPuerta(usuario);
   const evento = await obtenerDb().evento.findFirst({
     where: { id, ...filtroDeEventos(alcance) },
     select: { id: true, nombre: true, fecha: true, lugar: true },
