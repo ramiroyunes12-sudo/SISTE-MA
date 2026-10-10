@@ -23,7 +23,7 @@ Sistema de venta de entradas por lotes para varias **productoras** (se alquila p
 - Los mails salen por Gmail (`sistemaentradas@gmail.com`, contraseña de aplicación). Ramiro no quiere pagar un servicio de mails: se queda Gmail aunque algunos caigan en spam.
 - **Paso 16** ("Compra confirmada" y "Reenviar mis entradas"): borrador probado por Ramiro (9/10) y **arreglos de la revisión con agentes listos** (10/10/2026). Falta que Ramiro pruebe los arreglos para marcarlo `[x]`.
 - Decidido por Ramiro (10/10): **la menor cantidad de mails**. Las compras de una misma persona (mismo email) en un evento que salen a la vez van en un solo mail; el reenvío llega con el asunto "Te reenviamos tus entradas…".
-- **Paso 17** (escáner de la puerta y pantalla "Validadores"): **borrador listo** (10/10/2026). Decidido por Ramiro: escanear = entra (la entrada queda usada al leerla, se ven los datos y un botón para la siguiente). Falta que Ramiro lo pruebe en el celu y la revisión con agentes.
+- **Paso 17** (escáner de la puerta y pantalla "Validadores"): **borrador probado por Ramiro** en producción (10/10/2026: compu, celu, Android de un amigo, validador nuevo, desactivar y activar). Decidido por Ramiro: escanear = entra; el ADMIN también ve "Validadores" (todas las productoras). Falta la revisión con agentes.
 
 ## Acciones del dueño pendientes
 
@@ -80,5 +80,5 @@ Detalle en `.claude/rules/` (se cargan solas al tocar esos archivos) y permisos 
 
 ## Traspaso (último chat)
 
-- **10/10/2026:** paso 17, borrador. Escáner en `/validar/<evento>` (marca usada con un solo `UPDATE` condicionado; test con 8 escaneos a la vez: entra 1), ruta `POST /api/puerta/escanear`, pantalla "Validadores" del organizador (solo validadores de su productora). Probado en local con la cámara falsa de Chromium a 390 y 320 px. 322 tests, 0 salteados, build. El paso 16 sigue esperando la prueba de Ramiro.
-- **Para el próximo chat:** si Ramiro probó el paso 16, marcarlo `[x]`. Con lo que diga de su prueba del escáner (ver "Para probarlo" del paso 17 en `PASOS.md`), arreglar y hacer la revisión con agentes del paso 17 (seguridad de la ruta y los validadores, carreras del escaneo, la pantalla en iPhone y Android): `/empezar-paso 17`.
+- **10/10/2026:** paso 17. Borrador (PR #11, mergeado) probado por Ramiro en producción: anduvo todo (PASA, YA INGRESÓ, NO VÁLIDA, Android, validador nuevo, desactivar y activar). Pedido por él: "Validadores" también para el ADMIN (una sección por productora). 325 tests, 0 salteados. El paso 16 sigue esperando la prueba de Ramiro.
+- **Para el próximo chat:** si Ramiro probó el paso 16, marcarlo `[x]`. Revisión con agentes del paso 17 (seguridad de la ruta `/api/puerta/escanear` y de "Validadores", carreras del escaneo, la pantalla en iPhone y Android), arreglos con su test y que Ramiro los pruebe: `/empezar-paso 17`.
