@@ -2,13 +2,14 @@
 
 Una entrada por chat, la más nueva arriba. Corta: qué se hizo, qué quedó y cómo se probó. El detalle está en los commits y en `PASOS.md`.
 
-## 10/10/2026 — Paso 17 (probado) y paso 18: búsqueda por DNI o nombre y contador (borrador, prueba y revisión)
+## 10/10/2026 — Pasos 17 y 18 (probados): búsqueda por DNI o nombre y contador
 - Paso 17 `[x]`: Ramiro probó los arreglos (modo avión, cámara pausada, evento mal copiado).
 - Decidido con Ramiro: buscar por DNI completo o nombre (desde 3 letras, hasta 10); marcar el ingreso sin QR solo el organizador y el ADMIN; "Ingresaron X de Y" para todos.
 - Borrador: `src/lib/entradas/buscar.ts` (búsqueda y contador), `marcarEntrada` en `escanear.ts` (mismo `UPDATE` condicionado, anotado `DNI`), rutas `/api/puerta/buscar`, `/marcar` y `/contador` (lo común en `comun.ts`), pantalla con contador y pestañas (`puerta.tsx`, `buscar.tsx`, `resultado.tsx`). Publicado (PR #15) y probado por Ramiro en su iPhone: anduvo todo.
 - Revisión con 3 agentes, cada hallazgo verificado: la cámara podía prenderse escondida en "Buscar" y marcar un QR de la fila (arreglado: no se prende ahí y las pestañas se traban mientras se verifica o se marca); búsqueda por nombre lenta con miles de entradas y letras que no encontraba (ahora una expresión con las variantes de cada letra); DNI con cero adelante; "a a a"; contador con compras devueltas; "NO SE PUDO MARCAR" en vez de NO VÁLIDA; textos, foco y 320 px. Del paso 17: el código a mano por POST.
 - Decidido por Ramiro después de la revisión: validador solo de 12 h antes a 24 h después del evento; 5 búsquedas por minuto; cada búsqueda anotada (quién, qué y cuándo); máximo 4 entradas por compra. Migración nueva (tabla `busquedas` y `max_por_compra`). 361 tests (0 salteados), typecheck, lint y build.
-- Quedó: que Ramiro pruebe los arreglos.
+- Paso 18 `[x]`: Ramiro probó los arreglos en producción (PR #16) y anduvo todo.
+- Quedó: el paso 19 (cortesías).
 
 ## 10/10/2026 — Pasos 16 (probado) y 17: escáner de la puerta (borrador probado y revisión)
 - Decidido con Ramiro: escanear = entra (la entrada queda usada al leerla; se ven nombre, DNI y tipo, y un botón para la siguiente).
