@@ -8,9 +8,9 @@
 // por qué no pasa.
 //
 // Cada escaneo queda anotado en `escaneos` (quién, cuándo, qué dio). De lo
-// leído se guarda solo un código con la firma mal, para investigar QR
-// truchos: uno bien firmado (por ejemplo, de otro evento) es un QR que sirve
-// y no se guarda, y un texto cualquiera puede traer cualquier cosa.
+// leído se guarda solo un código con la firma mal, sin la firma, para
+// investigar QR truchos: uno bien firmado (por ejemplo, de otro evento) es un
+// QR que sirve y no se guarda, y un texto cualquiera puede traer cualquier cosa.
 import type { MetodoIngreso, PrismaClient } from "@/generated/prisma/client";
 import { type Alcance, filtroDeEventos } from "@/lib/auth/alcance";
 
@@ -31,7 +31,6 @@ export type Escaneado =
     }
   | { resultado: "no_valida"; motivo: MotivoNoValida; entrada?: DatosPuerta };
 
-const LARGO_GUARDADO = 120;
 // Si entre el UPDATE y la consulta la entrada pasó a válida (por ejemplo, se
 // acreditó el pago justo), se vuelve a probar; más de esto, error.
 const INTENTOS = 3;
@@ -53,8 +52,12 @@ export async function escanearCodigo(
 
   const leido = leerCodigo(texto);
   if (!leido.ok) {
-    const truchado = leido.motivo === "firma" && typeof texto === "string";
-    await anotar("NO_VALIDA", null, truchado ? texto.trim().toUpperCase().slice(0, LARGO_GUARDADO) : null);
+    // Solo "E1-<al azar>", sin la firma: si se tipeó mal un carácter de la
+    // parte al azar, la firma es la verdadera de otra entrada (con la base
+    // sola se podría volver a armar su QR). La parte al azar no agrega nada:
+    // las de verdad ya están en la base.
+    const sinFirma = leido.motivo === "firma" && typeof texto === "string";
+    await anotar("NO_VALIDA", null, sinFirma ? texto.trim().toUpperCase().split("-").slice(0, 2).join("-") : null);
     return { resultado: "no_valida", motivo: leido.motivo };
   }
 

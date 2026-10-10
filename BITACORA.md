@@ -2,12 +2,14 @@
 
 Una entrada por chat, la más nueva arriba. Corta: qué se hizo, qué quedó y cómo se probó. El detalle está en los commits y en `PASOS.md`.
 
-## 10/10/2026 — Paso 17: escáner de la puerta (borrador, probado)
+## 10/10/2026 — Pasos 16 (probado) y 17: escáner de la puerta (borrador probado y revisión)
 - Decidido con Ramiro: escanear = entra (la entrada queda usada al leerla; se ven nombre, DNI y tipo, y un botón para la siguiente).
 - Borrador: `src/lib/entradas/escanear.ts` (un solo `UPDATE` condicionado + registro en `escaneos`), `POST /api/puerta/escanear` (ruta y no acción, para cortar a los 8 s sin trabar los siguientes), `/validar` (eventos de la productora) y `/validar/<evento>` (cámara con BarcodeDetector o jsQR, verde/rojo en pantalla completa, sonido, vibración, linterna, código a mano), panel "Validadores" del organizador (`soloRol` en `productoras.ts`).
 - Probado en local con la cámara falsa de Chromium (camino de iPhone). 322 tests (0 salteados), typecheck, lint y build.
 - Prueba de Ramiro en producción (PR #11): anduvo todo en compu, celu y el Android de un amigo; un validador nuevo entró, escaneó, quedó afuera al desactivarlo y volvió al activarlo. Pedido por él: "Validadores" también para el ADMIN (una sección por productora). 325 tests (0 salteados).
-- Quedó: la revisión con agentes. El paso 16 sigue esperando su prueba.
+- Paso 16 `[x]`: Ramiro probó el reenvío (las 3 entradas de un amigo pasaron una vez y después dieron YA INGRESÓ).
+- Revisión con 3 agentes (seguridad, carreras en la base, pantalla del celu), cada hallazgo verificado: firma verdadera guardada de más en `escaneos` (ahora solo `E1-<al azar>`), "la escaneaste vos" ambiguo con una cuenta en dos puertas (ahora dice cuánto hace), 10 s bloqueado tras un error de conexión, carreras al abrir la cámara (pantalla trabada sin cámara; YA INGRESÓ falso), lector de Android leyendo fuera del cuadrado visible, sin señal / QR largo / evento inexistente / 360 px. Todo arreglado con test o reproducido antes y después; 331 tests (0 salteados) y build. Para los pasos 20 y 21: anular con `UPDATE` condicionado y el pool de conexiones. Riesgo aceptado: un organizador puede saber si un email ya tiene cuenta.
+- Quedó: que Ramiro pruebe los arreglos.
 
 ## 9-10/10/2026 — Paso 16: "Compra confirmada" y "Reenviar mis entradas"
 - Decidido con Ramiro: reenviar desde cada evento (email + DNI); link propio por entrada, más adelante. Después de probar el borrador: la menor cantidad de mails (las compras de una persona en un evento, juntas en un mail).

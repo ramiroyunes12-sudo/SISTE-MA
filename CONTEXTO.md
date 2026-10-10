@@ -18,12 +18,11 @@ Sistema de venta de entradas por lotes para varias **productoras** (se alquila p
 
 ## Estado actual
 
-- **Hechos y probados:** pasos 1 a 15 (base, login, productoras, evento y lotes, página pública, reparto entre lotes, datos del checkout, reserva, cobro por transferencia y Mercado Pago con plata real el 8/10/2026, código firmado de cada entrada, QR y PDF, y el mail con las entradas, probados el 9/10/2026).
+- **Hechos y probados:** pasos 1 a 16 (base, login, productoras, evento y lotes, página pública, reparto entre lotes, datos del checkout, reserva, cobro por transferencia y Mercado Pago con plata real el 8/10/2026, código firmado de cada entrada, QR y PDF, y el mail con las entradas, probados el 9/10/2026; "Compra confirmada" y "Reenviar mis entradas", probados el 10/10/2026).
 - El panel todavía **no lista las compras pagas ni sus entradas** (llega en el paso 20): solo muestra cuántas, lo cobrado y los mails que no salieron. El código de cada entrada se ve en el link secreto de la compra y en el mail.
 - Los mails salen por Gmail (`sistemaentradas@gmail.com`, contraseña de aplicación). Ramiro no quiere pagar un servicio de mails: se queda Gmail aunque algunos caigan en spam.
-- **Paso 16** ("Compra confirmada" y "Reenviar mis entradas"): borrador probado por Ramiro (9/10) y **arreglos de la revisión con agentes listos** (10/10/2026). Falta que Ramiro pruebe los arreglos para marcarlo `[x]`.
 - Decidido por Ramiro (10/10): **la menor cantidad de mails**. Las compras de una misma persona (mismo email) en un evento que salen a la vez van en un solo mail; el reenvío llega con el asunto "Te reenviamos tus entradas…".
-- **Paso 17** (escáner de la puerta y pantalla "Validadores"): **borrador probado por Ramiro** en producción (10/10/2026: compu, celu, Android de un amigo, validador nuevo, desactivar y activar). Decidido por Ramiro: escanear = entra; el ADMIN también ve "Validadores" (todas las productoras). Falta la revisión con agentes.
+- **Paso 17** (escáner de la puerta y pantalla "Validadores"): borrador probado por Ramiro en producción (10/10/2026) y **arreglos de la revisión con agentes listos** (10/10/2026). Decidido por Ramiro: escanear = entra; el ADMIN también ve "Validadores" (todas las productoras). Falta que Ramiro pruebe los arreglos (ver "Para probarlo" del paso 17 en `PASOS.md`) para marcarlo `[x]`.
 
 ## Acciones del dueño pendientes
 
@@ -80,5 +79,5 @@ Detalle en `.claude/rules/` (se cargan solas al tocar esos archivos) y permisos 
 
 ## Traspaso (último chat)
 
-- **10/10/2026:** paso 17. Borrador (PR #11, mergeado) probado por Ramiro en producción: anduvo todo (PASA, YA INGRESÓ, NO VÁLIDA, Android, validador nuevo, desactivar y activar). Pedido por él: "Validadores" también para el ADMIN (una sección por productora). 325 tests, 0 salteados. El paso 16 sigue esperando la prueba de Ramiro.
-- **Para el próximo chat:** si Ramiro probó el paso 16, marcarlo `[x]`. Revisión con agentes del paso 17 (seguridad de la ruta `/api/puerta/escanear` y de "Validadores", carreras del escaneo, la pantalla en iPhone y Android), arreglos con su test y que Ramiro los pruebe: `/empezar-paso 17`.
+- **10/10/2026:** paso 16 marcado `[x]` (Ramiro probó el reenvío: 3 entradas de un amigo pasaron una vez y después dieron YA INGRESÓ). Paso 17: revisión con 3 agentes (seguridad, carreras en la base, pantalla del celu); arreglados con su test o reproducidos antes y después en el navegador: firma guardada de más, 10 s bloqueado tras un error de conexión, carreras al abrir la cámara, lector de Android leyendo fuera del cuadrado, textos y pantallas angostas. 331 tests, 0 salteados, build. Quedó anotado para los pasos 20 (anular con `UPDATE` condicionado) y 21 (pool de conexiones).
+- **Para el próximo chat:** si Ramiro probó los arreglos del paso 17, marcarlo `[x]` y arrancar el paso 18 (búsqueda por DNI y contador) con `/empezar-paso 18`.

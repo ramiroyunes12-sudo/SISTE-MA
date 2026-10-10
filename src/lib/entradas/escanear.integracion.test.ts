@@ -188,16 +188,27 @@ describe.skipIf(!url)("escanear en la puerta", () => {
     expect(await escaneosDe(id)).toHaveLength(0);
   });
 
-  it("firma trucha: NO VÁLIDA y se guarda lo leído; un texto cualquiera, no", async () => {
+  it("firma trucha: NO VÁLIDA y se guarda lo leído sin la firma; un texto cualquiera, no", async () => {
     const { firmado, id } = await entrada("PAGADA", "VALIDA");
     const trucho = firmado.slice(0, -1) + (firmado.endsWith("0") ? "1" : "0");
     expect(await escanear(trucho)).toEqual({ resultado: "no_valida", motivo: "firma" });
     expect((await db.entrada.findUniqueOrThrow({ where: { id } })).estado).toBe("VALIDA");
-    expect(await db.escaneo.count({ where: { eventoId, codigoLeido: trucho } })).toBe(1);
+    const [version, azar] = trucho.split("-");
+    expect(await db.escaneo.count({ where: { eventoId, codigoLeido: `${version}-${azar}` } })).toBe(1);
+    expect(await db.escaneo.count({ where: { codigoLeido: { contains: trucho.split("-")[2] } } })).toBe(0);
 
     const cualquiera = `https://ejemplo.com/${crypto.randomUUID()}`;
     expect(await escanear(cualquiera)).toEqual({ resultado: "no_valida", motivo: "formato" });
     expect(await db.escaneo.count({ where: { codigoLeido: { contains: "ejemplo.com" } } })).toBe(0);
+  });
+
+  it("código a mano con un error en la parte al azar: no guarda la firma verdadera (con la base sola no se arma el QR)", async () => {
+    const { firmado, id } = await entrada("PAGADA", "VALIDA");
+    const [version, azar, firma] = firmado.split("-");
+    const tipeado = `${version}-${(azar[0] === "A" ? "B" : "A") + azar.slice(1)}-${firma}`;
+    expect(await escanear(tipeado)).toEqual({ resultado: "no_valida", motivo: "firma" });
+    expect((await db.entrada.findUniqueOrThrow({ where: { id } })).estado).toBe("VALIDA");
+    expect(await db.escaneo.count({ where: { codigoLeido: { contains: firma } } })).toBe(0);
   });
 
   it("bien firmado pero inexistente: NO VÁLIDA (sin guardar el código)", async () => {
