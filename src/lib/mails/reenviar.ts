@@ -3,12 +3,13 @@
 // MAX_REENVIOS_POR_DIA seguidos por compra; para volver a pedir hacen falta 24
 // horas sin reenvíos: así nadie lo usa para llenarle la casilla a otra persona.
 //
-// Se pide de dos formas:
+// Se pide de tres formas:
 // - Desde el link de la compra paga: la llave del link es el permiso
 //   (reenviarDeCompra).
 // - Desde la página del evento, con email y DNI, para quien perdió el mail y
 //   el link (reenviarPorEmailYDni). La respuesta es siempre la misma, haya o
-//   no una compra con esos datos.
+//   no una compra con esos datos. También sirve para una cortesía con email.
+// - Una cortesía, desde el panel (reenviarCortesia), con el mismo límite.
 //
 // Acá no se manda nada: la orden queda como "falta el mail" (igual que recién
 // pagada) y el envío de siempre (pendientes.ts) la manda una sola vez, con
@@ -27,12 +28,12 @@ import { buscarCompra } from "@/lib/ventas/ordenes";
 import { DURACION_MAXIMA_ENVIO_MS, hayEnvioConfigurado, MAX_INTENTOS } from "./pendientes";
 
 export const MAX_REENVIOS_POR_DIA = 3; // seguidos, por compra (la columna reenvios_count)
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const DIA_MS = 24 * 60 * 60_000;
 
-// Compras pagas cuyo mail se puede volver a mandar ahora.
+// Compras pagas (o cortesías) cuyo mail se puede volver a mandar ahora.
 function sePuedeReenviar(ahora: Date): Prisma.OrdenWhereInput {
   return {
-    tipo: "VENTA",
     estado: "PAGADA",
     email: { not: null },
     OR: [
@@ -95,13 +96,29 @@ export type ReenvioDeCompra =
 export async function reenviarDeCompra(db: PrismaClient, llave: string, ahora = new Date()): Promise<ReenvioDeCompra> {
   const compra = await buscarCompra(db, llave, ahora);
   if (!compra || compra.estado !== "PAGADA" || !compra.email) return { ok: false, motivo: "no_encontrada" };
+  return reenviarOrden(db, compra.id, compra.email, ahora);
+}
+
+// "Reenviar" de una cortesía desde el panel. Quien la pide ya tiene que poder
+// ver el evento; acá se mira que la cortesía sea de ese evento.
+export async function reenviarCortesia(db: PrismaClient, eventoId: string, ordenId: unknown, ahora = new Date()): Promise<ReenvioDeCompra> {
+  if (typeof ordenId !== "string" || !UUID.test(ordenId)) return { ok: false, motivo: "no_encontrada" };
+  const orden = await db.orden.findFirst({
+    where: { id: ordenId, eventoId, tipo: "CORTESIA", estado: "PAGADA", email: { not: null } },
+    select: { id: true, email: true },
+  });
+  if (!orden?.email) return { ok: false, motivo: "no_encontrada" };
+  return reenviarOrden(db, orden.id, orden.email, ahora);
+}
+
+async function reenviarOrden(db: PrismaClient, ordenId: string, email: string, ahora: Date): Promise<ReenvioDeCompra> {
   // Sin servidor de mail no se gasta ningún reenvío.
   if (!hayEnvioConfigurado()) return { ok: false, motivo: "sin_configurar" };
-  const [marcada] = await marcarParaReenviar(db, { id: compra.id }, ahora);
-  if (marcada) return { ok: true, ordenId: compra.id, email: compra.email };
+  const [marcada] = await marcarParaReenviar(db, { id: ordenId }, ahora);
+  if (marcada) return { ok: true, ordenId, email };
   // ¿Por qué no? Si se podía, es que llegó al límite; si no, el mail se está mandando (o está por salir).
-  const sePodia = await db.orden.count({ where: { AND: [{ id: compra.id }, sePuedeReenviar(ahora)] } });
-  return { ok: false, motivo: sePodia ? "limite" : "ya_sale", ordenId: compra.id };
+  const sePodia = await db.orden.count({ where: { AND: [{ id: ordenId }, sePuedeReenviar(ahora)] } });
+  return { ok: false, motivo: sePodia ? "limite" : "ya_sale", ordenId };
 }
 
 export type ErroresReenvio = { email?: string; dni?: string };
@@ -111,8 +128,9 @@ export type ReenvioPorDatos =
   | { ok: false; errores: ErroresReenvio }
   | { ok: false; sinConfigurar: true };
 
-// "Reenviar mis entradas" de la página del evento: las compras pagas de ese
-// evento con ese email y con alguna entrada (válida o usada) de ese DNI.
+// "Reenviar mis entradas" de la página del evento: las compras pagas (y las
+// cortesías) de ese evento con ese email y con alguna entrada (válida o
+// usada) de ese DNI.
 export async function reenviarPorEmailYDni(
   db: PrismaClient,
   eventoId: string,

@@ -2,6 +2,12 @@
 
 Una entrada por chat, la más nueva arriba. Corta: qué se hizo, qué quedó y cómo se probó. El detalle está en los commits y en `PASOS.md`.
 
+## 10/10/2026 — Paso 19: cortesías (borrador para revisar)
+- Decidido con Ramiro: las dan el organizador (en sus eventos) y el ADMIN, dentro del cupo de "Evento y lotes"; email opcional (sin email, PDF desde el panel); la carga masiva se pega desde Excel o Google Sheets o se elige el .xlsx o .csv.
+- Borrador: `src/lib/cortesias/` (dar con cupo condicionado y un DNI por evento, anular con `UPDATE` condicionado, lista, PDF; leer la lista pegada, CSV y .xlsx en el navegador con `fflate`), panel → Cortesías (`/admin/cortesias`), mail y PDF con "cortesía", la puerta dice "Cortesía". Migración: email opcional solo en cortesías y cortesía siempre gratis.
+- Probado en local con Chromium (1280, 390 y 320 px). Los tests fallan sin el cupo condicionado, con el control de DNI antes de bloquear el evento o sin la condición al anular. 398 tests (0 salteados), typecheck, lint y build.
+- Quedó: que Ramiro lo pruebe en producción y la revisión con agentes.
+
 ## 10/10/2026 — Pasos 17 y 18 (probados): búsqueda por DNI o nombre y contador
 - Paso 17 `[x]`: Ramiro probó los arreglos (modo avión, cámara pausada, evento mal copiado).
 - Decidido con Ramiro: buscar por DNI completo o nombre (desde 3 letras, hasta 10); marcar el ingreso sin QR solo el organizador y el ADMIN; "Ingresaron X de Y" para todos.

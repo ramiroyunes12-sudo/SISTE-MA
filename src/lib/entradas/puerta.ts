@@ -8,7 +8,13 @@ import { formatearDni } from "@/lib/ventas/datos";
 import type { Buscado } from "./buscar";
 import type { DatosPuerta, Escaneado, MotivoNoValida } from "./escanear";
 
-export type PersonaPuerta = { titular: string | null; dni: string | null; tipo: string; compra: number };
+// compra: el N° de la orden; cortesia: la pantalla dice "Cortesía" en vez de "Compra N°".
+export type PersonaPuerta = { titular: string | null; dni: string | null; tipo: string; compra: number; cortesia?: boolean };
+
+// "Compra N° 12" o "Cortesía" (lo que dice la puerta debajo del tipo).
+export function deDonde(persona: Pick<PersonaPuerta, "compra" | "cortesia">) {
+  return persona.cortesia ? "Cortesía" : `Compra N° ${persona.compra}`;
+}
 
 export type RespuestaPuerta =
   | { resultado: "pasa"; persona: PersonaPuerta }
@@ -58,7 +64,13 @@ function ingreso(
 }
 
 function persona(datos: DatosPuerta): PersonaPuerta {
-  return { titular: datos.titular, dni: datos.dni ? formatearDni(datos.dni) : null, tipo: datos.tipo, compra: datos.compra };
+  return {
+    titular: datos.titular,
+    dni: datos.dni ? formatearDni(datos.dni) : null,
+    tipo: datos.tipo,
+    compra: datos.compra,
+    cortesia: datos.cortesia,
+  };
 }
 
 export function respuestaPuerta(escaneado: Escaneado, usuarioId: string, ahora = new Date()): RespuestaPuerta {

@@ -15,6 +15,7 @@ export type DatosEntrada = {
   dni: string | null;
   tipo: string;
   compra: number;
+  cortesia: boolean; // es una cortesía (no una compra)
   usadaEn: Date | null;
   validadaPor: { id: string; nombre: string } | null; // quién la escaneó en la puerta
   metodo: MetodoIngreso | null; // cómo entró: con el QR o buscada por DNI o nombre
@@ -54,7 +55,7 @@ export async function verificarEntrada(
       usadaEn: true,
       validadaPor: { select: { id: true, nombre: true } },
       tipoEntrada: { select: { nombre: true } },
-      orden: { select: { numero: true, estado: true } },
+      orden: { select: { numero: true, estado: true, tipo: true } },
       escaneos: { where: { resultado: "PASA" }, select: { metodo: true }, orderBy: { creadoEn: "desc" }, take: 1 },
     },
   });
@@ -66,6 +67,7 @@ export async function verificarEntrada(
     dni: entrada.dni,
     tipo: entrada.tipoEntrada.nombre,
     compra: entrada.orden.numero,
+    cortesia: entrada.orden.tipo === "CORTESIA",
     usadaEn: entrada.usadaEn,
     validadaPor: entrada.validadaPor,
     metodo: entrada.estado === "USADA" ? (entrada.escaneos[0]?.metodo ?? null) : null,

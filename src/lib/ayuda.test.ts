@@ -14,6 +14,9 @@ describe("WhatsApp para consultas", () => {
       `https://wa.me/5493794123456?text=${encodeURIComponent("Hola, tengo una consulta por las compras N° 7, 12 y 30")}`,
     );
     expect(ayuda.link([12])).toBe(ayuda.link(12));
+    // Una cortesía (o varias), con su palabra.
+    expect(decodeURIComponent(ayuda.link(12, true))).toMatch(/consulta por la cortesía N° 12$/);
+    expect(decodeURIComponent(ayuda.link([12, 13], true))).toMatch(/consulta por las cortesías N° 12 y 13$/);
   });
 
   it("sin la variable, o si no parece un número, no hay WhatsApp", () => {

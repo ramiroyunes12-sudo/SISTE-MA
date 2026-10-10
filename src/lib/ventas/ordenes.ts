@@ -204,6 +204,7 @@ export type EntradaDeCompra = {
 export type Compra = {
   id: string;
   numero: number; // el "N° de orden" que ve la gente
+  tipo: "VENTA" | "CORTESIA";
   estado: "PENDIENTE" | "VENCIDA" | "CANCELADA" | "PAGADA" | "REEMBOLSADA";
   vencida: boolean; // pendiente, pero ya se le pasó la hora
   venceEn: Date | null;
@@ -253,11 +254,12 @@ export async function buscarCompra(db: PrismaClient, llave: string, ahora = new 
 
 // La misma compra, por el id de la orden: para lo que no tiene el link (en
 // la base solo queda la huella de la llave), como el mail con las entradas.
-// Quien la pide tiene que saber que le corresponde.
+// También una cortesía (no tiene link). Quien la pide tiene que saber que le
+// corresponde.
 export async function buscarCompraPorId(db: PrismaClient, ordenId: string, ahora = new Date()): Promise<Compra | null> {
   if (typeof ordenId !== "string" || !UUID.test(ordenId)) return null;
   const orden = await db.orden.findUnique({ where: { id: ordenId }, select: SELECT_COMPRA });
-  if (!orden || orden.tipo !== "VENTA") return null;
+  if (!orden) return null;
   return aCompra(orden, ahora);
 }
 
@@ -283,6 +285,7 @@ function aCompra(orden: OrdenLeida, ahora: Date): Compra {
   return {
     id: orden.id,
     numero: orden.numero,
+    tipo: orden.tipo,
     estado: orden.estado,
     vencida: orden.estado === "PENDIENTE" && (!orden.venceEn || orden.venceEn <= ahora),
     venceEn: orden.venceEn,

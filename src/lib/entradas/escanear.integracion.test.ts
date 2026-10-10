@@ -110,7 +110,7 @@ describe.skipIf(!url)("escanear en la puerta", () => {
     const { firmado, numero, id } = await entrada("PAGADA", "VALIDA");
     expect(await escanear(firmado)).toEqual({
       resultado: "pasa",
-      entrada: { titular: "Persona de Prueba", dni: "30111222", tipo: "VIP", compra: numero },
+      entrada: { titular: "Persona de Prueba", dni: "30111222", tipo: "VIP", compra: numero, cortesia: false },
     });
     const guardada = await db.entrada.findUniqueOrThrow({ where: { id } });
     expect(guardada).toMatchObject({ estado: "USADA", usadaEn: AHORA, validadaPorId: validador.id });
@@ -131,7 +131,7 @@ describe.skipIf(!url)("escanear en la puerta", () => {
     const despues = new Date(AHORA.getTime() + 5 * 60_000);
     expect(await escanear(firmado, { usuario: otroValidador, ahora: despues })).toEqual({
       resultado: "ya_ingreso",
-      entrada: { titular: "Persona de Prueba", dni: "30111222", tipo: "VIP", compra: numero },
+      entrada: { titular: "Persona de Prueba", dni: "30111222", tipo: "VIP", compra: numero, cortesia: false },
       usadaEn: AHORA,
       validadaPor: validador,
       metodo: "QR",
@@ -248,7 +248,7 @@ describe.skipIf(!url)("escanear en la puerta", () => {
     const { id, numero } = await entrada("PAGADA", "VALIDA");
     expect(await marcar(id)).toEqual({
       resultado: "pasa",
-      entrada: { titular: "Persona de Prueba", dni: "30111222", tipo: "VIP", compra: numero },
+      entrada: { titular: "Persona de Prueba", dni: "30111222", tipo: "VIP", compra: numero, cortesia: false },
     });
     expect(await db.entrada.findUniqueOrThrow({ where: { id } })).toMatchObject({
       estado: "USADA",

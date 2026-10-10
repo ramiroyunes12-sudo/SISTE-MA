@@ -9,7 +9,8 @@ import { enumerar } from "./texto";
 
 export type WhatsappDeAyuda = {
   numero: string; // como se muestra
-  link: (compras?: number | readonly number[]) => string; // abre el chat con el mensaje (y la compra) ya escrito
+  // Abre el chat con el mensaje (y la compra, o la cortesía) ya escrito.
+  link: (compras?: number | readonly number[], cortesia?: boolean) => string;
 };
 
 export function whatsappDeAyuda(env: Record<string, string | undefined> = process.env): WhatsappDeAyuda | null {
@@ -18,13 +19,14 @@ export function whatsappDeAyuda(env: Record<string, string | undefined> = proces
   if (!/^\+?[\d\s().-]+$/.test(numero) || digitos.length < 10 || digitos.length > 15) return null;
   return {
     numero,
-    link: (compras) => {
+    link: (compras, cortesia = false) => {
       const numeros = typeof compras === "number" ? [compras] : (compras ?? []);
+      const [una, varias] = cortesia ? ["la cortesía", "las cortesías"] : ["la compra", "las compras"];
       const texto =
         numeros.length > 1
-          ? `Hola, tengo una consulta por las compras N° ${enumerar(numeros)}`
+          ? `Hola, tengo una consulta por ${varias} N° ${enumerar(numeros)}`
           : numeros.length === 1
-            ? `Hola, tengo una consulta por la compra N° ${numeros[0]}`
+            ? `Hola, tengo una consulta por ${una} N° ${numeros[0]}`
             : "Hola, tengo una consulta por una compra";
       return `https://wa.me/${digitos}?text=${encodeURIComponent(texto)}`;
     },

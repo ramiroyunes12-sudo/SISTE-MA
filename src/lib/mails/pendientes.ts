@@ -27,7 +27,9 @@
 //   persona (mismo email) en el mismo evento salen juntas en un solo mail
 //   (hasta MAX_COMPRAS_POR_MAIL), se toman juntas y, si falla, se reintentan
 //   juntas. Por ejemplo, "Reenviar mis entradas" con varias compras.
-import type { Prisma, PrismaClient } from "@/generated/prisma/client";
+// - Las cortesías (paso 19) salen igual, si tienen email; un mail lleva solo
+//   compras o solo cortesías (cada una con sus palabras).
+import type { Prisma, PrismaClient, TipoOrden } from "@/generated/prisma/client";
 import { whatsappDeAyuda } from "@/lib/ayuda";
 import { hayClaveDeCodigos } from "@/lib/entradas/codigo";
 import { type EntradaConQr, entradasConQr } from "@/lib/entradas/imprimir";
@@ -61,7 +63,6 @@ const NO_HAY_ENTRADAS = "No tiene entradas para mandar.";
 // Las órdenes a las que les falta el mail y se pueden intentar en `momento`.
 function pendientes(momento: Date): Prisma.OrdenWhereInput {
   return {
-    tipo: "VENTA",
     estado: "PAGADA",
     mailEnviadoEn: null,
     email: { not: null },
@@ -80,8 +81,8 @@ export function hayEnvioConfigurado() {
   return configuracionSmtp() !== null && hayClaveDeCodigos();
 }
 
-// El mail de las compras pagas `ids` (todas de la misma persona y del mismo
-// evento: las junta enviarJuntas), armado desde la base (sin la llave del
+// El mail de las compras pagas `ids` (todas de la misma persona, del mismo
+// evento y del mismo tipo: las junta enviarJuntas), armado desde la base (sin la llave del
 // link). null si ninguna tiene algo para mandar; si no, el mail y qué compras
 // lleva. Va como reenvío si a todas ya las pidieron de nuevo ("Reenviar mis
 // entradas", reenviar.ts): todo mail después del primer reenvío es un reenvío.
@@ -106,22 +107,27 @@ async function mailDeOrdenes(db: PrismaClient, ids: string[], ahora: Date) {
     ayuda: whatsappDeAyuda(),
     evento: primera.compra.evento,
     compras: compras.map(({ compra, entradas }) => ({ numero: compra.numero, totalEntradas: compra.entradas.length, entradas })),
+    cortesia: primera.compra.tipo === "CORTESIA",
     reenvio: ordenes.every((orden) => orden.reenviosCount > 0),
   });
   return { mensaje, incluidas: compras.map(({ compra }) => compra.id) };
 }
 
 // Manda en un solo mail la compra `ordenId` y las otras que le faltan a la
-// misma persona (mismo email) en el mismo evento, hasta MAX_COMPRAS_POR_MAIL.
+// misma persona (mismo email) en el mismo evento, hasta MAX_COMPRAS_POR_MAIL
+// (si es una cortesía, las otras cortesías; si es una compra, las otras compras).
 // Devuelve de cuántas compras salió y de cuántas falló.
 // `reloj`: la hora de cada paso (en los tests, una hora inventada que avanza).
 async function enviarJuntas(db: PrismaClient, cartero: Cartero, ordenId: string, reloj: () => Date) {
   const ninguna = { enviadas: 0, fallidas: 0 };
   const tomada = reloj();
-  const orden = await db.orden.findFirst({ where: { AND: [pendientes(tomada), { id: ordenId }] }, select: { eventoId: true, email: true } });
+  const orden = await db.orden.findFirst({
+    where: { AND: [pendientes(tomada), { id: ordenId }] },
+    select: { eventoId: true, email: true, tipo: true },
+  });
   if (!orden?.email) return ninguna; // otro envío la tomó (o ya salió)
   const otras = await db.orden.findMany({
-    where: { AND: [pendientes(tomada), { id: { not: ordenId }, eventoId: orden.eventoId, email: orden.email }] },
+    where: { AND: [pendientes(tomada), { id: { not: ordenId }, eventoId: orden.eventoId, email: orden.email, tipo: orden.tipo }] },
     orderBy: { pagadaEn: "asc" },
     take: MAX_COMPRAS_POR_MAIL - 1,
     select: { id: true },
@@ -216,19 +222,21 @@ export async function enviarMailsPendientes(
 }
 
 // "Reintentar" del panel: vuelve a intentar ya los mails del evento que no
-// salieron, aunque hayan llegado a MAX_INTENTOS o estén esperando. No toca
-// uno que se está mandando en este momento.
+// salieron (los de las compras o, desde Cortesías, los de las cortesías),
+// aunque hayan llegado a MAX_INTENTOS o estén esperando. No toca uno que se
+// está mandando en este momento.
 export async function reintentarMailsDelEvento(
   db: PrismaClient,
   eventoId: string,
   cartero: Cartero | null,
   ahora = new Date(),
+  tipo: TipoOrden = "VENTA",
 ): Promise<ResultadoEnvio> {
   if (!cartero || !hayClaveDeCodigos()) return { enviados: 0, fallidos: 0, sinConfigurar: true };
   await db.orden.updateMany({
     where: {
       eventoId,
-      tipo: "VENTA",
+      tipo,
       estado: "PAGADA",
       mailEnviadoEn: null,
       OR: [{ mailIntentoEn: null }, { mailIntentoEn: { lte: new Date(ahora.getTime() - DURACION_MAXIMA_ENVIO_MS) } }],
@@ -251,9 +259,10 @@ export type MailSinEnviar = {
 
 const MOSTRAR_SIN_ENVIAR = 20;
 
-// Para el panel: cuántos mails salieron, cuántos no y los últimos que no.
-export async function estadoDeLosMails(db: PrismaClient, eventoId: string, ahora = new Date()) {
-  const donde = { eventoId, tipo: "VENTA" as const, estado: "PAGADA" as const };
+// Para el panel: cuántos mails salieron, cuántos no y los últimos que no (de
+// las compras o de las cortesías con email).
+export async function estadoDeLosMails(db: PrismaClient, eventoId: string, ahora = new Date(), tipo: TipoOrden = "VENTA") {
+  const donde = { eventoId, tipo, estado: "PAGADA" as const, email: { not: null } };
   const [enviados, cuantosSinEnviar, sinEnviar] = await Promise.all([
     db.orden.count({ where: { ...donde, mailEnviadoEn: { not: null } } }),
     db.orden.count({ where: { ...donde, mailEnviadoEn: null } }),

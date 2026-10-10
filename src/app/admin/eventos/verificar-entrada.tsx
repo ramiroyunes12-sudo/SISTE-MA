@@ -99,7 +99,7 @@ function Resultado({ verificada: v, codigo }: { verificada: EntradaVerificada; c
             {v.dni && <> · DNI {v.dni}</>}
           </p>
           <p>
-            {v.tipo} · Compra N° {v.compra}
+            {v.tipo} · {v.cortesia ? `Cortesía N° ${v.compra}` : `Compra N° ${v.compra}`}
           </p>
           {v.resultado === "usada" && v.usadaEn && (
             <p>

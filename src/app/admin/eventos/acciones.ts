@@ -172,6 +172,7 @@ export type EntradaVerificada = {
   dni?: string;
   tipo?: string;
   compra?: number;
+  cortesia?: boolean; // es una cortesía (no una compra)
   usadaEn?: string; // "sáb 21/11/2026 23:40"
   validadaPor?: string; // quién la escaneó en la puerta
   porDni?: boolean; // la marcaron desde la búsqueda por DNI o nombre, sin el QR
@@ -205,6 +206,7 @@ export async function verificarEntradaAccion(
         dni: v.entrada.dni ? formatearDni(v.entrada.dni) : undefined,
         tipo: v.entrada.tipo,
         compra: v.entrada.compra,
+        cortesia: v.entrada.cortesia,
         usadaEn: v.entrada.usadaEn ? formatearFecha(v.entrada.usadaEn) : undefined,
         validadaPor: v.entrada.validadaPor?.nombre,
         porDni: v.entrada.metodo === "DNI",

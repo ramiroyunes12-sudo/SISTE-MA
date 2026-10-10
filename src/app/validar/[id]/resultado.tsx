@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import type { ErrorPuerta, IngresoPuerta, PersonaPuerta, RespuestaPuerta } from "@/lib/entradas/puerta";
+import { deDonde, type ErrorPuerta, type IngresoPuerta, type PersonaPuerta, type RespuestaPuerta } from "@/lib/entradas/puerta";
 
 export type Resultado = RespuestaPuerta | ErrorPuerta;
 
@@ -140,7 +140,7 @@ function DatosPersona({ persona, grande }: { persona: PersonaPuerta; grande: boo
       {persona.dni && <p className={grande ? "text-3xl" : "text-2xl"}>DNI {persona.dni}</p>}
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xl">
         <span className="rounded-lg bg-white px-3 py-0.5 font-extrabold text-tinta uppercase">{persona.tipo}</span>
-        <span className="text-white/90">Compra N° {persona.compra}</span>
+        <span className="text-white/90">{deDonde(persona)}</span>
       </p>
     </div>
   );

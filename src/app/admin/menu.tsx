@@ -10,7 +10,7 @@ const SECCIONES: { texto: string; href?: string; paso?: number; soloAdmin?: bool
   { texto: "Productoras", href: "/admin/productoras", soloAdmin: true },
   { texto: "Evento y lotes", href: "/admin/eventos" },
   { texto: "Ventas", paso: 20 },
-  { texto: "Cortesías", paso: 19 },
+  { texto: "Cortesías", href: "/admin/cortesias" },
   { texto: "Validadores", href: "/admin/validadores" },
   { texto: "Claves", href: "/admin/claves", soloAdmin: true },
 ];
