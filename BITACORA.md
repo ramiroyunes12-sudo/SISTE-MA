@@ -2,11 +2,12 @@
 
 Una entrada por chat, la más nueva arriba. Corta: qué se hizo, qué quedó y cómo se probó. El detalle está en los commits y en `PASOS.md`.
 
-## 9/10/2026 — Paso 16: "Compra confirmada" y "Reenviar mis entradas" (borrador)
-- Decidido con Ramiro: reenviar desde cada evento (email + DNI); link propio por entrada, más adelante.
-- `src/lib/mails/reenviar.ts`: reenviar = dejar la orden "falta el mail" con un `UPDATE` condicionado (3 por compra cada 24 h, nunca sobre un mail en curso); lo manda el envío del paso 15. Desde el link de la compra ("Reenviar el mail") y desde `/e/<evento>/mis-entradas` (misma respuesta siempre). "Compra confirmada" como el diseño.
-- 291 tests (0 salteados), 11 nuevos contra la base; cada condición del reenvío probada sacándola. Capturas en tamaño celu con la app local.
-- Quedó: revisión con agentes, arreglos y la prueba de Ramiro.
+## 9-10/10/2026 — Paso 16: "Compra confirmada" y "Reenviar mis entradas"
+- Decidido con Ramiro: reenviar desde cada evento (email + DNI); link propio por entrada, más adelante. Después de probar el borrador: la menor cantidad de mails (las compras de una persona en un evento, juntas en un mail).
+- Borrador (PR #9): `src/lib/mails/reenviar.ts` (reenviar = dejar la orden "falta el mail" con un `UPDATE` condicionado), "Compra confirmada" como el diseño, `/e/<evento>/mis-entradas`.
+- Prueba de Ramiro: salieron las 4 compras pero Gmail las escondió en la conversación de cada una → el reenvío lleva otro asunto y las compras de la persona van en un solo mail (`pendientes.ts` las toma y reintenta juntas).
+- Revisión con 4 agentes (seguridad, carreras del reenvío, carreras de las compras juntas, pantallas): email gigante que trababa el servidor, formularios que sin JavaScript mandaban datos por la URL, pedidos que contaban doble, "ya sale" sin estar saliendo, intento colgado que pisaba un reenvío, traba entre consultas, mail que podía salir dos veces si se caía la base, página que quedaba abajo de todo al confirmarse el pago, mensajes fuera de la pantalla. Todo arreglado con su test. 305 tests (0 salteados) y build.
+- Quedó: la prueba de Ramiro de los arreglos.
 
 ## 9/10/2026 — Paso 15: el mail con las entradas (probado)
 - Paso 14 marcado `[x]` (Ramiro probó los arreglos).

@@ -52,7 +52,8 @@ const POR_CONSULTA = 10;
 // siguen, en otro): así el mail no queda gigante.
 export const MAX_COMPRAS_POR_MAIL = 10;
 
-// Cuántos mails salieron y cuántos fallaron (un mail puede llevar varias compras).
+// De cuántas compras salió el mail y de cuántas falló (como la lista del
+// panel: un mail puede llevar varias compras).
 export type ResultadoEnvio = { enviados: number; fallidos: number; sinConfigurar?: true };
 
 const NO_HAY_ENTRADAS = "No tiene entradas para mandar.";
@@ -112,24 +113,32 @@ async function mailDeOrdenes(db: PrismaClient, ids: string[], ahora: Date) {
 
 // Manda en un solo mail la compra `ordenId` y las otras que le faltan a la
 // misma persona (mismo email) en el mismo evento, hasta MAX_COMPRAS_POR_MAIL.
+// Devuelve de cuántas compras salió y de cuántas falló.
 // `reloj`: la hora de cada paso (en los tests, una hora inventada que avanza).
 async function enviarJuntas(db: PrismaClient, cartero: Cartero, ordenId: string, reloj: () => Date) {
+  const ninguna = { enviadas: 0, fallidas: 0 };
   const tomada = reloj();
   const orden = await db.orden.findFirst({ where: { AND: [pendientes(tomada), { id: ordenId }] }, select: { eventoId: true, email: true } });
-  if (!orden?.email) return "ocupada" as const; // otro envío la tomó (o ya salió)
+  if (!orden?.email) return ninguna; // otro envío la tomó (o ya salió)
   const otras = await db.orden.findMany({
     where: { AND: [pendientes(tomada), { id: { not: ordenId }, eventoId: orden.eventoId, email: orden.email }] },
     orderBy: { pagadaEn: "asc" },
     take: MAX_COMPRAS_POR_MAIL - 1,
     select: { id: true },
   });
-  // Tomarlas: las que otro envío tomó en el medio (o ya salieron) quedan afuera.
-  const tomadas = await db.orden.updateManyAndReturn({
-    where: { AND: [pendientes(tomada), { id: { in: [ordenId, ...otras.map((otra) => otra.id)] } }] },
-    data: { mailIntentoEn: tomada, mailIntentos: { increment: 1 }, mailError: null, mailReintentarDesde: null },
-    select: { id: true, mailIntentos: true },
-  });
-  if (tomadas.length === 0) return "ocupada" as const;
+  // Tomarlas de a una (las que otro envío tomó en el medio, o ya salieron,
+  // quedan afuera). De a una a propósito: un UPDATE de varias filas las
+  // bloquea en otro orden que "Reintentar" o un reenvío, y se pueden trabar.
+  const tomadas: { id: string; mailIntentos: number }[] = [];
+  for (const id of [ordenId, ...otras.map((otra) => otra.id)]) {
+    const [una] = await db.orden.updateManyAndReturn({
+      where: { AND: [pendientes(tomada), { id }] },
+      data: { mailIntentoEn: tomada, mailIntentos: { increment: 1 }, mailError: null, mailReintentarDesde: null },
+      select: { id: true, mailIntentos: true },
+    });
+    if (una) tomadas.push(una);
+  }
+  if (tomadas.length === 0) return ninguna;
   const ids = tomadas.map((tomadaYa) => tomadaYa.id);
   // Lo que se anota al final, solo en las que siguen tomadas por este intento.
   const siguenTomadas = (cuales: string[]) => ({ id: { in: cuales }, mailIntentoEn: tomada });
@@ -143,8 +152,9 @@ async function enviarJuntas(db: PrismaClient, cartero: Cartero, ordenId: string,
     // Solo los ids y el motivo: nada de la persona en los logs.
     console.error(`[mail] ${ids.length === 1 ? "Compra" : "Compras"} ${ids.join(", ")}: ${motivo}`);
     const limite = esLimiteDiario(error);
-    // Se reintentan juntas: la espera de la que más intentos lleva.
-    const intentos = Math.max(...tomadas.map((tomadaYa) => tomadaYa.mailIntentos));
+    // Se reintentan juntas, con la espera de la que menos intentos lleva: una
+    // recién pagada no espera horas por otra que viene fallando.
+    const intentos = Math.min(...tomadas.map((tomadaYa) => tomadaYa.mailIntentos));
     const espera = limite ? ESPERA_LIMITE_DIARIO_MS : ESPERAS_MS[Math.min(intentos, ESPERAS_MS.length) - 1];
     await db.orden.updateMany({
       where: siguenTomadas(ids),
@@ -154,17 +164,19 @@ async function enviarJuntas(db: PrismaClient, cartero: Cartero, ordenId: string,
         ...(limite ? { mailIntentos: { decrement: 1 } } : {}),
       },
     });
-    return "fallo" as const;
+    return { enviadas: 0, fallidas: ids.length };
+  }
+  // Primero, anotar las que salieron (si la base se cae después, no salen otra vez).
+  const incluidas = armado?.incluidas ?? [];
+  if (incluidas.length > 0) {
+    await db.orden.updateMany({ where: siguenTomadas(incluidas), data: { mailEnviadoEn: reloj(), mailError: null, mailReintentarDesde: null } });
   }
   // Las que no tenían nada para mandar (por ejemplo, todas sus entradas anuladas) no se reintentan.
-  const incluidas = armado?.incluidas ?? [];
   const sinNada = ids.filter((id) => !incluidas.includes(id));
   if (sinNada.length > 0) {
     await db.orden.updateMany({ where: siguenTomadas(sinNada), data: { mailIntentos: MAX_INTENTOS, mailError: NO_HAY_ENTRADAS } });
   }
-  if (incluidas.length === 0) return "fallo" as const;
-  await db.orden.updateMany({ where: siguenTomadas(incluidas), data: { mailEnviadoEn: reloj(), mailError: null, mailReintentarDesde: null } });
-  return "enviado" as const;
+  return { enviadas: incluidas.length, fallidas: sinNada.length };
 }
 
 // Manda los mails que faltan (todos, los de un evento o el de una orden).
@@ -195,9 +207,9 @@ export async function enviarMailsPendientes(
     if (candidatas.length === 0) break;
     for (const { id } of candidatas) {
       if (Date.now() - inicio >= TOPE_VUELTA_MS) break;
-      const uno = await enviarJuntas(db, cartero, id, reloj);
-      if (uno === "enviado") resultado.enviados++;
-      if (uno === "fallo") resultado.fallidos++;
+      const { enviadas, fallidas } = await enviarJuntas(db, cartero, id, reloj);
+      resultado.enviados += enviadas;
+      resultado.fallidos += fallidas;
     }
   }
   return resultado;

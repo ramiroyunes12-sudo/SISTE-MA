@@ -26,6 +26,8 @@ const url = process.env.TEST_DATABASE_URL;
 const MINUTO = 60_000;
 const HORA = 60 * MINUTO;
 
+const dormir = (ms: number) => new Promise((listo) => setTimeout(listo, ms));
+
 // Un cartero de mentira: anota lo que manda. `fallar`: tira ese error;
 // `demora`: tarda en "mandarlo" (para probar dos envíos a la vez).
 function carteroDePrueba(opciones: { fallar?: unknown; demora?: number } = {}) {
@@ -153,8 +155,9 @@ describe.skipIf(!url)("Mail con las entradas", () => {
     const deOtroEvento = await compra(otroEvento, "PAGADA", ["VALIDA"]);
     const { cartero, enviados } = carteroDePrueba();
 
-    // Pedida por una sola (como la página de la compra): sale con la otra de la misma persona.
-    expect(await enviarMailsPendientes(db, cartero, { ordenId: primera })).toEqual({ enviados: 1, fallidos: 0 });
+    // Pedida por una sola (como la página de la compra): sale con la otra de la
+    // misma persona. La cuenta es de compras (como la lista del panel).
+    expect(await enviarMailsPendientes(db, cartero, { ordenId: primera })).toEqual({ enviados: 2, fallidos: 0 });
     expect(enviados).toHaveLength(1);
     const [mail] = enviados;
     const [n1, n2] = await Promise.all([primera, segunda].map(async (id) => (await db.orden.findUniqueOrThrow({ where: { id } })).numero));
@@ -188,7 +191,7 @@ describe.skipIf(!url)("Mail con las entradas", () => {
     const ids: string[] = [];
     for (let i = 0; i < MAX_COMPRAS_POR_MAIL + 2; i++) ids.push(await compra(ev, "PAGADA", ["VALIDA"]));
     const { cartero, enviados } = carteroDePrueba();
-    expect(await enviarMailsPendientes(db, cartero, { eventoId: ev.eventoId })).toEqual({ enviados: 2, fallidos: 0 });
+    expect(await enviarMailsPendientes(db, cartero, { eventoId: ev.eventoId })).toEqual({ enviados: MAX_COMPRAS_POR_MAIL + 2, fallidos: 0 });
     expect(enviados.map((m) => m.adjuntos.filter((a) => a.tipo === "image/png").length)).toEqual([MAX_COMPRAS_POR_MAIL, 2]);
     for (const id of ids) expect((await mailDe(id)).mailIntentos).toBe(1);
   });
@@ -214,15 +217,78 @@ describe.skipIf(!url)("Mail con las entradas", () => {
     const ids = [await compra(ev, "PAGADA", ["VALIDA"]), await compra(ev, "PAGADA", ["VALIDA"])];
     const ahora = new Date();
     const fallando = carteroDePrueba({ fallar: Object.assign(new Error("x"), { code: "ECONNECTION" }) });
-    expect(await enviarMailsPendientes(db, fallando.cartero, { eventoId: ev.eventoId, ahora })).toEqual({ enviados: 0, fallidos: 1 });
+    expect(await enviarMailsPendientes(db, fallando.cartero, { eventoId: ev.eventoId, ahora })).toEqual({ enviados: 0, fallidos: 2 });
     const [a, b] = await Promise.all(ids.map(mailDe));
     expect(a.mailError).toBe(b.mailError);
     expect(a.mailReintentarDesde).toEqual(b.mailReintentarDesde);
 
     const andando = carteroDePrueba();
     const despues = new Date(a.mailReintentarDesde!.getTime() + 1000);
-    expect(await enviarMailsPendientes(db, andando.cartero, { eventoId: ev.eventoId, ahora: despues })).toEqual({ enviados: 1, fallidos: 0 });
+    expect(await enviarMailsPendientes(db, andando.cartero, { eventoId: ev.eventoId, ahora: despues })).toEqual({ enviados: 2, fallidos: 0 });
     expect(andando.enviados).toHaveLength(1);
+  });
+
+  it("una compra recién pagada no espera horas por otra de su mail que viene fallando", async () => {
+    const ev = await evento();
+    const vieja = await compra(ev, "PAGADA", ["VALIDA"]);
+    await db.orden.update({
+      where: { id: vieja },
+      data: { mailIntentos: MAX_INTENTOS - 1, mailError: "x", mailReintentarDesde: new Date(Date.now() - MINUTO) },
+    });
+    const nueva = await compra(ev, "PAGADA", ["VALIDA"]);
+    const ahora = new Date();
+    const fallando = carteroDePrueba({ fallar: Object.assign(new Error("x"), { code: "ECONNECTION" }) });
+    expect(await enviarMailsPendientes(db, fallando.cartero, { eventoId: ev.eventoId, ahora })).toEqual({ enviados: 0, fallidos: 2 });
+    // La vieja llegó al último intento; la nueva se reintenta en 5 minutos (no en 4 horas).
+    expect((await mailDe(vieja)).mailIntentos).toBe(MAX_INTENTOS);
+    const { mailReintentarDesde } = await mailDe(nueva);
+    expect(mailReintentarDesde!.getTime() - ahora.getTime()).toBeLessThan(ESPERAS_MS[0] + 30_000);
+  });
+
+  it("tomar las compras de un mail no se traba con otro que las bloquea en otro orden (como 'Reintentar')", async () => {
+    const ev = await evento();
+    const a = await compra(ev, "PAGADA", ["VALIDA"]);
+    const b = await compra(ev, "PAGADA", ["VALIDA"]);
+    const { cartero, enviados } = carteroDePrueba();
+    let envio: ReturnType<typeof enviarMailsPendientes> | undefined;
+    await db.$transaction(
+      async (tx) => {
+        // Otro (por ejemplo "Reintentar" del panel) bloquea primero la b…
+        await tx.$queryRaw`SELECT id FROM entradas.ordenes WHERE id = ${b}::uuid FOR UPDATE`;
+        // …el envío arranca por la a y también quiere la b…
+        envio = enviarMailsPendientes(db, cartero, { ordenId: a });
+        await dormir(400);
+        // …y el otro después quiere la a. Si el envío las tomara a las dos en
+        // una sola consulta, se trabarían (y Postgres cortaría a uno).
+        await tx.$queryRaw`SELECT id FROM entradas.ordenes WHERE id = ${a}::uuid FOR UPDATE`;
+      },
+      { timeout: 15_000 },
+    );
+    expect(await envio).toEqual({ enviados: 2, fallidos: 0 });
+    expect(enviados).toHaveLength(1);
+  });
+
+  it("si la base se cae justo después de mandar, la compra que salió queda anotada (no sale otra vez)", async () => {
+    const ev = await evento();
+    const conEntradas = await compra(ev, "PAGADA", ["VALIDA"]);
+    await compra(ev, "PAGADA", ["ANULADA"]); // de la misma persona, sin nada para mandar
+    const conFalla = db.$extends({
+      query: {
+        orden: {
+          async updateMany({ args, query }) {
+            if ((args.data as { mailError?: unknown }).mailError === "No tiene entradas para mandar.") throw new Error("se cayó la base");
+            return query(args);
+          },
+        },
+      },
+    }) as unknown as PrismaClient;
+    const { cartero, enviados } = carteroDePrueba();
+    await expect(enviarMailsPendientes(conFalla, cartero, { eventoId: ev.eventoId })).rejects.toThrow("se cayó la base");
+    expect(enviados).toHaveLength(1);
+    expect((await mailDe(conEntradas)).mailEnviadoEn).not.toBeNull();
+    // Pasado lo que puede durar un intento, no vuelve a salir.
+    await enviarMailsPendientes(db, cartero, { eventoId: ev.eventoId, ahora: new Date(Date.now() + DURACION_MAXIMA_ENVIO_MS + 1000) });
+    expect(enviados).toHaveLength(1);
   });
 
   it("dos envíos a la vez no mandan el mismo mail dos veces", async () => {

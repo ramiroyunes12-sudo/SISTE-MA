@@ -4,14 +4,17 @@ import { obtenerDb } from "@/lib/db";
 import { carteroSmtp } from "@/lib/mails/cartero";
 import { enviarMailsPendientes } from "@/lib/mails/pendientes";
 
-// Lo que puede durar (la vuelta de envíos se corta sola a los 25 segundos).
-export const maxDuration = 60;
+// Lo que puede durar: la vuelta de envíos deja de tomar compras a los 25
+// segundos, pero el último mail que tomó todavía se arma y tiene hasta 45 s
+// para salir (PLAZO_ENVIO_MS). Si la cortaran en el medio, ese mail podría
+// salir dos veces. (Con Fluid compute, Vercel deja hasta 300 s.)
+export const maxDuration = 120;
 
 // GET /api/mails/pendientes: la tarea programada de Vercel (una vez por día,
 // ver vercel.json) manda los mails con las entradas que hayan quedado sin
 // salir (src/lib/mails/pendientes.ts). Vercel la llama con la clave
 // CRON_SECRET en el encabezado Authorization; sin esa variable cargada no
-// hace nada. Nunca dice a quién se mandó: solo cuántos.
+// hace nada. Nunca dice a quién se mandó: solo de cuántas compras.
 export async function GET(request: Request) {
   const clave = process.env.CRON_SECRET;
   if (!clave || clave.length < 16) return Response.json({ ok: false }, { status: 503 });
