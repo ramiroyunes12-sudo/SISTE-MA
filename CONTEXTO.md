@@ -21,7 +21,8 @@ Sistema de venta de entradas por lotes para varias **productoras** (se alquila p
 - **Hechos y probados:** pasos 1 a 15 (base, login, productoras, evento y lotes, página pública, reparto entre lotes, datos del checkout, reserva, cobro por transferencia y Mercado Pago con plata real el 8/10/2026, código firmado de cada entrada, QR y PDF, y el mail con las entradas, probados el 9/10/2026).
 - El panel todavía **no lista las compras pagas ni sus entradas** (llega en el paso 20): solo muestra cuántas, lo cobrado y los mails que no salieron. El código de cada entrada se ve en el link secreto de la compra y en el mail.
 - Los mails salen por Gmail (`sistemaentradas@gmail.com`, contraseña de aplicación). Ramiro no quiere pagar un servicio de mails: se queda Gmail aunque algunos caigan en spam.
-- **Paso 16** ("Compra confirmada" y "Reenviar mis entradas"): **borrador listo** (9/10/2026). Falta la revisión con agentes, sus arreglos y la prueba de Ramiro.
+- **Paso 16** ("Compra confirmada" y "Reenviar mis entradas"): borrador probado por Ramiro (9/10) y **arreglos de la revisión con agentes listos** (10/10/2026). Falta que Ramiro pruebe los arreglos para marcarlo `[x]`.
+- Decidido por Ramiro (10/10): **la menor cantidad de mails**. Las compras de una misma persona (mismo email) en un evento que salen a la vez van en un solo mail; el reenvío llega con el asunto "Te reenviamos tus entradas…".
 
 ## Acciones del dueño pendientes
 
@@ -72,11 +73,11 @@ Detalle en `.claude/rules/` (se cargan solas al tocar esos archivos) y permisos 
 | `src/lib/ventas` | Reparto por lote, reservas, órdenes, turno del evento, simulación |
 | `src/lib/pagos` | Cobros, confirmar, montos únicos, cuenta de Mercado Pago |
 | `src/lib/entradas` | Código firmado (`codigo.ts`), verificar, QR (`qr.ts`, también el PNG del mail), entradas con QR (`imprimir.ts`), PDF (`pdf.ts`, `texto-pdf.ts`, `descarga.ts`) |
-| `src/lib/mails` | Mail con las entradas: SMTP (`cartero.ts`), contenido (`entradas.ts`), envío una sola vez y reintentos (`pendientes.ts`), reenviar con límite (`reenviar.ts`), `after()` (`despues.ts`). El WhatsApp para consultas: `src/lib/ayuda.ts` |
+| `src/lib/mails` | Mail con las entradas: SMTP (`cartero.ts`), contenido (`entradas.ts`, una o varias compras de la misma persona), envío una sola vez, compras juntas y reintentos (`pendientes.ts`), reenviar con límite (`reenviar.ts`), `after()` (`despues.ts`). El WhatsApp para consultas: `src/lib/ayuda.ts` |
 | `prisma/` | `schema.prisma`, migraciones, datos de prueba |
 | `scripts/` | `migrar.mjs` (deploy), `usuario.ts` (crear ADMIN / resetear contraseña) |
 
 ## Traspaso (último chat)
 
-- **9/10/2026:** paso 16, borrador. Decidido con Ramiro: "Reenviar mis entradas" en cada evento (`/e/<evento>/mis-entradas`, email + DNI, misma respuesta siempre); el link propio por entrada queda para más adelante (`PENDIENTES.md`). Hecho: `src/lib/mails/reenviar.ts` (3 por compra cada 24 h, `UPDATE` condicionado, reusa el envío del paso 15), "Compra confirmada" como el diseño con "Reenviar el mail", link en la página del evento. Sin migración.
-- **Para el próximo chat:** etapa 3 del paso 16: revisión con agentes en paralelo (seguridad y datos personales del formulario público; límite y carreras del reenvío; cómo se ve en el celu), verificar cada hallazgo, arreglar y commit `Paso 16: arreglos de la revisión con agentes`.
+- **9-10/10/2026:** paso 16. Borrador (9/10, PR #9 mergeado): Ramiro lo probó y creyó que el reenvío mandaba una sola compra; salieron las 4, pero Gmail las escondió en la conversación de cada compra. Arreglado: otro asunto para el reenvío y, pedido por Ramiro, un solo mail con todas las compras de la persona. Revisión con 4 agentes (seguridad, carreras x2, pantallas): arreglados los hallazgos, cada uno con su test (detalle en `PASOS.md`). 305 tests, 0 salteados.
+- **Para el próximo chat:** si Ramiro confirma que probó los arreglos del paso 16 (ver "Para probarlo" en `PASOS.md`), marcarlo `[x]` y arrancar el paso 17 (escáner) con `/empezar-paso 17`.

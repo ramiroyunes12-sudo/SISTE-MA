@@ -174,7 +174,12 @@ export function EsperarPago({
     ocupado.current = true;
     try {
       const resultado = await revisar();
-      if (resultado && (resultado.estado !== estadoInicial || resultado.aDevolver)) router.refresh();
+      if (resultado && (resultado.estado !== estadoInicial || resultado.aDevolver)) {
+        // Arriba de todo: si no, al cambiar la página el navegador la deja
+        // abajo (en las últimas entradas) y no se ve "¡Compra confirmada!".
+        window.scrollTo({ top: 0 });
+        router.refresh();
+      }
     } finally {
       ocupado.current = false;
     }

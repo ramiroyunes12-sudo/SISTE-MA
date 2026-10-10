@@ -52,7 +52,8 @@ export function errorDeDni(texto: string): string | undefined {
 export function errorDeEmail(texto: string): string | undefined {
   const email = texto.trim().toLowerCase();
   if (!email) return "Poné tu email.";
-  if (!EMAIL.test(email) || email.length > 200) return "Ese email no parece válido. Revisalo.";
+  // Primero el largo: con un texto gigante el regex tarda minutos (y el formulario de reenviar es público).
+  if (email.length > 200 || !EMAIL.test(email)) return "Ese email no parece válido. Revisalo.";
   return undefined;
 }
 

@@ -150,9 +150,10 @@ export async function reintentarMailsAccion(eventoId: string): Promise<EstadoPag
     if (enviados === 0 && fallidos === 0) {
       return { listo: "Ya se están mandando (o no había ninguno para mandar): recargá la página en un minuto para ver cómo salieron." };
     }
+    // Cuenta compras, como la lista (un mail puede llevar varias de la misma persona).
     const partes = [
-      enviados && `${enviados === 1 ? "Salió 1 mail" : `Salieron ${enviados} mails`}`,
-      fallidos && `${fallidos === 1 ? "1 volvió a fallar" : `${fallidos} volvieron a fallar`}`,
+      enviados && `${enviados === 1 ? "Salió el mail de 1 compra" : `Salieron los mails de ${enviados} compras`}`,
+      fallidos && `${fallidos === 1 ? "El de 1 compra volvió a fallar" : `Los de ${fallidos} compras volvieron a fallar`}`,
     ].filter(Boolean);
     return fallidos ? { error: `${partes.join(". ")}.` } : { listo: `${partes.join(". ")}.` };
   } catch (error) {

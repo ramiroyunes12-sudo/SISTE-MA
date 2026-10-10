@@ -13,7 +13,8 @@ export type EstadoMisEntradas = { errores?: ErroresReenvio; general?: string; li
 // "Reenviar mis entradas": email y DNI por POST (nunca en la URL). La
 // respuesta es la misma haya o no una compra con esos datos, y el mail sale
 // después de responder (si saliera antes, por lo que tarda se sabría si hay
-// una compra).
+// una compra). El envío del evento arranca siempre: si a esa persona le
+// faltaba un mail que se trabó (y por eso no se marcó de nuevo), sale ahora.
 export async function reenviarEntradasAccion(
   slug: string,
   _anterior: EstadoMisEntradas,
@@ -28,7 +29,7 @@ export async function reenviarEntradasAccion(
       if ("errores" in resultado) return { errores: resultado.errores };
       return { general: "Ahora no podemos mandar mails. Probá de nuevo más tarde." };
     }
-    if (resultado.reenviadas.length > 0) mandarMailsDespues({ eventoId });
+    mandarMailsDespues({ eventoId });
     return { listo: true };
   } catch (error) {
     unstable_rethrow(error);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { errorDeDni, errorDeNombre, errorDeTelefono, formatearDni, normalizarNombre, validarDatosCompra } from "./datos";
+import { errorDeDni, errorDeEmail, errorDeNombre, errorDeTelefono, formatearDni, normalizarNombre, validarDatosCompra } from "./datos";
 import { pedidoATexto, pedidoDesdeTexto, validarPedido } from "./pedido";
 
 const GENERAL = "00000000-0000-4000-8000-000000000001";
@@ -21,6 +21,13 @@ const BIEN = {
 };
 
 describe("datos del checkout", () => {
+  it("un email gigante se rechaza enseguida (el formulario público no puede trabar el servidor)", () => {
+    const gigante = `a@${".".repeat(100_000)}@`;
+    const inicio = performance.now();
+    expect(errorDeEmail(gigante)).toBe("Ese email no parece válido. Revisalo.");
+    expect(performance.now() - inicio).toBeLessThan(500);
+  });
+
   it("nombre y DNI por entrada, email y celular: los deja prolijos", () => {
     expect(validarDatosCompra(formulario(BIEN), 2)).toEqual({
       ok: true,

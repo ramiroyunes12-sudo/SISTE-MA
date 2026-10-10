@@ -1,7 +1,7 @@
 // "Reenviar mis entradas": volver a mandar el mail con las entradas de una
 // compra paga. Siempre al email de la compra (nunca a otro) y como mucho
-// MAX_REENVIOS_POR_DIA veces por compra en 24 horas: así nadie lo usa para
-// llenarle la casilla a otra persona.
+// MAX_REENVIOS_POR_DIA seguidos por compra; para volver a pedir hacen falta 24
+// horas sin reenvíos: así nadie lo usa para llenarle la casilla a otra persona.
 //
 // Se pide de dos formas:
 // - Desde el link de la compra paga: la llave del link es el permiso
@@ -17,14 +17,16 @@
 // - Cada reenvío es un UPDATE condicionado: dos pedidos a la vez no pasan el
 //   límite ni lo cuentan dos veces.
 // - No se reenvía un mail que se está mandando o que está por salir solo (ya
-//   va): solo uno que ya salió, o uno cuyo último intento falló.
+//   va): solo uno que ya salió, o uno cuyo último intento terminó y falló (el
+//   envío borra el error al empezar cada intento: con error, no hay ninguno en
+//   curso).
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { errorDeDni, errorDeEmail, normalizarDni } from "@/lib/ventas/datos";
 import { buscarCompra } from "@/lib/ventas/ordenes";
 
 import { DURACION_MAXIMA_ENVIO_MS, hayEnvioConfigurado, MAX_INTENTOS } from "./pendientes";
 
-export const MAX_REENVIOS_POR_DIA = 3; // por compra (la columna reenvios_count)
+export const MAX_REENVIOS_POR_DIA = 3; // seguidos, por compra (la columna reenvios_count)
 const DIA_MS = 24 * 60 * 60_000;
 
 // Compras pagas cuyo mail se puede volver a mandar ahora.
@@ -36,14 +38,15 @@ function sePuedeReenviar(ahora: Date): Prisma.OrdenWhereInput {
     OR: [
       // Ya salió.
       { mailEnviadoEn: { not: null } },
-      // No salió: el último intento falló (o se dejó de intentar, como las
-      // compras de antes de los mails) y nadie lo está mandando ahora.
+      // No salió y el último intento terminó con un error (también las compras
+      // de antes de los mails): al empezar un intento el error se borra.
+      { mailEnviadoEn: null, mailError: { not: null } },
+      // Se dejó de intentar sin error anotado (el último intento se cortó), y
+      // ya pasó lo que puede durar un intento.
       {
         mailEnviadoEn: null,
-        AND: [
-          { OR: [{ mailError: { not: null } }, { mailIntentos: { gte: MAX_INTENTOS } }] },
-          { OR: [{ mailIntentoEn: null }, { mailIntentoEn: { lte: new Date(ahora.getTime() - DURACION_MAXIMA_ENVIO_MS) } }] },
-        ],
+        mailIntentos: { gte: MAX_INTENTOS },
+        OR: [{ mailIntentoEn: null }, { mailIntentoEn: { lte: new Date(ahora.getTime() - DURACION_MAXIMA_ENVIO_MS) } }],
       },
     ],
   };
@@ -60,24 +63,27 @@ const FALTA_EL_MAIL = {
 
 // Marca para reenviar las compras de `donde` que se puedan y no hayan llegado
 // al límite. Devuelve sus ids. Siempre hace las mismas dos consultas, haya o
-// no compras.
+// no compras. reenviosDesde guarda el último reenvío: la cuenta vuelve a
+// empezar recién después de 24 horas sin reenviar.
 async function marcarParaReenviar(db: PrismaClient, donde: Prisma.OrdenWhereInput, ahora: Date) {
   const haceUnDia = new Date(ahora.getTime() - DIA_MS);
   const base: Prisma.OrdenWhereInput[] = [donde, sePuedeReenviar(ahora)];
-  // Primer reenvío en 24 horas: la cuenta arranca de nuevo.
+  // Primero las que tuvieron un reenvío en las últimas 24 horas: solo si no
+  // llegaron al límite. Van primero a propósito: una que marca esta consulta
+  // queda con reenviosDesde = ahora y la de abajo ya no la toma, aunque en el
+  // medio el mail salga entero (al revés, un pedido podría contar dos veces).
+  const seguidas = await db.orden.updateManyAndReturn({
+    where: { AND: [...base, { reenviosDesde: { gt: haceUnDia }, reenviosCount: { lt: MAX_REENVIOS_POR_DIA } }] },
+    data: { ...FALTA_EL_MAIL, reenviosCount: { increment: 1 }, reenviosDesde: ahora },
+    select: { id: true },
+  });
+  // Después, el primer reenvío en 24 horas: la cuenta arranca de nuevo.
   const primeras = await db.orden.updateManyAndReturn({
     where: { AND: [...base, { OR: [{ reenviosDesde: null }, { reenviosDesde: { lte: haceUnDia } }] }] },
     data: { ...FALTA_EL_MAIL, reenviosCount: 1, reenviosDesde: ahora },
     select: { id: true },
   });
-  // Ya hubo reenvíos en estas 24 horas: solo si no llegó al límite. (Las que
-  // marcó la consulta anterior ya no entran: quedaron "por salir".)
-  const otras = await db.orden.updateManyAndReturn({
-    where: { AND: [...base, { reenviosDesde: { gt: haceUnDia }, reenviosCount: { lt: MAX_REENVIOS_POR_DIA } }] },
-    data: { ...FALTA_EL_MAIL, reenviosCount: { increment: 1 } },
-    select: { id: true },
-  });
-  return [...primeras, ...otras].map((orden) => orden.id);
+  return [...seguidas, ...primeras].map((orden) => orden.id);
 }
 
 export type ReenvioDeCompra =

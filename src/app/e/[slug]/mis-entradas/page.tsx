@@ -55,7 +55,7 @@ export default async function PaginaMisEntradas({ params }: PageProps<"/e/[slug]
         </p>
         <FormularioMisEntradas accion={reenviarEntradasAccion.bind(null, evento.slug)} />
         <p className="text-sm leading-normal text-tenue">
-          Se pueden reenviar hasta {MAX_REENVIOS_POR_DIA} veces por día.
+          Se puede pedir hasta {MAX_REENVIOS_POR_DIA} veces seguidas; después, hay que esperar 24 horas.
           {whatsapp ? (
             <>
               {" "}
