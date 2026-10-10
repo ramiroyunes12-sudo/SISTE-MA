@@ -9,7 +9,8 @@ Una entrada por chat, la más nueva arriba. Corta: qué se hizo, qué quedó y c
 - Prueba de Ramiro en producción (PR #11): anduvo todo en compu, celu y el Android de un amigo; un validador nuevo entró, escaneó, quedó afuera al desactivarlo y volvió al activarlo. Pedido por él: "Validadores" también para el ADMIN (una sección por productora). 325 tests (0 salteados).
 - Paso 16 `[x]`: Ramiro probó el reenvío (las 3 entradas de un amigo pasaron una vez y después dieron YA INGRESÓ).
 - Revisión con 3 agentes (seguridad, carreras en la base, pantalla del celu), cada hallazgo verificado: firma verdadera guardada de más en `escaneos` (ahora solo `E1-<al azar>`), "la escaneaste vos" ambiguo con una cuenta en dos puertas (ahora dice cuánto hace), 10 s bloqueado tras un error de conexión, carreras al abrir la cámara (pantalla trabada sin cámara; YA INGRESÓ falso), lector de Android leyendo fuera del cuadrado visible, sin señal / QR largo / evento inexistente / 360 px. Todo arreglado con test o reproducido antes y después; 331 tests (0 salteados) y build. Para los pasos 20 y 21: anular con `UPDATE` condicionado y el pool de conexiones. Riesgo aceptado: un organizador puede saber si un email ya tiene cuenta.
-- Quedó: que Ramiro pruebe los arreglos.
+- Decidido por Ramiro: las devoluciones de plata no van por el sistema (se contactan con él); el paso 20 pasa a "anular compras" (PLAN, PASOS y CONTEXTO al día).
+- Quedó: que Ramiro pruebe los arreglos (PR #13 ya publicado).
 
 ## 9-10/10/2026 — Paso 16: "Compra confirmada" y "Reenviar mis entradas"
 - Decidido con Ramiro: reenviar desde cada evento (email + DNI); link propio por entrada, más adelante. Después de probar el borrador: la menor cantidad de mails (las compras de una persona en un evento, juntas en un mail).

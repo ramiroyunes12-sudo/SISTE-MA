@@ -12,7 +12,7 @@ Plataforma para vender entradas por lotes, enviar el QR por mail y validarlo en 
 | Comprador | "Mis entradas": reenviar el mail ingresando email + DNI. |
 | Cortesías | Individuales, carga masiva por Excel/CSV, cupo aparte del stock en venta. |
 | Puerta | Escáner web desde el celular (solo online), búsqueda por DNI/nombre, contador en vivo. Resultados: PASA / YA INGRESÓ / NO VÁLIDA. |
-| Panel admin | Resumen (recaudación, ventas por lote, ingresos), evento y lotes, ventas (reenviar, anular, reembolsar), cortesías, validadores, exportar a Excel. Cada productora ve solo lo suyo. |
+| Panel admin | Resumen (recaudación, ventas por lote, ingresos), evento y lotes, ventas (reenviar, anular), cortesías, validadores, exportar a Excel. Cada productora ve solo lo suyo. Las devoluciones de plata no van por el sistema: quien la pide se contacta con el dueño (por el WhatsApp de ayuda) y él la hace aparte. |
 | Productoras | El dueño de la plataforma crea productoras y su gente (organizadores y validadores) con su email y contraseña temporal; puede desactivarlas. |
 | Cobros | Cada productora conecta **su propio Mercado Pago**: la plata de las entradas le llega directo. El dueño cobra un **alquiler fijo por evento**, aparte del sistema. |
 | Mails | Gmail SMTP para arrancar (< 500 por día en total); con varias productoras conviene pasar a un servicio de mails con dominio propio (Resend). |
@@ -54,7 +54,7 @@ Escaneo      (id, entrada_id, usuario_id, resultado, fecha)
 2. Checkout con Mercado Pago, generación de QR y envío por mail.
 3. Escáner, búsqueda por DNI y contador en vivo.
 4. Cortesías (individual, masiva, cupo) y reenvío de entradas.
-5. Resumen, exportar a Excel y reembolsos.
+5. Resumen, exportar a Excel y anular compras.
 
 ## Diseño
 
