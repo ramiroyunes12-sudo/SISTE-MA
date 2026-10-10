@@ -7,11 +7,20 @@
 //
 // Leer el QR: en Android (Chrome) con el lector del navegador
 // (BarcodeDetector); en iPhone no existe, así que con jsQR, que mira la imagen
-// de la cámara cuadro por cuadro (se descarga solo si hace falta).
+// de la cámara cuadro por cuadro (se baja al entrar, solo si hace falta). Los
+// dos miran solo el cuadrado que se ve en pantalla: nunca se lee un QR que no
+// se ve (el de la persona de atrás, la entrada de abajo en la misma pantalla),
+// y con dos a la vista no se lee ninguno.
 import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
-import type { ErrorPuerta, PersonaPuerta, RespuestaPuerta } from "@/lib/entradas/puerta";
+import {
+  bloqueaRepetir,
+  type ErrorPuerta,
+  leerRespuestaPuerta,
+  type PersonaPuerta,
+  type RespuestaPuerta,
+} from "@/lib/entradas/puerta";
 
 type Resultado = RespuestaPuerta | ErrorPuerta;
 type Fase =
@@ -26,7 +35,9 @@ type Lector = (video: HTMLVideoElement) => Promise<string | null>;
 const ESPERA_MS = 8_000; // sin respuesta en este tiempo: NO VÁLIDA (escanear de nuevo)
 const ENTRE_CUADROS_MS = 100;
 const MISMA_ENTRADA_MS = 10_000; // la entrada de recién, todavía delante de la cámara: no se vuelve a mandar
-const LADO_JSQR = 640; // jsQR mira el centro de la imagen, achicado a esto (más rápido)
+const LADO_JSQR = 640; // jsQR mira el cuadrado del centro achicado a esto (más rápido)
+const LADO_NATIVO = 1_080; // el lector de Android, el mismo cuadrado casi sin achicar
+const LARGO_ENVIADO = 200; // un QR que no es una entrada puede ser larguísimo: con esto el servidor ya dice que no lo es
 
 const MOTIVOS: Record<Extract<RespuestaPuerta, { resultado: "no_valida" }>["motivo"], string> = {
   formato: "Este QR no es una entrada.",
@@ -56,8 +67,10 @@ export function Escaner({ eventoId }: { eventoId: string }) {
   const quiereCamara = useRef(false);
   const ultimo = useRef<string | null>(null);
   const reciente = useRef<{ texto: string; hasta: number } | null>(null);
+  const apertura = useRef(0); // cuenta las aperturas de la cámara: detenerla deja vieja la que esté en curso
 
   const detenerCamara = useCallback(() => {
+    apertura.current++;
     flujo.current?.getTracks().forEach((pista) => pista.stop());
     flujo.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
@@ -85,35 +98,58 @@ export function Escaner({ eventoId }: { eventoId: string }) {
       setFase({ tipo: "sin_camara", motivo: "Este navegador no deja usar la cámara. Abrí la página en Chrome o en Safari." });
       return;
     }
+    detenerCamara();
+    // Si mientras se abre la cámara se detiene (celu bloqueado, otra app),
+    // esta apertura queda vieja: apaga lo suyo y no toca la pantalla (si no,
+    // pisaba "La cámara se pausó" o el resultado de un código escrito a mano).
+    const mia = apertura.current;
+    const vieja = () => apertura.current !== mia;
     setFase({ tipo: "abriendo" });
     try {
-      detenerCamara();
       const nuevo = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
       });
+      if (vieja()) {
+        nuevo.getTracks().forEach((pista) => pista.stop());
+        return;
+      }
       flujo.current = nuevo;
       const video = videoRef.current!;
       video.srcObject = nuevo;
       await video.play();
+      if (vieja()) return;
       lector.current ??= await crearLector();
+      if (vieja()) return;
       const pista = nuevo.getVideoTracks()[0];
       setLinterna("torch" in (pista?.getCapabilities?.() ?? {}) ? false : null);
       pista?.addEventListener("ended", () => {
+        if (flujo.current !== nuevo) return;
         detenerCamara();
         setFase((actual) => (actual.tipo === "escaneando" ? { tipo: "inicio", aviso: "Se cortó la cámara." } : actual));
       });
-      pantalla.current = await pedirPantallaPrendida();
-      setFase({ tipo: "escaneando" });
+      const bloqueo = await pedirPantallaPrendida();
+      if (vieja()) {
+        bloqueo?.release().catch(() => {});
+        return;
+      }
+      pantalla.current = bloqueo;
+      // Si mientras abría se escribió un código a mano, queda su resultado.
+      setFase((actual) => (actual.tipo === "abriendo" ? { tipo: "escaneando" } : actual));
     } catch (error) {
+      if (vieja()) return;
       detenerCamara();
-      setFase({ tipo: "sin_camara", motivo: motivoSinCamara(error) });
+      const motivo = motivoSinCamara(error);
+      setFase((actual) => (actual.tipo === "abriendo" ? { tipo: "sin_camara", motivo } : actual));
     }
   }
 
   async function otraEntrada() {
-    if (ultimo.current) reciente.current = { texto: ultimo.current, hasta: Date.now() + MISMA_ENTRADA_MS };
+    const anterior = fase.tipo === "resultado" ? fase.resultado : null;
+    reciente.current =
+      ultimo.current && anterior && bloqueaRepetir(anterior) ? { texto: ultimo.current, hasta: Date.now() + MISMA_ENTRADA_MS } : null;
     setRepetida(false);
+    sonido.current?.resume().catch(() => {}); // si el celu lo suspendió (una llamada), vuelve a sonar
     if (flujo.current?.getVideoTracks()[0]?.readyState === "live") setFase({ tipo: "escaneando" });
     else if (quiereCamara.current) await abrirCamara();
     else setFase({ tipo: "inicio" });
@@ -178,20 +214,28 @@ export function Escaner({ eventoId }: { eventoId: string }) {
     };
   }, [fase.tipo, verificar]);
 
-  // Con el celu bloqueado o en otra app, la cámara se apaga (batería); al
-  // volver, un toque la prende de nuevo.
+  // En iPhone el lector se baja al entrar, no al tocar "Abrir la cámara": con
+  // mala señal tardaba segundos justo ahí.
+  useEffect(() => {
+    if (!("BarcodeDetector" in window)) import("jsqr").catch(() => {});
+  }, []);
+
+  // Con el celu bloqueado o en otra app, la cámara se apaga (batería), también
+  // si se estaba abriendo; al volver, un toque la prende de nuevo.
   useEffect(() => {
     function alCambiar() {
-      if (document.visibilityState !== "hidden" || !flujo.current) return;
+      if (document.visibilityState !== "hidden") return;
       detenerCamara();
       setFase((actual) =>
         actual.tipo === "escaneando" || actual.tipo === "abriendo" ? { tipo: "inicio", aviso: "La cámara se pausó." } : actual,
       );
     }
     document.addEventListener("visibilitychange", alCambiar);
+    const audio = sonido;
     return () => {
       document.removeEventListener("visibilitychange", alCambiar);
       detenerCamara();
+      audio.current?.close().catch(() => {});
     };
   }, [detenerCamara]);
 
@@ -237,7 +281,10 @@ export function Escaner({ eventoId }: { eventoId: string }) {
 
       <div className="flex min-h-12 items-center justify-between gap-3">
         <p role="status" className="text-lg text-white/90">
-          {fase.tipo === "escaneando" && (repetida ? "Es la entrada de recién: mostrá la siguiente." : "Apuntá al QR de la entrada.")}
+          {fase.tipo === "escaneando" &&
+            (repetida
+              ? "Es el mismo QR de recién. Si lo muestra otra persona, es una copia: no pasa."
+              : "Apuntá al QR de la entrada.")}
         </p>
         {linterna !== null && camaraVisible && (
           <button
@@ -321,10 +368,11 @@ function PantallaResultado({ resultado, alSeguir }: { resultado: Resultado; alSe
       role="alert"
       className={`fixed inset-0 z-50 flex flex-col overflow-y-auto text-white ${pasa ? "bg-ok" : "bg-error"}`}
     >
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-5 px-5 pt-10 pb-4">
-        <p className="flex items-center gap-3 font-display text-6xl font-extrabold">
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-4 px-5 pt-6 pb-4 min-[400px]:gap-5 min-[400px]:pt-10">
+        {/* Más chico en celulares angostos: "YA INGRESÓ" no entraba en 360 px. */}
+        <p className="flex items-center gap-3 font-display text-5xl font-extrabold min-[400px]:text-6xl">
           <span aria-hidden="true">{pasa ? "✓" : "✕"}</span>
-          {titulo}
+          <span className="min-w-0 [overflow-wrap:anywhere]">{titulo}</span>
         </p>
         {detalle && <p className="text-2xl font-semibold">{detalle}</p>}
         {persona && <DatosPersona persona={persona} grande={pasa} />}
@@ -377,12 +425,12 @@ async function pedir(eventoId: string, codigo: string): Promise<Resultado> {
     const respuesta = await fetch("/api/puerta/escanear", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ eventoId, codigo }),
+      body: JSON.stringify({ eventoId, codigo: codigo.slice(0, LARGO_ENVIADO) }),
       cache: "no-store",
       signal: control.signal,
     });
     const cuerpo: unknown = await respuesta.json();
-    return comoResultado(respuesta.ok, cuerpo);
+    return leerRespuestaPuerta(respuesta.ok, cuerpo);
   } catch {
     return { error: "conexion" };
   } finally {
@@ -390,51 +438,61 @@ async function pedir(eventoId: string, codigo: string): Promise<Resultado> {
   }
 }
 
-// Solo se cree lo que tiene la forma esperada: cualquier otra cosa es NO VÁLIDA.
-function comoResultado(ok: boolean, cuerpo: unknown): Resultado {
-  if (typeof cuerpo !== "object" || cuerpo === null) return { error: "conexion" };
-  if (ok && "resultado" in cuerpo && ["pasa", "ya_ingreso", "no_valida"].includes(String(cuerpo.resultado))) {
-    return cuerpo as RespuestaPuerta;
-  }
-  if (!ok && "error" in cuerpo && String(cuerpo.error) in ERRORES) return cuerpo as ErrorPuerta;
-  return { error: "conexion" };
-}
-
-type Detector = { detect(fuente: HTMLVideoElement): Promise<{ rawValue: string }[]> };
+type Detector = { detect(fuente: HTMLCanvasElement): Promise<{ rawValue: string }[]> };
 type ClaseDetector = {
   new (opciones: { formats: string[] }): Detector;
   getSupportedFormats(): Promise<string[]>;
 };
 
+// No se pudo bajar jsQR (sin señal): es otro problema que el de la cámara.
+class SinLector extends Error {}
+
 async function crearLector(): Promise<Lector> {
+  const lienzo = document.createElement("canvas");
+  const contexto = lienzo.getContext("2d", { willReadFrequently: true });
+  // Copia en el lienzo el cuadrado del centro del cuadro de la cámara, que es
+  // lo que se ve en pantalla (el video está recortado así, con object-cover),
+  // achicado a `maximo`. Devuelve el lado (0 si todavía no hay imagen).
+  function recortar(video: HTMLVideoElement, maximo: number) {
+    if (!contexto || !video.videoWidth) return 0;
+    const lado = Math.min(video.videoWidth, video.videoHeight);
+    const destino = Math.min(lado, maximo);
+    lienzo.width = destino;
+    lienzo.height = destino;
+    contexto.drawImage(video, (video.videoWidth - lado) / 2, (video.videoHeight - lado) / 2, lado, lado, 0, 0, destino, destino);
+    return destino;
+  }
+
   const Clase = (window as unknown as { BarcodeDetector?: ClaseDetector }).BarcodeDetector;
   if (Clase) {
     try {
       if ((await Clase.getSupportedFormats()).includes("qr_code")) {
         const detector = new Clase({ formats: ["qr_code"] });
-        return async (video) => (await detector.detect(video))[0]?.rawValue ?? null;
+        return async (video) => {
+          if (!recortar(video, LADO_NATIVO)) return null;
+          const codigos = await detector.detect(lienzo);
+          return codigos.length === 1 ? codigos[0].rawValue : null;
+        };
       }
     } catch {
       // sigue con jsQR
     }
   }
-  const { default: jsQR } = await import("jsqr");
-  const lienzo = document.createElement("canvas");
-  const contexto = lienzo.getContext("2d", { willReadFrequently: true });
+  const { default: jsQR } = await import("jsqr").catch(() => {
+    throw new SinLector();
+  });
   return async (video) => {
-    if (!contexto || !video.videoWidth) return null;
-    // El cuadrado del centro (donde está el recuadro), achicado.
-    const lado = Math.min(video.videoWidth, video.videoHeight);
-    const destino = Math.min(lado, LADO_JSQR);
-    lienzo.width = destino;
-    lienzo.height = destino;
-    contexto.drawImage(video, (video.videoWidth - lado) / 2, (video.videoHeight - lado) / 2, lado, lado, 0, 0, destino, destino);
+    const destino = recortar(video, LADO_JSQR);
+    if (!destino || !contexto) return null;
     const imagen = contexto.getImageData(0, 0, destino, destino);
     return jsQR(imagen.data, destino, destino, { inversionAttempts: "dontInvert" })?.data ?? null;
   };
 }
 
 function motivoSinCamara(error: unknown) {
+  if (error instanceof SinLector) {
+    return "No se pudo cargar el lector de QR (¿sin señal?). Probá de nuevo o escribí el código abajo.";
+  }
   const nombre = error instanceof DOMException ? error.name : "";
   if (nombre === "NotAllowedError") {
     return "No hay permiso para usar la cámara. Tocá el candado (o «aA») al lado de la dirección, permití la cámara y probá de nuevo.";

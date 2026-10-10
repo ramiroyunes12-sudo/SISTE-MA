@@ -15,7 +15,9 @@ export type RespuestaPuerta =
   | { resultado: "no_valida"; motivo: MotivoNoValida; persona?: PersonaPuerta };
 
 // Errores (sin resultado): la puerta los muestra como NO VÁLIDA, nunca como PASA.
-export type ErrorPuerta = { error: "sesion" | "evento" | "pedido" | "conexion" };
+const ERRORES = ["sesion", "evento", "pedido", "conexion"] as const;
+export type ErrorPuerta = { error: (typeof ERRORES)[number] };
+const RESULTADOS: string[] = ["pasa", "ya_ingreso", "no_valida"];
 
 const MINUTO = 60 * 1000;
 const DOCE_HORAS = 12 * 60 * MINUTO;
@@ -54,4 +56,25 @@ export function respuestaPuerta(escaneado: Escaneado, usuarioId: string, ahora =
         ...(escaneado.entrada && { persona: persona(escaneado.entrada) }),
       };
   }
+}
+
+// En la pantalla de la puerta: lo que contestó el servidor. Solo se cree un
+// resultado de una respuesta que salió bien y con un resultado conocido;
+// cualquier otra cosa es "falló la conexión" (NO VÁLIDA), nunca PASA.
+export function leerRespuestaPuerta(ok: boolean, cuerpo: unknown): RespuestaPuerta | ErrorPuerta {
+  if (typeof cuerpo !== "object" || cuerpo === null) return { error: "conexion" };
+  if (ok && "resultado" in cuerpo && RESULTADOS.includes(String(cuerpo.resultado))) return cuerpo as RespuestaPuerta;
+  if (!ok && "error" in cuerpo) {
+    const error = ERRORES.find((conocido) => conocido === cuerpo.error);
+    if (error) return { error };
+  }
+  return { error: "conexion" };
+}
+
+// Al seguir escaneando, el QR de recién (todavía delante de la cámara) no se
+// vuelve a mandar por un rato, pero solo si el servidor contestó: después de
+// un error ("falló la conexión, escaneala de nuevo") la entrada puede seguir
+// válida y hay que poder escanearla enseguida.
+export function bloqueaRepetir(resultado: RespuestaPuerta | ErrorPuerta) {
+  return "resultado" in resultado;
 }
