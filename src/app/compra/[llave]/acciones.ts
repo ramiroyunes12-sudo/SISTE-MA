@@ -104,7 +104,7 @@ export async function reenviarMailAccion(llave: string): Promise<EstadoReenvio> 
       mandarMailsDespues({ ordenId: resultado.ordenId });
       return {
         tipo: "ok",
-        mensaje: `Listo: te lo mandamos de nuevo a ${resultado.email}, con el asunto "Te reenviamos tus entradas…". Puede tardar unos minutos; si no lo ves, revisá en spam o promociones.`,
+        mensaje: `Listo: te lo mandamos a ${resultado.email}, con el asunto "Te reenviamos tus entradas…". Puede tardar unos minutos; si no lo ves, revisá en spam o promociones.`,
       };
     }
     switch (resultado.motivo) {

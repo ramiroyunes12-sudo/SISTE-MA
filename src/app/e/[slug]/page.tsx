@@ -77,9 +77,13 @@ export default async function PaginaEvento({ params }: PageProps<"/e/[slug]">) {
             />
           )}
 
-          <p className="text-sm text-tenue">
+          <p className="text-sm text-tenue last:pb-8 lg:last:pb-0">
             ¿Ya compraste y no encontrás tus entradas?{" "}
-            <Link href={`/e/${evento.slug}/mis-entradas`} className="font-semibold text-acento hover:text-acento-hover">
+            {/* Más alto para el dedo (sin mover el renglón) y sin partirse en dos. */}
+            <Link
+              href={`/e/${evento.slug}/mis-entradas`}
+              className="-my-3 inline-block py-3 font-semibold whitespace-nowrap text-acento hover:text-acento-hover"
+            >
               Reenviar mis entradas
             </Link>
           </p>

@@ -270,10 +270,12 @@ export async function estadoDeLosMails(db: PrismaClient, eventoId: string, ahora
   };
 }
 
+export type EstadoDelMail = "enviado" | "enviando" | "no_salio" | "nada";
+
 // Para la página de la compra paga: ¿ya salió el mail? "nada" si no hay que
 // decir nada: el envío no está configurado, o se pagó antes de que
 // existieran los mails y nunca se intentó.
-export async function estadoDelMail(db: PrismaClient, ordenId: string): Promise<"enviado" | "enviando" | "no_salio" | "nada"> {
+export async function estadoDelMail(db: PrismaClient, ordenId: string): Promise<EstadoDelMail> {
   const orden = await db.orden.findUnique({
     where: { id: ordenId },
     select: { mailEnviadoEn: true, mailIntentos: true, mailIntentoEn: true },

@@ -34,6 +34,7 @@ import { FormularioDatos } from "./formulario-datos";
 import { BotonCambiarEntradas, DatosTransferencia, ElegirPago, EsperarPago } from "./pago";
 import { ReenviarMail } from "./reenviar";
 import { Reloj } from "./reloj";
+import { TituloConFoco } from "./titulo";
 
 export const metadata: Metadata = {
   title: "Tu compra",
@@ -86,7 +87,7 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
               <path d="M5 12.5l4.5 4.5L19 7.5" />
             </svg>
           </span>
-          <h2 className="font-display text-[28px] font-extrabold leading-tight">¡Compra confirmada!</h2>
+          <TituloConFoco className="font-display text-[28px] font-extrabold leading-tight">¡Compra confirmada!</TituloConFoco>
           {compra.email && mail !== "nada" && (
             <p className="leading-normal [overflow-wrap:anywhere]">
               {mail === "enviado" && (
@@ -115,7 +116,7 @@ export default async function PaginaCompra({ params, searchParams }: PageProps<"
           Guardá este link: es tu comprobante. Tus entradas están acá abajo, cada una con su QR: descargalas en PDF.
         </p>
         <EntradasPagas llave={llave} compra={compra} />
-        {compra.email && hayEnvioConfigurado() && <ReenviarMail reenviar={reenviarMailAccion.bind(null, llave)} />}
+        {compra.email && hayEnvioConfigurado() && <ReenviarMail mail={mail} reenviar={reenviarMailAccion.bind(null, llave)} />}
         <div className="h-6" />
       </Marco>
     );
