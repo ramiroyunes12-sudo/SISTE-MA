@@ -18,12 +18,12 @@ Sistema de venta de entradas por lotes para varias **productoras** (se alquila p
 
 ## Estado actual
 
-- **Hechos y probados:** pasos 1 a 17 (base, login, productoras, evento y lotes, página pública, reparto entre lotes, datos del checkout, reserva, cobro por transferencia y Mercado Pago con plata real el 8/10/2026, código firmado de cada entrada, QR y PDF, y el mail con las entradas, probados el 9/10/2026; "Compra confirmada" y "Reenviar mis entradas", y el escáner de la puerta con "Validadores", probados el 10/10/2026).
+- **Hechos y probados:** pasos 1 a 18 (base, login, productoras, evento y lotes, página pública, reparto entre lotes, datos del checkout, reserva, cobro por transferencia y Mercado Pago con plata real el 8/10/2026, código firmado de cada entrada, QR y PDF, y el mail con las entradas, probados el 9/10/2026; "Compra confirmada" y "Reenviar mis entradas", el escáner de la puerta con "Validadores", y la búsqueda por DNI o nombre con el contador, probados el 10/10/2026).
 - El panel todavía **no lista las compras pagas ni sus entradas** (llega en el paso 20): solo muestra cuántas, lo cobrado y los mails que no salieron. El código de cada entrada se ve en el link secreto de la compra y en el mail.
 - Los mails salen por Gmail (`sistemaentradas@gmail.com`, contraseña de aplicación). Ramiro no quiere pagar un servicio de mails: se queda Gmail aunque algunos caigan en spam.
 - Decidido por Ramiro (10/10): **las devoluciones de plata no van por el sistema**; quien la pide se contacta con él (WhatsApp de ayuda). En el paso 20, en vez de reembolsos, ver un "Anular compra" para que esos QR no entren.
 - Decidido por Ramiro (10/10): **la menor cantidad de mails**. Las compras de una misma persona (mismo email) en un evento que salen a la vez van en un solo mail; el reenvío llega con el asunto "Te reenviamos tus entradas…".
-- **Paso 18** (buscar por DNI o nombre y contador en la puerta): borrador probado por Ramiro en producción y **arreglos de la revisión con agentes listos** (10/10/2026). Decidido por Ramiro: DNI completo o nombre desde 3 letras (hasta 10); marcar el ingreso sin QR, solo organizador y ADMIN; "Ingresaron X de Y" para todos; un validador usa la puerta solo de 12 h antes a 24 h después del evento y hace hasta 5 búsquedas por minuto; cada búsqueda queda anotada (quién, qué y cuándo, tabla `busquedas`). Falta que Ramiro pruebe los arreglos ("Arreglos para probar" del paso 18 en `PASOS.md`).
+- La puerta (decidido por Ramiro, 10/10): marcar el ingreso sin QR, solo organizador y ADMIN; un validador usa la puerta solo de 12 h antes a 24 h después del evento y hace hasta 5 búsquedas por minuto; cada búsqueda queda anotada (quién, qué y cuándo, tabla `busquedas`).
 - Decidido por Ramiro (10/10): **como mucho 4 entradas por compra** en cualquier evento (el panel deja de 1 a 4).
 
 ## Acciones del dueño pendientes
@@ -81,5 +81,5 @@ Detalle en `.claude/rules/` (se cargan solas al tocar esos archivos) y permisos 
 
 ## Traspaso (último chat)
 
-- **10/10/2026:** paso 17 `[x]`. Paso 18: borrador probado por Ramiro; revisión con 3 agentes (seguridad, base y carreras, pantalla del celu) y arreglos, cada uno con su test o reproducido en el navegador antes y después. Lo más importante: la cámara podía prenderse escondida en "Buscar" y marcar un QR de la fila. Decidido por Ramiro: ventana de 12 h antes a 24 h después para validadores, 5 búsquedas por minuto, registro de búsquedas y máximo 4 por compra (migración `20261010120000_busquedas_y_max_por_compra`). 361 tests (0 salteados), typecheck, lint y build.
-- **Para el próximo chat:** si Ramiro probó los arreglos del paso 18 ("Arreglos para probar" en `PASOS.md`), marcarlo `[x]` y arrancar el paso 19 (cortesías) con `/empezar-paso 19`.
+- **10/10/2026:** pasos 17 y 18 `[x]` (Ramiro probó los arreglos de la revisión con agentes del 18 en producción: anduvo todo). Quedó en `PENDIENTES.md` decidir cuánto se guardan las búsquedas de la puerta, y en el paso 21 bajar el CHECK de `max_por_compra` a 1 a 4.
+- **Para el próximo chat:** arrancar el paso 19 (cortesías: individual, carga masiva, cupo aparte; ver sus notas en `PASOS.md`, también "Para el paso 19" del paso 18) con `/empezar-paso 19`.
