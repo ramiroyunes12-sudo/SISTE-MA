@@ -91,7 +91,7 @@ describe.skipIf(!url)("verificar una entrada por su código", () => {
     expect(await verificarCodigo(db, eventoId, TODO, firmado)).toEqual({
       resultado: "valida",
       entradaId: expect.any(String),
-      entrada: { titular: "Persona de Prueba", dni: "30111222", tipo: "General", compra: numero, usadaEn: null, validadaPor: null },
+      entrada: { titular: "Persona de Prueba", dni: "30111222", tipo: "General", compra: numero, usadaEn: null, validadaPor: null, metodo: null },
     });
   });
 

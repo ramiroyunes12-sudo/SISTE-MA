@@ -174,6 +174,7 @@ export type EntradaVerificada = {
   compra?: number;
   usadaEn?: string; // "sáb 21/11/2026 23:40"
   validadaPor?: string; // quién la escaneó en la puerta
+  porDni?: boolean; // la marcaron desde la búsqueda por DNI o nombre, sin el QR
 };
 export type EstadoVerificacion = { error?: string; verificada?: EntradaVerificada };
 
@@ -206,6 +207,7 @@ export async function verificarEntradaAccion(
         compra: v.entrada.compra,
         usadaEn: v.entrada.usadaEn ? formatearFecha(v.entrada.usadaEn) : undefined,
         validadaPor: v.entrada.validadaPor?.nombre,
+        porDni: v.entrada.metodo === "DNI",
       },
     };
   } catch (error) {

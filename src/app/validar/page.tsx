@@ -13,8 +13,8 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-// Puerta: elegir el evento y abrir su escáner (/validar/<evento>). La
-// búsqueda por DNI llega en el paso 18.
+// Puerta: elegir el evento y abrir su pantalla (/validar/<evento>: el
+// contador, el escáner y la búsqueda por DNI o nombre).
 export default async function PaginaValidar({ searchParams }: PageProps<"/validar">) {
   const usuario = await requerirUsuario(["ADMIN", "ORGANIZADOR", "VALIDADOR"]);
   const { contrasena } = await searchParams;
