@@ -18,13 +18,12 @@ Sistema de venta de entradas por lotes para varias **productoras** (se alquila p
 
 ## Estado actual
 
-- **Hechos y probados:** pasos 1 a 16 (base, login, productoras, evento y lotes, página pública, reparto entre lotes, datos del checkout, reserva, cobro por transferencia y Mercado Pago con plata real el 8/10/2026, código firmado de cada entrada, QR y PDF, y el mail con las entradas, probados el 9/10/2026; "Compra confirmada" y "Reenviar mis entradas", probados el 10/10/2026).
+- **Hechos y probados:** pasos 1 a 17 (base, login, productoras, evento y lotes, página pública, reparto entre lotes, datos del checkout, reserva, cobro por transferencia y Mercado Pago con plata real el 8/10/2026, código firmado de cada entrada, QR y PDF, y el mail con las entradas, probados el 9/10/2026; "Compra confirmada" y "Reenviar mis entradas", y el escáner de la puerta con "Validadores", probados el 10/10/2026).
 - El panel todavía **no lista las compras pagas ni sus entradas** (llega en el paso 20): solo muestra cuántas, lo cobrado y los mails que no salieron. El código de cada entrada se ve en el link secreto de la compra y en el mail.
 - Los mails salen por Gmail (`sistemaentradas@gmail.com`, contraseña de aplicación). Ramiro no quiere pagar un servicio de mails: se queda Gmail aunque algunos caigan en spam.
 - Decidido por Ramiro (10/10): **las devoluciones de plata no van por el sistema**; quien la pide se contacta con él (WhatsApp de ayuda). En el paso 20, en vez de reembolsos, ver un "Anular compra" para que esos QR no entren.
 - Decidido por Ramiro (10/10): **la menor cantidad de mails**. Las compras de una misma persona (mismo email) en un evento que salen a la vez van en un solo mail; el reenvío llega con el asunto "Te reenviamos tus entradas…".
-- **Paso 17** (escáner de la puerta y pantalla "Validadores"): borrador y arreglos probados por Ramiro en producción (10/10/2026), menos la prueba (4) de los arreglos (evento mal copiado: `/validar/hola` tiene que decir "Este evento no está disponible"). Cuando la confirme, `[x]`.
-- **Paso 18** (buscar por DNI o nombre y contador en la puerta): **borrador listo** (10/10/2026). Decidido por Ramiro: DNI completo o nombre desde 3 letras (hasta 10); marcar el ingreso sin QR, solo organizador y ADMIN; "Ingresaron X de Y" para todos. Falta la revisión con agentes y que Ramiro lo pruebe (ver "Para probarlo" del paso 18 en `PASOS.md`).
+- **Paso 18** (buscar por DNI o nombre y contador en la puerta): **borrador probado por Ramiro en producción** (10/10/2026); revisión con agentes en curso. Decidido por Ramiro: DNI completo o nombre desde 3 letras (hasta 10); marcar el ingreso sin QR, solo organizador y ADMIN; "Ingresaron X de Y" para todos. Después de la revisión, que Ramiro pruebe los arreglos (ver "Para probarlo" del paso 18 en `PASOS.md`).
 
 ## Acciones del dueño pendientes
 
