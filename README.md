@@ -217,7 +217,7 @@ Los **validadores** entran por `/ingresar` desde el celu y caen en **`/validar`*
 - Al seguir, si la entrada de recién todavía está delante de la cámara, no se vuelve a mandar (10 segundos): dice "Es la entrada de recién".
 - Lee el QR con el lector del navegador en Android (Chrome) y con **jsQR** en iPhone (Safari no tiene lector). Pide la cámara trasera, suena y vibra con el resultado (verde: pitido corto; rojo: largo), mantiene la pantalla prendida y, si el celu tiene, ofrece la **linterna**. Si la cámara no anda, se puede escribir el código que está abajo del QR. Fondo oscuro para no encandilar de noche.
 - Cada escaneo queda anotado (tabla `escaneos`: quién, cuándo, qué dio). De lo leído se guarda solo un código con la firma mal (para investigar QR truchos), nunca uno que sirve ni un texto cualquiera.
-- **Validadores:** cada organizador suma los suyos en el panel, **Validadores** (nombre y email; sale una contraseña temporal para pasársela), les da una contraseña nueva o los desactiva. Solo validadores de su productora: a otro organizador no lo puede tocar. El ADMIN lo hace desde Productoras.
+- **Validadores:** cada organizador suma los suyos en el panel, **Validadores** (nombre y email; sale una contraseña temporal para pasársela), les da una contraseña nueva o los desactiva. Solo validadores de su productora: a otro organizador no lo puede tocar. El ADMIN ve en esa misma pantalla los validadores de todas las productoras (una sección por productora) y también puede hacerlo desde Productoras.
 
 ## Publicación (Vercel)
 

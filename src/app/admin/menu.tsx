@@ -5,14 +5,13 @@ import { usePathname } from "next/navigation";
 
 // Secciones del panel. Las que todavía no existen se muestran apagadas.
 // (El número es el paso del plan en el que se arma cada una.)
-// soloAdmin: solo el dueño; soloOrganizador: el dueño no (lo hace desde Productoras).
-const SECCIONES: { texto: string; href?: string; paso?: number; soloAdmin?: boolean; soloOrganizador?: boolean }[] = [
+const SECCIONES: { texto: string; href?: string; paso?: number; soloAdmin?: boolean }[] = [
   { texto: "Resumen", href: "/admin" },
   { texto: "Productoras", href: "/admin/productoras", soloAdmin: true },
   { texto: "Evento y lotes", href: "/admin/eventos" },
   { texto: "Ventas", paso: 20 },
   { texto: "Cortesías", paso: 19 },
-  { texto: "Validadores", href: "/admin/validadores", soloOrganizador: true },
+  { texto: "Validadores", href: "/admin/validadores" },
   { texto: "Claves", href: "/admin/claves", soloAdmin: true },
 ];
 
@@ -27,7 +26,7 @@ export function MenuAdmin({ esAdmin }: { esAdmin: boolean }) {
   const ruta = usePathname();
   return (
     <ul className="flex flex-col gap-1">
-      {SECCIONES.filter((seccion) => (esAdmin ? !seccion.soloOrganizador : !seccion.soloAdmin)).map(({ texto, href }) => (
+      {SECCIONES.filter((seccion) => esAdmin || !seccion.soloAdmin).map(({ texto, href }) => (
         <li key={texto}>
           {href ? (
             <Link

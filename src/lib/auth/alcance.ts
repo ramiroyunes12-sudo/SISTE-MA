@@ -18,3 +18,12 @@ export function alcanceDe(usuario: { rol: Rol; productora: { id: string } | null
 export function filtroDeEventos(alcance: Alcance): Prisma.EventoWhereInput {
   return alcance.todo ? {} : { productoraId: alcance.productoraId };
 }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+// Para las acciones que reciben la productora desde la pantalla (por ejemplo,
+// "Validadores"): el ADMIN puede tocar cualquiera; los demás, solo la suya.
+export function puedeTocarProductora(alcance: Alcance, productoraId: unknown): productoraId is string {
+  if (typeof productoraId !== "string" || !UUID.test(productoraId)) return false;
+  return alcance.todo || alcance.productoraId === productoraId;
+}

@@ -135,7 +135,16 @@ export function FormularioEditarProductora({
 }
 
 // soloValidadores: la pantalla "Validadores" de un organizador (sin elegir qué puede hacer).
-export function FormularioAgregarPersona({ accion: accionAgregar, soloValidadores = false }: { accion: Accion; soloValidadores?: boolean }) {
+// prefijo: para que los campos no repitan id si hay varios formularios en la página.
+export function FormularioAgregarPersona({
+  accion: accionAgregar,
+  soloValidadores = false,
+  prefijo = "",
+}: {
+  accion: Accion;
+  soloValidadores?: boolean;
+  prefijo?: string;
+}) {
   const [estado, accion, enviando] = useActionState(accionAgregar, {});
   const errores = estado.errores ?? {};
   return (
@@ -144,13 +153,13 @@ export function FormularioAgregarPersona({ accion: accionAgregar, soloValidadore
       <div className={`grid gap-4 ${soloValidadores ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
         <Campo
           etiqueta="Nombre y apellido"
-          id="nombrePersona"
+          id={`${prefijo}nombrePersona`}
           name="nombrePersona"
           maxLength={80}
           error={errores.nombrePersona}
           required
         />
-        <Campo etiqueta="Email" id="email-persona" name="email" type="email" error={errores.email} required />
+        <Campo etiqueta="Email" id={`${prefijo}email-persona`} name="email" type="email" error={errores.email} required />
         {!soloValidadores && (
           <div className="flex flex-col gap-1.5">
             <label htmlFor="rol" className="text-sm font-semibold">
