@@ -17,7 +17,8 @@ import { type Alcance, filtroDeEventos, HORAS_EN_LA_PUERTA } from "@/lib/auth/al
 import { leerCodigo } from "./codigo";
 import { verificarEntrada } from "./verificar";
 
-export type DatosPuerta = { titular: string | null; dni: string | null; tipo: string; compra: number };
+// compra: el N° de la orden; cortesia: es una cortesía (la puerta dice "Cortesía").
+export type DatosPuerta = { titular: string | null; dni: string | null; tipo: string; compra: number; cortesia: boolean };
 
 export type MotivoNoValida = "formato" | "firma" | "no_existe" | "otro_evento" | "sin_pagar" | "anulada";
 
@@ -106,14 +107,14 @@ async function marcar(
           AND e.estado = 'VALIDA'
           AND o.id = e.orden_id AND o.estado = 'PAGADA'
           AND t.id = e.tipo_entrada_id
-        RETURNING e.id, e.titular, e.dni, t.nombre AS tipo, o.numero AS compra`;
+        RETURNING e.id, e.titular, e.dni, t.nombre AS tipo, o.numero AS compra, o.tipo = 'CORTESIA' AS cortesia`;
       if (!marcada) return null;
       await tx.escaneo.create({ data: { eventoId, entradaId: marcada.id, usuarioId, metodo, resultado: "PASA" } });
       return marcada;
     });
     if (pasada) {
-      const { titular, dni, tipo, compra } = pasada;
-      return { resultado: "pasa", entrada: { titular, dni, tipo, compra } };
+      const { titular, dni, tipo, compra, cortesia } = pasada;
+      return { resultado: "pasa", entrada: { titular, dni, tipo, compra, cortesia } };
     }
 
     // No cambió nada: ¿por qué?

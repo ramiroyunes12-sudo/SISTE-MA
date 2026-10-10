@@ -13,6 +13,7 @@ import Link from "next/link";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 
 import {
+  deDonde,
   type EncontradaPuerta,
   type ErrorPuerta,
   leerRespuestaBusqueda,
@@ -253,7 +254,7 @@ function Tarjeta({
           <p className="text-xl font-bold [overflow-wrap:anywhere]">{persona.titular ?? "Sin nombre"}</p>
           <p className="text-white/80">
             {persona.dni && <>DNI {persona.dni} · </>}
-            {persona.tipo} · Compra N° {persona.compra}
+            {persona.tipo} · {deDonde(persona)}
           </p>
         </div>
         <span

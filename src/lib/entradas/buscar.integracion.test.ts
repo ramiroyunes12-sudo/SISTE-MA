@@ -117,8 +117,8 @@ describe.skipIf(!url)("buscar en la puerta por DNI o nombre, y contar ingresos",
       resultado: "ok",
       hayMas: false,
       entradas: [
-        { id: una.id, titular: `Juan ${apellido}`, dni, tipo: "General", compra: una.compra, ingreso: null },
-        { id: otra.id, titular: `Juan ${apellido}`, dni, tipo: "General", compra: otra.compra, ingreso: null },
+        { id: una.id, titular: `Juan ${apellido}`, dni, tipo: "General", compra: una.compra, cortesia: false, ingreso: null },
+        { id: otra.id, titular: `Juan ${apellido}`, dni, tipo: "General", compra: otra.compra, cortesia: false, ingreso: null },
       ],
     });
     const conPuntos = `${dni.slice(0, 2)}.${dni.slice(2, 5)}.${dni.slice(5)}`;

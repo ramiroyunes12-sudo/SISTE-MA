@@ -30,6 +30,7 @@ export type EntradaParaPdf = {
 export type DatosPdf = {
   evento: { nombre: string; fecha: Date; lugar: string; direccion: string | null };
   compra: number;
+  cortesia?: boolean; // dice "Cortesía N°" en vez de "Compra N°"
   totalEntradas: number;
   whatsapp?: string; // el WhatsApp para consultas (src/lib/ayuda.ts), al pie
   entradas: EntradaParaPdf[];
@@ -141,7 +142,11 @@ function paginaDeEntrada(pdf: PDFDocument, fuentes: Fuentes, datos: DatosPdf, en
   y = escribir(pagina, tipo.texto, y, { fuente: fuentes.negrita, tamano: tipo.tamano, maximo: 1 });
   const compra = entrada.compra ?? datos.compra;
   const total = entrada.totalEntradas ?? datos.totalEntradas;
-  y = escribir(pagina, `Entrada ${entrada.numero} de ${total} · Compra N° ${compra}`, y, {
+  // Una cortesía tiene una sola entrada: "Cortesía N° 12" (sin "Entrada 1 de 1").
+  const deCompra = datos.cortesia
+    ? [total > 1 ? `Entrada ${entrada.numero} de ${total}` : "", `Cortesía N° ${compra}`].filter(Boolean).join(" · ")
+    : `Entrada ${entrada.numero} de ${total} · Compra N° ${compra}`;
+  y = escribir(pagina, deCompra, y, {
     fuente: fuentes.normal,
     tamano: 8.5,
     color: TENUE,

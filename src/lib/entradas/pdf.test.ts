@@ -115,6 +115,15 @@ describe("PDF de las entradas", () => {
     expect(qr).toBe(CODIGO);
   });
 
+  it("una cortesía dice \"Cortesía N°\" (sin \"Entrada 1 de 1\" ni \"Compra\")", async () => {
+    const base = datos();
+    const pdf = await armarPdfEntradas({ ...base, cortesia: true, totalEntradas: 1, entradas: [base.entradas[0]] });
+    const { textos, qr } = await leerPagina(pdf, 0);
+    expect(textos).toEqual(expect.arrayContaining(["María José Núñez", "Cortesía N° 12"]));
+    expect(textos.join(" ")).not.toMatch(/Compra|Entrada 1 de/);
+    expect(qr).toBe(CODIGO);
+  });
+
   it("una entrada usada lo dice", async () => {
     const base = datos();
     const pdf = await armarPdfEntradas({ ...base, entradas: [{ ...base.entradas[0], usada: true }, base.entradas[1]] });

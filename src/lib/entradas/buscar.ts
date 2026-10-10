@@ -26,6 +26,7 @@ export type Encontrada = {
   dni: string | null;
   tipo: string;
   compra: number;
+  cortesia: boolean;
   // null si todavía no entró
   ingreso: { usadaEn: Date | null; validadaPor: { id: string; nombre: string } | null; metodo: MetodoIngreso | null } | null;
 };
@@ -95,7 +96,7 @@ export function leerBusqueda(texto: unknown): { ok: true; busqueda: Busqueda } |
 
 // El DNI con y sin ceros adelante ("1234567" y "01234567"): el checkout los
 // guarda como se escribieron. Con = ANY(...) se sigue usando el índice.
-function variantesDni(dni: string) {
+export function variantesDni(dni: string) {
   const sinCeros = dni.replace(/^0+/, "");
   const variantes: string[] = [];
   for (let largo = Math.max(6, sinCeros.length); largo <= 8; largo++) variantes.push(sinCeros.padStart(largo, "0"));
@@ -110,6 +111,7 @@ type Fila = {
   dni: string | null;
   tipo: string;
   compra: number;
+  cortesia: boolean;
   estado: "VALIDA" | "USADA";
   usada_en: Date | null;
   validada_por_id: string | null;
@@ -147,7 +149,7 @@ export async function buscarEnLaPuerta(
         );
 
   const filas = await db.$queryRaw<Fila[]>`
-    SELECT e.id, e.titular, e.dni, t.nombre AS tipo, o.numero AS compra, e.estado::text AS estado,
+    SELECT e.id, e.titular, e.dni, t.nombre AS tipo, o.numero AS compra, o.tipo = 'CORTESIA' AS cortesia, e.estado::text AS estado,
       e.usada_en, u.id AS validada_por_id, u.nombre AS validada_por_nombre, pasa.metodo
     FROM entradas.entradas AS e
     JOIN entradas.ordenes AS o ON o.id = e.orden_id
@@ -177,6 +179,7 @@ export async function buscarEnLaPuerta(
       dni: fila.dni,
       tipo: fila.tipo,
       compra: fila.compra,
+      cortesia: fila.cortesia,
       ingreso:
         fila.estado === "USADA"
           ? {

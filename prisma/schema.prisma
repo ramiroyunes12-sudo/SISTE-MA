@@ -216,13 +216,15 @@ enum EstadoOrden {
 
 // La reserva se crea al tocar "Continuar" (todavía sin email ni datos de las
 // personas); la base exige esos datos recién cuando la orden pasa a PAGADA.
+// Una cortesía (paso 19) nace PAGADA, gratis, con una sola entrada y sin link
+// de compra; anulada queda CANCELADA (src/lib/cortesias/cortesias.ts).
 model Orden {
   id              String      @id @default(uuid(7)) @db.Uuid
   numero          Int         @unique @default(autoincrement()) // el "N° de orden" que ve la gente
   eventoId        String      @map("evento_id") @db.Uuid
   tipo            TipoOrden   @default(VENTA)
   estado          EstadoOrden @default(PENDIENTE)
-  email           String? // a dónde se mandan las entradas (en minúsculas)
+  email           String? // a dónde se mandan las entradas (en minúsculas; en una cortesía, opcional)
   telefono        String?
   totalCentavos   Int         @map("total_centavos")
   venceEn         DateTime?   @map("vence_en") @db.Timestamptz(3) // fin de la reserva (solo ventas)
@@ -231,7 +233,7 @@ model Orden {
   mpPreferenciaId String?     @unique @map("mp_preferencia_id") // Mercado Pago: checkout creado
   metodoPago      MetodoPago? @map("metodo_pago") // el último que eligió quien compra
   recargoCentavos Int         @default(0) @map("recargo_centavos") // cargo por servicio de Mercado Pago
-  emitidaPorId    String?     @map("emitida_por_id") @db.Uuid // admin que dio la cortesía
+  emitidaPorId    String?     @map("emitida_por_id") @db.Uuid // quién dio la cortesía (ADMIN u organizador)
 
   // El link de la compra (/compra/<llave>) es la llave para verla: acá solo
   // se guarda su huella (SHA-256), como con las sesiones.

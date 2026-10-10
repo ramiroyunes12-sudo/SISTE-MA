@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   bloqueaRepetir,
+  deDonde,
   leerContador,
   leerRespuestaBusqueda,
   leerRespuestaPuerta,
@@ -10,15 +11,23 @@ import {
   respuestaPuerta,
 } from "./puerta";
 
-const ENTRADA = { titular: "Ana Pérez", dni: "30111222", tipo: "VIP", compra: 12 };
+const ENTRADA = { titular: "Ana Pérez", dni: "30111222", tipo: "VIP", compra: 12, cortesia: false };
 const AHORA = new Date("2026-11-22T01:10:00-03:00");
 
 describe("lo que ve la puerta", () => {
   it("PASA: los datos de la persona, con el DNI con puntos", () => {
     expect(respuestaPuerta({ resultado: "pasa", entrada: ENTRADA }, "yo", AHORA)).toEqual({
       resultado: "pasa",
-      persona: { titular: "Ana Pérez", dni: "30.111.222", tipo: "VIP", compra: 12 },
+      persona: { titular: "Ana Pérez", dni: "30.111.222", tipo: "VIP", compra: 12, cortesia: false },
     });
+  });
+
+  it("una cortesía dice \"Cortesía\" en vez del N° de compra", () => {
+    const respuesta = respuestaPuerta({ resultado: "pasa", entrada: { ...ENTRADA, cortesia: true } }, "yo", AHORA);
+    expect(respuesta).toMatchObject({ persona: { compra: 12, cortesia: true } });
+    expect(deDonde({ compra: 12, cortesia: true })).toBe("Cortesía");
+    expect(deDonde({ compra: 12, cortesia: false })).toBe("Compra N° 12");
+    expect(deDonde({ compra: 12 })).toBe("Compra N° 12"); // una respuesta de antes, sin el dato
   });
 
   it("YA INGRESÓ: a qué hora y quién (o 'vos' si fue quien escanea)", () => {
@@ -122,7 +131,7 @@ describe("lo que cree la pantalla de la puerta", () => {
 });
 
 describe("buscar sin el QR", () => {
-  const ENCONTRADA = { id: "e1", titular: "Ana Pérez", dni: "30111222", tipo: "VIP", compra: 12 };
+  const ENCONTRADA = { id: "e1", titular: "Ana Pérez", dni: "30111222", tipo: "VIP", compra: 12, cortesia: false };
 
   it("marcar el ingreso sin el QR: solo el organizador y el ADMIN (decidido por Ramiro)", () => {
     expect(puedeMarcarSinQr("ADMIN")).toBe(true);
@@ -147,10 +156,10 @@ describe("buscar sin el QR", () => {
     expect(respuesta).toEqual({
       hayMas: true,
       encontradas: [
-        { id: "e1", persona: { titular: "Ana Pérez", dni: "30.111.222", tipo: "VIP", compra: 12 }, ingreso: null },
+        { id: "e1", persona: { titular: "Ana Pérez", dni: "30.111.222", tipo: "VIP", compra: 12, cortesia: false }, ingreso: null },
         {
           id: "e2",
-          persona: { titular: "Ana Pérez", dni: "30.111.222", tipo: "VIP", compra: 12 },
+          persona: { titular: "Ana Pérez", dni: "30.111.222", tipo: "VIP", compra: 12, cortesia: false },
           ingreso: { entro: "a las 01:07, hace 3 minutos", por: "vos", porDni: true },
         },
       ],

@@ -19,6 +19,8 @@ Sistema de venta de entradas por lotes para varias **productoras** (se alquila p
 ## Estado actual
 
 - **Hechos y probados:** pasos 1 a 18 (base, login, productoras, evento y lotes, página pública, reparto entre lotes, datos del checkout, reserva, cobro por transferencia y Mercado Pago con plata real el 8/10/2026, código firmado de cada entrada, QR y PDF, y el mail con las entradas, probados el 9/10/2026; "Compra confirmada" y "Reenviar mis entradas", el escáner de la puerta con "Validadores", y la búsqueda por DNI o nombre con el contador, probados el 10/10/2026).
+- **Paso 19 (cortesías): borrador para revisar**, falta que Ramiro lo pruebe en producción (PR abierto). Panel → Cortesías: dar una (email opcional), cargar varias (pegar desde Excel o elegir .xlsx/.csv), lista con PDF, reenviar y anular; cupo aparte en "Evento y lotes".
+- Decidido por Ramiro (10/10): **las cortesías las dan el organizador (en sus eventos) y el ADMIN**; email opcional (sin email, PDF desde el panel); la carga masiva se pega o se sube el archivo.
 - El panel todavía **no lista las compras pagas ni sus entradas** (llega en el paso 20): solo muestra cuántas, lo cobrado y los mails que no salieron. El código de cada entrada se ve en el link secreto de la compra y en el mail.
 - Los mails salen por Gmail (`sistemaentradas@gmail.com`, contraseña de aplicación). Ramiro no quiere pagar un servicio de mails: se queda Gmail aunque algunos caigan en spam.
 - Decidido por Ramiro (10/10): **las devoluciones de plata no van por el sistema**; quien la pide se contacta con él (WhatsApp de ayuda). En el paso 20, en vez de reembolsos, ver un "Anular compra" para que esos QR no entren.
@@ -67,7 +69,7 @@ Detalle en `.claude/rules/` (se cargan solas al tocar esos archivos) y permisos 
 |---|---|
 | `src/app/e/[slug]` | Página pública del evento, "Continuar" (reserva) y `mis-entradas` ("Reenviar mis entradas" con email y DNI) |
 | `src/app/compra/[llave]` | La compra: datos, reloj, pago, "Compra confirmada" con el QR de las entradas, "Reenviar el mail" y `pdf/` (descarga) |
-| `src/app/admin/` | Panel: `eventos` (lotes, pagos, verificar entrada), `productoras` (gente, cobros), `validadores` (del organizador), `claves` |
+| `src/app/admin/` | Panel: `eventos` (lotes, pagos, verificar entrada), `productoras` (gente, cobros), `validadores` (del organizador), `cortesias` (dar una, cargar varias, lista, `pdf/`), `claves` |
 | `src/app/validar` | Puerta: elegir el evento y `[id]`: `puerta.tsx` (contador y pestañas), `escaner.tsx` (cámara, BarcodeDetector o jsQR), `buscar.tsx` (DNI o nombre, marcar ingreso), `resultado.tsx` (verde/rojo en pantalla completa) |
 | `src/app/api/` | `mercadopago/aviso` (aviso de pagos), `mails/pendientes` (tarea diaria de Vercel), `puerta/` (`escanear`, `buscar`, `marcar` y `contador`; lo común en `comun.ts`), `salud` (estado de la base) |
 | `src/lib/auth` | Login, sesiones, contraseñas, `alcance.ts` (qué ve cada rol; `alcanceDeLaPuerta`: la ventana del validador) |
@@ -75,11 +77,12 @@ Detalle en `.claude/rules/` (se cargan solas al tocar esos archivos) y permisos 
 | `src/lib/ventas` | Reparto por lote, reservas, órdenes, turno del evento, simulación |
 | `src/lib/pagos` | Cobros, confirmar, montos únicos, cuenta de Mercado Pago |
 | `src/lib/entradas` | Código firmado (`codigo.ts`), verificar, escanear y marcar sin QR en la puerta (`escanear.ts`), buscar por DNI o nombre, tope y registro de búsquedas, y el contador (`buscar.ts`), lo que ve la puerta (`puerta.ts`), QR (`qr.ts`, también el PNG del mail), entradas con QR (`imprimir.ts`), PDF (`pdf.ts`, `texto-pdf.ts`, `descarga.ts`) |
+| `src/lib/cortesias` | Cortesías: dar (cupo y DNI), anular, lista y PDF (`cortesias.ts`), leer la lista pegada o CSV (`planilla.ts`), revisar cada fila (`revision.ts`), leer un .xlsx en el navegador (`xlsx.ts`) |
 | `src/lib/mails` | Mail con las entradas: SMTP (`cartero.ts`), contenido (`entradas.ts`, una o varias compras de la misma persona), envío una sola vez, compras juntas y reintentos (`pendientes.ts`), reenviar con límite (`reenviar.ts`), `after()` (`despues.ts`). El WhatsApp para consultas: `src/lib/ayuda.ts` |
 | `prisma/` | `schema.prisma`, migraciones, datos de prueba |
 | `scripts/` | `migrar.mjs` (deploy), `usuario.ts` (crear ADMIN / resetear contraseña) |
 
 ## Traspaso (último chat)
 
-- **10/10/2026:** pasos 17 y 18 `[x]` (Ramiro probó los arreglos de la revisión con agentes del 18 en producción: anduvo todo). Quedó en `PENDIENTES.md` decidir cuánto se guardan las búsquedas de la puerta, y en el paso 21 bajar el CHECK de `max_por_compra` a 1 a 4.
-- **Para el próximo chat:** arrancar el paso 19 (cortesías: individual, carga masiva, cupo aparte; ver sus notas en `PASOS.md`, también "Para el paso 19" del paso 18) con `/empezar-paso 19`.
+- **10/10/2026:** paso 19 (cortesías) en borrador: decidido con Ramiro quién las da, email opcional y carga pegando o con el archivo. Probado en local con Chromium; 398 tests (0 salteados), typecheck, lint y build. PR abierto para que Ramiro lo pruebe en producción (los pasos en `PASOS.md`).
+- **Para el próximo chat:** si Ramiro ya lo probó, revisión con agentes del paso 19 (seguridad entre productoras, carreras de cupo/anular/escaneo, pantalla y carga del Excel) con `/empezar-paso 19`; si no, que lo pruebe primero.

@@ -15,9 +15,13 @@
 // Un reenvío ("Reenviar mis entradas") lleva otro asunto: con el mismo, Gmail
 // lo mete en la conversación del primer mail de esa compra y parece que no
 // llegó nada nuevo.
+//
+// Una cortesía (paso 19) va en el mismo mail, con sus palabras: "tu entrada de
+// cortesía (cortesía N° 12)". Un mail lleva solo compras o solo cortesías.
 import type { WhatsappDeAyuda } from "@/lib/ayuda";
 import type { EntradaConQr } from "@/lib/entradas/imprimir";
 import { tipoYLote } from "@/lib/entradas/imprimir";
+import { nombreDelPdf } from "@/lib/entradas/descarga";
 import { armarPdfEntradas, type DatosPdf } from "@/lib/entradas/pdf";
 import { qrPng } from "@/lib/entradas/qr";
 import { formatearFechaLarga } from "@/lib/fechas";
@@ -38,6 +42,7 @@ export type DatosMailEntradas = {
   ayuda: WhatsappDeAyuda | null; // el WhatsApp para consultas (si está cargado)
   evento: { nombre: string; fecha: Date; lugar: string; direccion: string | null };
   compras: CompraDelMail[]; // una o más, de la misma persona y el mismo evento
+  cortesia?: boolean; // son cortesías (no compras)
   reenvio?: boolean; // lo pidieron de nuevo ("Reenviar mis entradas")
 };
 
@@ -60,19 +65,24 @@ export function escaparHtml(texto: string) {
 }
 
 const cid = ({ compra, entrada }: EntradaDelMail) => `qr-${compra.numero}-${entrada.numero}@entradas`;
-const archivoDe = ({ compra, entrada }: EntradaDelMail) => `entrada-${entrada.numero}-compra-${compra.numero}.pdf`;
 
 export async function armarMailEntradas(datos: DatosMailEntradas): Promise<Mensaje> {
   const todas: EntradaDelMail[] = datos.compras.flatMap((compra) => compra.entradas.map((entrada) => ({ compra, entrada })));
   if (todas.length === 0) throw new Error("Mail sin entradas");
-  const { evento } = datos;
+  const { evento, cortesia = false } = datos;
   const lugar = evento.direccion ? `${evento.lugar} · ${evento.direccion}` : evento.lugar;
   const fecha = formatearFechaLarga(evento.fecha);
   const numeros = datos.compras.map((compra) => compra.numero);
   const variasCompras = numeros.length > 1;
-  const deLaCompra = variasCompras ? `compras N° ${enumerar(numeros)}` : `compra N° ${numeros[0]}`;
+  // "compra" o "cortesía" (y sus plurales), para cada texto.
+  const [compraEn, comprasEn, CompraEn] = cortesia ? ["cortesía", "cortesías", "Cortesía"] : ["compra", "compras", "Compra"];
+  const deLaCompra = variasCompras ? `${comprasEn} N° ${enumerar(numeros)}` : `${compraEn} N° ${numeros[0]}`;
   const una = todas.length === 1;
-  const cantidad = una ? "tu entrada" : `tus ${todas.length} entradas`;
+  const deCortesia = cortesia ? " de cortesía" : "";
+  const cantidad = una ? `tu entrada${deCortesia}` : `tus ${todas.length} entradas${deCortesia}`;
+  // Los archivos, solo con números: "entrada-2-compra-12.pdf" o "cortesia-12.pdf".
+  const archivoDe = ({ compra, entrada }: EntradaDelMail) =>
+    cortesia ? nombreDelPdf(compra.numero, entrada.numero, true) : `entrada-${entrada.numero}-compra-${compra.numero}.pdf`;
   // El primer renglón: "Acá están tus 2 entradas (compra N° 12)." o, en un
   // reenvío, que son las mismas de antes.
   const saludo = datos.reenvio
@@ -82,16 +92,23 @@ export async function armarMailEntradas(datos: DatosMailEntradas): Promise<Mensa
   // compra tiene una sola) o, con varias compras, "Compra N° 12 · Entrada 2 de 3".
   const tituloDe = ({ compra, entrada }: EntradaDelMail) => {
     const enLaCompra = compra.totalEntradas > 1 ? `Entrada ${entrada.numero} de ${compra.totalEntradas}` : "";
-    if (variasCompras) return [`Compra N° ${compra.numero}`, enLaCompra].filter(Boolean).join(" · ");
+    if (variasCompras) return [`${CompraEn} N° ${compra.numero}`, enLaCompra].filter(Boolean).join(" · ");
     return enLaCompra || "Tu entrada";
   };
   // Para terminar una oración con un nombre sin que quede ".." ("S.R.L.").
   const alFinal = (texto: string) => texto.replace(/[.\s]+$/, "");
-  const archivoTodas = variasCompras ? `entradas-compras-${numeros.join("-")}.pdf` : `entradas-compra-${numeros[0]}.pdf`;
+  const archivoTodas = cortesia
+    ? variasCompras
+      ? `cortesias-${numeros.join("-")}.pdf`
+      : nombreDelPdf(numeros[0], null, true)
+    : variasCompras
+      ? `entradas-compras-${numeros.join("-")}.pdf`
+      : `entradas-compra-${numeros[0]}.pdf`;
 
   // ─── Adjuntos ───
   const datosPdf = (entradas: EntradaDelMail[]): DatosPdf => ({
     evento,
+    cortesia,
     compra: entradas[0].compra.numero,
     totalEntradas: entradas[0].compra.totalEntradas,
     whatsapp: datos.ayuda?.numero,
@@ -104,7 +121,7 @@ export async function armarMailEntradas(datos: DatosMailEntradas): Promise<Mensa
   });
   const pdf = (archivo: string, contenido: Uint8Array): Adjunto => ({ archivo, contenido, tipo: "application/pdf" });
   const adjuntos: Adjunto[] = todas.map((item) => ({
-    archivo: `qr-entrada-${item.entrada.numero}-compra-${item.compra.numero}.png`,
+    archivo: `qr-entrada-${item.entrada.numero}-${compraEn === "compra" ? "compra" : "cortesia"}-${item.compra.numero}.png`,
     contenido: qrPng(item.entrada.codigoFirmado),
     tipo: "image/png",
     cid: cid(item),
@@ -119,7 +136,7 @@ export async function armarMailEntradas(datos: DatosMailEntradas): Promise<Mensa
   const tarjetas = todas
     .map((item) => {
       const { compra, entrada } = item;
-      const alt = variasCompras ? `QR de la entrada ${entrada.numero} de la compra N° ${compra.numero}` : `QR de la entrada ${entrada.numero}`;
+      const alt = variasCompras ? `QR de la entrada ${entrada.numero} de la ${compraEn} N° ${compra.numero}` : `QR de la entrada ${entrada.numero}`;
       return `
 <tr><td align="center" style="background:#FFFFFF;border-radius:14px;padding:20px;text-align:center;">
   <div style="font-size:13px;font-weight:700;color:${TENUE};letter-spacing:0.04em;">${tituloDe(item).toUpperCase()}</div>
@@ -137,12 +154,15 @@ export async function armarMailEntradas(datos: DatosMailEntradas): Promise<Mensa
     ? "También va adjunta en PDF."
     : "También van adjuntas en PDF: un archivo con todas y uno por persona, para mandarle a cada uno la suya.";
   const { ayuda } = datos;
+  const porQueLlega = cortesia
+    ? `Te llega este mail porque ${datos.productora.nombre} te dio ${una ? "una entrada" : "entradas"} de cortesía para ${alFinal(evento.nombre)}.`
+    : `Te llega este mail porque compraste entradas para ${evento.nombre} de ${datos.productora.nombre} con esta dirección.`;
   const whatsapp = ayuda
     ? `
 <tr><td style="height:12px;line-height:12px;font-size:0;">&nbsp;</td></tr>
 <tr><td style="background:#FFFFFF;border-radius:14px;padding:16px 20px;font-size:14px;line-height:1.6;">
   <div style="font-weight:700;font-size:15px;">¿Algún problema?</div>
-  Escribinos por WhatsApp: <a href="${e(ayuda.link(numeros))}" style="color:${ACENTO};font-weight:700;">${e(ayuda.numero)}</a>
+  Escribinos por WhatsApp: <a href="${e(ayuda.link(numeros, cortesia))}" style="color:${ACENTO};font-weight:700;">${e(ayuda.numero)}</a>
 </td></tr>`
     : "";
 
@@ -156,7 +176,7 @@ export async function armarMailEntradas(datos: DatosMailEntradas): Promise<Mensa
 <title>${e(`Tus entradas para ${evento.nombre}`)}</title>
 </head>
 <body style="margin:0;padding:0;background:${FONDO};">
-<div style="display:none;mso-hide:all;max-height:0;overflow:hidden;">${variasCompras ? "Compras" : "Compra"} N° ${enumerar(numeros)}: ${datos.reenvio ? "te reenviamos " : ""}${cantidad} con QR para ${e(alFinal(evento.nombre))}.</div>
+<div style="display:none;mso-hide:all;max-height:0;overflow:hidden;">${variasCompras ? `${CompraEn}s` : CompraEn} N° ${enumerar(numeros)}: ${datos.reenvio ? "te reenviamos " : ""}${cantidad} con QR para ${e(alFinal(evento.nombre))}.</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${FONDO};">
 <tr><td align="center" style="padding:16px 12px;">
 <!--[if mso]><table role="presentation" width="480" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
@@ -178,7 +198,7 @@ ${tarjetas}
   • ${pdfs}
 </td></tr>${whatsapp}
 <tr><td style="padding:16px 4px;font-size:12px;line-height:1.5;color:${TENUE};">
-  Te llega este mail porque compraste entradas para ${e(evento.nombre)} de ${e(datos.productora.nombre)} con esta dirección. Se manda solo: no respondas, nadie lo lee.
+  ${e(porQueLlega)} Se manda solo: no respondas, nadie lo lee.
 </td></tr>
 </table>
 <!--[if mso]></td></tr></table><![endif]-->
@@ -204,17 +224,26 @@ ${tarjetas}
     ...lineas,
     "Importante: cada persona entra con su QR y su DNI. Cada QR sirve para entrar una sola vez (el primero que lo usa, entra). No lo publiques ni lo compartas con quien no va.",
     una ? `Adjunto: ${archivoTodas}.` : `Adjuntos: ${archivoTodas} (todas) y uno por persona.`,
-    ...(ayuda ? ["", `¿Algún problema? Escribinos por WhatsApp: ${ayuda.numero} (${ayuda.link(numeros)})`] : []),
+    ...(ayuda ? ["", `¿Algún problema? Escribinos por WhatsApp: ${ayuda.numero} (${ayuda.link(numeros, cortesia)})`] : []),
     "",
-    `Te llega este mail porque compraste entradas para ${evento.nombre} de ${datos.productora.nombre} con esta dirección. Se manda solo: no respondas, nadie lo lee.`,
+    `${porQueLlega} Se manda solo: no respondas, nadie lo lee.`,
   ].join("\n");
 
+  // "Tus entradas para…", "Te reenviamos tus entradas para…", "Tu entrada de
+  // cortesía para…" o "Te reenviamos tu entrada de cortesía para…".
+  const asuntoInicio = cortesia
+    ? datos.reenvio
+      ? `Te reenviamos ${cantidad}`
+      : `${una ? "Tu entrada" : "Tus entradas"} de cortesía`
+    : datos.reenvio
+      ? "Te reenviamos tus entradas"
+      : "Tus entradas";
   return {
     para: datos.para,
     nombreRemitente: enUnRenglon(datos.productora.nombre, 80),
     // Con el N° de compra: si no, Gmail junta en una conversación las de un
     // mismo evento. Y el reenvío, con otro asunto (ver arriba).
-    asunto: `${datos.reenvio ? "Te reenviamos tus entradas" : "Tus entradas"} para ${enUnRenglon(evento.nombre, 100)} (${deLaCompra})`,
+    asunto: `${asuntoInicio} para ${enUnRenglon(evento.nombre, 100)} (${deLaCompra})`,
     html,
     texto,
     adjuntos,
